@@ -1,0 +1,26 @@
+# PNetLab "AD Lab DC" node — Samba Active Directory Domain Controller
+# (LDAP / Kerberos / DNS / SMB) with a first-boot provisioning wizard, managed
+# entirely through a web GUI on container port 80 (console: http — the engine
+# publishes port 80 and the node console opens the GUI; admin/pnet).
+# Image: pnet-adlab (offline-install via the Dashboard Docker Devices page).
+# Leave dock_args EMPTY so device_docker takes the GUI-docker path (publishes
+# the console port + busybox-managed lab interface). Per-interface networking
+# (DHCP / static IP) is set in the normal node edit; all AD services bind
+# 0.0.0.0 so lab clients reach them over the lab interface (eth1): DNS 53,
+# Kerberos 88/464, LDAP 389, SMB 445, LDAPS 636, GC 3268. Point lab clients'
+# DNS at the eth1 address. config_script keeps the run LED working and pushes
+# the Startup-config blob in — the blob rebuilds the WHOLE domain (realm,
+# users, groups) on a fresh container, no wizard.
+type: docker
+config_script: config_aaa.py
+name: AD Lab DC
+description: AD Lab DC (Samba)
+cpulimit: 1
+icon: Server-2D-LDAP-S.svg
+ethernet: 2
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 2048
+mtu: 1500
+docker_shell: echo "AD Lab DC — manage via the http console GUI (admin/pnet)."; echo "Realm/users live in /firstboot.cfg; live smb.conf below:"; echo "--- /etc/samba/smb.conf ---"; cat /etc/samba/smb.conf 2>/dev/null || echo "(not provisioned yet — open the console for the first-boot wizard)"; exec /bin/bash

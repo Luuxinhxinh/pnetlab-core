@@ -1,0 +1,41 @@
+# ── External MCP endpoint over Apache + TLS (AI Lab Builder, P5) ──────────────
+#
+# By default pnetlab-mcp.service binds 127.0.0.1:5701 (local only) — the safe
+# default. To let EXTERNAL MCP clients (Claude Desktop/Code, etc.) drive PNetLab,
+# do NOT bind it to 0.0.0.0 in plaintext. Instead keep the bind on 127.0.0.1 and
+# reverse-proxy a TLS location to it, so every external request is encrypted and
+# still hits the bearer-token auth in the MCP server.
+#
+# The MCP server's Streamable-HTTP transport is mounted at /mcp on its own port.
+# We expose it under a DISTINCT external path (/ai-mcp) because /mcp/ is already
+# the Apache-served PHP shim directory (bridge.php + api.php) — proxying /mcp
+# would shadow those.
+#
+# Response model: the MCP server runs json_response=True, so each request returns a
+# single JSON body — NOT an SSE stream. There is nothing to stream incrementally.
+# The long proxy timeout below exists for the SLOW tools (start/stop/wipe a node,
+# console config-push, live config scrape), whose single response can take minutes.
+#
+# Enable:
+#   1. a2enmod proxy proxy_http headers ssl
+#   2. drop this (edited) block into the *:443 TLS vhost, reload apache2
+#   3. external clients point at  https://<host>/ai-mcp  with
+#        Authorization: Bearer <token minted in the dashboard AI view>
+#   4. rotate/revoke tokens from the dashboard (mcp_token_new/del) any time.
+#
+# Security: the bearer token is the ONLY external credential and is separate from
+# the appliance LLM key; it is admin-generated, hashed at rest, and pod-scoped.
+# Rate-limit at the proxy if the box is internet-facing.
+
+<IfModule mod_proxy.c>
+    # Streamable-HTTP, single-JSON-body responses (no SSE). The 600s timeout MUST
+    # stay in step with LONG_TIMEOUT in scripts/mcp/pnetlab-mcp.py — it bounds the
+    # slow lifecycle/console tools' one response, not a stream.
+    ProxyPreserveHost On
+    <Location /ai-mcp>
+        ProxyPass        http://127.0.0.1:5701/mcp retry=0 timeout=600
+        ProxyPassReverse http://127.0.0.1:5701/mcp
+        # Keep the upstream keep-alive so the MCP server's pooled client benefits.
+        SetEnv proxy-nokeepalive 0
+    </Location>
+</IfModule>

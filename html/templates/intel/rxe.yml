@@ -1,0 +1,16 @@
+# PNetLab native Soft-RoCE endpoint backed by the Debian 13/Trixie image
+# rxe-trixie-<version>/virtioa.qcow2.  The QEMU handler injects exactly one
+# vhost-vsock device with a UUID-derived guest CID; the only lab NIC is fabric.
+type: qemu
+name: RXE Endpoint
+description: Debian Trixie Soft-RoCE Endpoint
+cpulimit: 1
+icon: Server.png
+cpu: 1
+ram: 512
+ethernet: 1
+console: telnet
+qemu_arch: x86_64
+qemu_nic: virtio-net-pci
+qemu_options: -machine type=pc,accel=kvm -serial mon:stdio -nographic -enable-kvm
+...

@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+# ksm_merge_exec — opt the launched process (and its mm) into kernel
+# same-page merging via prctl(PR_SET_MEMORY_MERGE, 1), then exec the real
+# command in place.
+#
+# Why a wrapper: QEMU already madvise(MADV_MERGEABLE)s guest RAM (machine
+# mem-merge=on), so stock KSM already dedups guest memory. PR_SET_MEMORY_MERGE
+# additionally makes *all* of the process's anonymous VMAs mergeable, capturing
+# QEMU's own heap/JIT/etc. The flag is set on the calling mm and is preserved
+# across execve(), so the exec'd QEMU runs with whole-process merge enabled —
+# exactly how systemd's MemoryKSM= is implemented.
+#
+# Privilege: PR_SET_MEMORY_MERGE requires NO capability (verified working as
+# www-data on the 6.12 KSM kernel), so this runs fine under the post-B7
+# unprivileged QEMU launch path — no broker verb needed.
+#
+# Safety: on kernels < 6.4 the prctl returns EINVAL; we ignore any failure and
+# exec the target regardless, so this is a transparent no-op on old kernels.
+#
+# Usage: ksm_merge_exec <command> [args...]
+import ctypes
+import os
+import sys
+
+PR_SET_MEMORY_MERGE = 67  # linux/prctl.h, since v6.4
+
+if len(sys.argv) < 2:
+    sys.stderr.write("usage: ksm_merge_exec <command> [args...]\n")
+    sys.exit(2)
+
+try:
+    libc = ctypes.CDLL("libc.so.6", use_errno=True)
+    libc.prctl(PR_SET_MEMORY_MERGE, 1, 0, 0, 0)  # best-effort; ignore failure
+except Exception:
+    pass
+
+try:
+    os.execvp(sys.argv[1], sys.argv[1:])
+except OSError as e:
+    sys.stderr.write("ksm_merge_exec: exec %s failed: %s\n" % (sys.argv[1], e))
+    sys.exit(127)

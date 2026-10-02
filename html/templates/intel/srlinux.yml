@@ -1,0 +1,11 @@
+---
+type: docker
+name: SR_Linux
+description: Nokia SR_Linux
+icon: SROS.png
+ethernet: 10
+console: telnet
+console_2nd: bash
+Card_Type : 7250IXR6
+docker_options: '--privileged '
+...

@@ -1,0 +1,1005 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PNetLab REST API</title>
+<link rel="stylesheet" href="doc.css">
+<header class="hd"><h1>PNetLab REST API <span class="v">27H1-v8.2</span></h1>
+<p class="sub">HTTP interface of the PNetLab network-emulation appliance</p></header>
+<main>
+<nav class="toc"><strong>Sections</strong><ul>
+<li><a href="#tag-auth">auth</a></li>
+<li><a href="#tag-templates">templates</a></li>
+<li><a href="#tag-folders">folders</a></li>
+<li><a href="#tag-labs">labs</a></li>
+<li><a href="#tag-lab-session">lab-session</a></li>
+<li><a href="#tag-import-export">import-export</a></li>
+<li><a href="#tag-status">status</a></li>
+<li><a href="#tag-users">users</a></li>
+<li><a href="#tag-mcp-admin">mcp-admin</a></li>
+<li><a href="#tag-cluster">cluster</a></li>
+<li><a href="#tag-images">images</a></li>
+<li><a href="#tag-lab-import">lab-import</a></li>
+<li><a href="#tag-pki">pki</a></li>
+<li><a href="#tag-sdwan">sdwan</a></li>
+<li><a href="#tag-branding">branding</a></li>
+<li><a href="#tag-system">system</a></li>
+<li><a href="#tag-node-errors">node-errors</a></li>
+<li><a href="#tag-lab-tools">lab-tools</a></li>
+<li><a href="#tag-mail">mail</a></li>
+<li><a href="#tag-audit">audit</a></li>
+<li><a href="#mcp-tools">MCP tools</a></li>
+<li><a href="#artifacts">Machine-readable artifacts</a></li></ul></nav>
+<section class="intro"><pre class="desc">Every interactive feature of the PNetLab web UI rides this same-origin
+REST surface, so anything the UI can do, a script or AI agent can do too.
+The surface has three layers:
+1. The core Slim application at /api/... (labs, nodes, networks, folders,
+   templates, import/export, authentication).
+2. Per-feature sub-applications at /&lt;app&gt;/api.php?action=... (status,
+   users, cluster, images, PKI, MCP administration, ...). These are plain
+   PHP dispatchers keyed on an &quot;action&quot; request parameter.
+3. Lab-page helper endpoints at /pnq-*.php (live link statistics, per-node
+   telemetry history, protocol overlays, packet watchers, ...) scoped to
+   the caller&#x27;s open lab session.
+Authentication is a session cookie: POST /api/auth with username/password
+sets an HttpOnly, Secure, SameSite=Strict &quot;token&quot; cookie which every other
+endpoint validates. The appliance is served over HTTPS only (HTTP 301s to
+HTTPS for non-loopback clients) and the cookie is Secure-flagged, so
+clients MUST talk https and keep a cookie jar.
+Two response envelopes exist, for historical reasons:
+- Engine envelope (most endpoints): {&quot;code&quot;: int, &quot;status&quot;:
+  &quot;success&quot;|&quot;fail&quot;|&quot;unauthorized&quot;, &quot;message&quot;: str, &quot;data&quot;: any}
+- Compatibility envelope (a few status/api.php actions): {&quot;result&quot;: bool,
+  &quot;message&quot;: str, &quot;data&quot;: any}
+A machine agent should key on the HTTP status first, then &quot;status&quot; or
+&quot;result&quot;.
+A separate MCP (Model Context Protocol) endpoint at /mcp/ exposes the
+build-and-run surface as typed tools for AI agents; see mcp-tools.json
+and the MCP administration tag below.</pre></section>
+<section class="tag" id="tag-auth">
+<h2>auth</h2>
+<p class="tagdesc">Login, logout and session introspection.</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/auth</code></h3>
+<p class="sum">Current session and user profile.</p>
+<pre class="desc">Returns the logged-in user&#x27;s profile (username, role, pod/tenant id,
+html5 console preference, workspace folder, language table) in the
+engine envelope. 401 when the token cookie is missing or stale - use
+this as the cheap &quot;am I still logged in?&quot; probe. Query parameter
+&quot;lang&quot; selects the UI language table merged into data.lang.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>lang</code></td><td>query</td><td>Optional UI language code merged into the reply.</td></tr>
+</table>
+<pre class="curl">curl -sk -b jar.txt https://&lt;host&gt;/api/auth</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/auth</code></h3>
+<p class="sum">Log in and receive the session cookie.</p>
+<pre class="desc">Body: {&quot;username&quot;: str, &quot;password&quot;: str, &quot;html5&quot;: &quot;0&quot;|&quot;1&quot; (optional
+initial console preference)}. On success (200, message id 90013) the
+response sets the &quot;token&quot; cookie (HttpOnly, Secure, SameSite=Strict).
+Failure modes:
+- 401 (90002) invalid credentials - counts one failed attempt for the
+  client IP.
+- 403 (90003..90006) correct password but the account is contained:
+  not yet active, expired, outside its scheduled days, or disabled.
+  Does NOT count against the throttle.
+- 429 (90007) the IP exceeded 10 failures in 300 s; blocked 300 s,
+  Retry-After header carries the remaining seconds.
+- 503 (90020) the account is flagged for external authentication
+  (RADIUS/LDAP), the directory is unreachable, and local-hash
+  fallback is disabled. Not a credential failure - retry later or
+  contact the administrator. No throttle strike.
+Accounts flagged external (users.ext_auth = radius|ldap) are verified
+against the configured directory; every other account authenticates
+against its local password hash.</pre>
+<pre class="curl">curl -sk -c jar.txt -H &#x27;Content-Type: application/json&#x27; \
+  -d &#x27;{&quot;username&quot;:&quot;admin&quot;,&quot;password&quot;:&quot;...&quot;}&#x27; \
+  https://&lt;host&gt;/api/auth</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/auth/logout</code></h3>
+<p class="sum">Log out and clear the session cookie.</p>
+<pre class="desc">Invalidates the server-side session and expires the token cookie.</pre>
+<pre class="curl">curl -sk -b jar.txt https://&lt;host&gt;/api/auth/logout</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/health</code></h3>
+<p class="sum">Liveness probe (no authentication).</p>
+<pre class="desc">Returns 200 with a tiny JSON body when the web tier and database are
+answering. Safe to poll; used by installers and load balancers.</pre>
+<pre class="curl">curl -sk https://&lt;host&gt;/api/health</pre>
+</article>
+</section>
+<section class="tag" id="tag-templates">
+<h2>templates</h2>
+<p class="tagdesc">Node templates, template icons and per-template defaults.</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/list/networks</code></h3>
+<p class="sum">List network/cloud types available to the caller.</p>
+<pre class="desc">Admins see every network type including host-bridged clouds
+(pnetN/bridge interfaces); non-admin users get the restricted list.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/list/template-icons</code></h3>
+<p class="sum">List selectable node icons.</p>
+<pre class="desc">Returns the icon filenames under /opt/unetlab/html/images/icons that
+the node editor offers.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/list/template-types</code></h3>
+<p class="sum">List the node type families.</p>
+<pre class="desc">Returns the engine&#x27;s node type map (iol, qemu, docker, dynamips,
+vpcs).</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/list/templates/{template}</code></h3>
+<p class="sum">List node templates, or the form schema of one template.</p>
+<pre class="desc">Without a template slug: data maps every installed template slug to
+its display name; templates whose image is missing are suffixed
+&quot;.missing&quot;. With a slug (e.g. iol, vios, docker): data.options is the
+add-node form schema (name, type, image list, cpu, ram, ethernet, and
+per-type extras) - the exact field set POST
+/api/labs/session/nodes/add accepts.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>template</code></td><td>path</td><td>Template slug; empty for the full template map.</td></tr>
+</table>
+<pre class="curl">curl -sk -b jar.txt https://&lt;host&gt;/api/list/templates/</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/templatedefaults/{template}</code></h3>
+<p class="sum">Read saved per-template form defaults.</p>
+<pre class="desc">Returns the admin-saved default values applied when the add-node form
+opens for this template.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/templatedefaults/{template}</code></h3>
+<p class="sum">Save per-template form defaults.</p>
+<pre class="desc">Body is the field/value map to preset. Admin only.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-delete">DELETE</span> <code>/api/templatedefaults/{template}</code></h3>
+<p class="sum">Reset per-template form defaults.</p>
+<pre class="desc">Removes the stored defaults for the template. Admin only.</pre>
+</article>
+</section>
+<section class="tag" id="tag-folders">
+<h2>folders</h2>
+<p class="tagdesc">Lab-folder tree management inside the labs root.</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/folders</code></h3>
+<p class="sum">List a folder of the labs tree.</p>
+<pre class="desc">Query parameter &quot;path&quot; (default &quot;/&quot;) selects the folder. data
+contains &quot;folders&quot; and &quot;labs&quot; arrays. Non-admin users are jailed to
+their own workspace subtree.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>path</code></td><td>query</td><td>Folder path relative to the labs root.</td></tr>
+</table>
+<pre class="curl">curl -sk -b jar.txt &#x27;https://&lt;host&gt;/api/folders?path=/&#x27;</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/folders/{action}</code></h3>
+<p class="sum">Create, rename/move or delete a folder.</p>
+<pre class="desc">add - body {&quot;name&quot;: str, &quot;path&quot;: parent}; edit - body {&quot;path&quot;: old,
+&quot;new_path&quot;: new}; delete - body {&quot;path&quot;: str}. Permission-gated per
+role (add/edit/delete folder permissions).</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>path</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>add</code> <code>delete</code> <code>edit</code></p>
+</section>
+<section class="tag" id="tag-labs">
+<h2>labs</h2>
+<p class="tagdesc">Lab files - create, clone, read, edit, move, delete.</p>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/labs</code></h3>
+<p class="sum">Create a new lab, or clone an existing one.</p>
+<pre class="desc">Create - body {&quot;path&quot;: folder, &quot;name&quot;: str, &quot;version&quot;: str,
+&quot;description&quot;: str, &quot;body&quot;: str}. Clone - body {&quot;source&quot;:
+&quot;/Folder/Lab.unl&quot;, &quot;name&quot;: new-name}; presence of &quot;source&quot; selects
+the clone path. Returns the new lab in data.</pre>
+<pre class="curl">curl -sk -b jar.txt -H &#x27;Content-Type: application/json&#x27; \
+  -d &#x27;{&quot;path&quot;:&quot;/&quot;,&quot;name&quot;:&quot;demo&quot;,&quot;version&quot;:&quot;1&quot;}&#x27; \
+  https://&lt;host&gt;/api/labs</pre>
+</article>
+<article class="op">
+<h3><span class="m m-delete">DELETE</span> <code>/api/labs</code></h3>
+<p class="sum">Delete a lab file.</p>
+<pre class="desc">Body {&quot;path&quot;: &quot;/Folder/Lab.unl&quot;}. Also removes a corrupt lab file
+that can no longer be parsed.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/labs/{action}</code></h3>
+<p class="sum">Read or modify one lab file.</p>
+<pre class="desc">Body always carries {&quot;path&quot;: &quot;/Folder/Lab.unl&quot;} plus per-action
+fields. get - lab metadata; preview - one-shot bundle of labinfo +
+nodes + networks + text objects + lines (what the preview pane
+renders); edit - body.data carries the changed lab attributes
+(name, description, body, version, ...); move - body.new_path is the
+destination folder.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>path</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>edit</code> <code>get</code> <code>move</code> <code>preview</code></p>
+</section>
+<section class="tag" id="tag-lab-session">
+<h2>lab-session</h2>
+<p class="tagdesc">Running-lab sessions - open/join/leave/destroy a session, read topology objects, and drive every canvas mutation through the object/action fan-out.</p>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/labs/session/factory/{action}</code></h3>
+<p class="sum">Lab-session lifecycle (open/join/leave/destroy/stop).</p>
+<pre class="desc">create - body {&quot;path&quot;: &quot;/Folder/Lab.unl&quot;}; opens (or re-opens) a
+session for the lab and points the caller&#x27;s account at it. join -
+body {&quot;lab_session&quot;: id} joins a shared session. leave - leaves the
+caller&#x27;s current session. destroy - body {&quot;lab_session&quot;: id} tears
+the session down (stops its nodes, frees resources); also repairs
+half-broken sessions. stopNodes - body {&quot;lab_session&quot;: id} stops all
+nodes but keeps the session. Resource limits (per-user CPU/RAM caps,
+running-node limits) are enforced on create/start.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>path</td><td>One of the x-actions values.</td></tr>
+</table>
+<pre class="curl">curl -sk -b jar.txt -H &#x27;Content-Type: application/json&#x27; \
+  -d &#x27;{&quot;path&quot;:&quot;/demo.unl&quot;}&#x27; \
+  https://&lt;host&gt;/api/labs/session/factory/create</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>create</code> <code>destroy</code> <code>join</code> <code>leave</code> <code>stopNodes</code></p>
+<article class="op">
+<h3><span class="m m-put">PUT</span> <code>/api/labs/session/network/manage</code></h3>
+<p class="sum">Save a network&#x27;s managed settings (wireless cell WLANs).</p>
+<pre class="desc">Persists managed network attributes for the open session - primarily
+the wireless-cell WLAN list - and live-applies the change by
+restarting cabled, cell-driven access points.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/labs/session/nodestatus</code></h3>
+<p class="sum">Node status of the caller&#x27;s open lab session.</p>
+<pre class="desc">The topology page&#x27;s status poll. Optional body field lab_session pins
+a specific joined session (protects a second tab of the same account
+from repointing the poll).</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/labs/session/{object}</code></h3>
+<p class="sum">Read one object family of the caller&#x27;s open lab session.</p>
+<pre class="desc">The read fan-out of the lab page. object selects what is returned
+(see x-objects): info - lab metadata; topology - the full canvas
+bundle; nodes - node list with status, console host/port and url;
+networks - network list; links - wiring; interfaces /
+networkints / interface - per-node and per-network interface detail
+(query: id); configs - saved startup-configs; textobjects /
+pictures / picturemapped / picturedata - canvas annotations (query:
+id where applicable); line - drawn line objects; workbook - workbook
+pages; tasks - the kind=&quot;task&quot; view of workbook storage (optional
+query: name); wireshark - capture definitions; multi_cfg_list /
+multi_cfg_detail - config sets; portcheck - console-port
+reachability; console_guac_link - HTML5 console link mint; html -
+rendered lab description. Most object families accept an &quot;id&quot; query
+parameter to select a single element. GET /api/labs/session/tasks with
+no name returns {&quot;message&quot;:{&quot;tasks&quot;:[{&quot;id&quot;:&quot;Configure the OSPF
+underlay&quot;,&quot;weight&quot;:&quot;1723486210001&quot;}],&quot;can_edit&quot;:true}; with
+name=... it returns {&quot;message&quot;:{&quot;id&quot;:&quot;Configure the OSPF
+underlay&quot;,&quot;weight&quot;:&quot;1723486210001&quot;,&quot;html&quot;:&quot;&lt;h2&gt;...&lt;/h2&gt;&quot;}}.
+validation returns separate YAML-backed validation activities, node
+bindings, legacy task references, author capability, and the caller&#x27;s
+persisted check results and weighted completion. It never modifies
+embedded text tasks or includes definitions in existing lab ZIPs.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>object</code> <em>req</em></td><td>path</td><td>One of the x-objects values.</td></tr>
+<tr><td><code>id</code></td><td>query</td><td>Element id, where the object family supports it.</td></tr>
+<tr><td><code>name</code></td><td>query</td><td>Task title for GET /api/labs/session/tasks.</td></tr>
+</table>
+<pre class="curl">curl -sk -b jar.txt https://&lt;host&gt;/api/labs/session/nodes</pre>
+</article>
+<p class="fan"><strong>Objects:</strong> <code>configs</code> <code>console_guac_link</code> <code>html</code> <code>info</code> <code>interface</code> <code>interfaces</code> <code>line</code> <code>links</code> <code>multi_cfg_detail</code> <code>multi_cfg_list</code> <code>networkints</code> <code>networks</code> <code>nodes</code> <code>picturedata</code> <code>picturemapped</code> <code>pictures</code> <code>portcheck</code> <code>textobjects</code> <code>topology</code> <code>tasks</code> <code>validation</code> <code>wireshark</code> <code>workbook</code></p>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/labs/session/{object}/{action}</code></h3>
+<p class="sum">Mutate the caller&#x27;s open lab session (object/action fan-out).</p>
+<pre class="desc">The write fan-out of the lab page: object picks the family, action
+the operation (flattened &quot;object.action&quot; pairs in x-actions). The
+important families for an agent:
+- nodes: add (body = the template form fields from
+  /api/list/templates/{t} plus left/top), edit, delete, start, stop,
+  shutdown, wipe, export (save running-config back into the lab),
+  hibernate, freeze, isolate, lock/unlock, port/port_2nd (console
+  port reassignment). start/stop/etc take {&quot;id&quot;: node-id}.
+  commit takes {&quot;id&quot;, &quot;mode&quot;} and persists a STOPPED qemu node&#x27;s disk
+  overlay: mode=commit folds it into the shared base image every other
+  lab is linked-cloned from (destructive, retroactive), mode=save_as
+  additionally takes {&quot;dest&quot;} and writes a NEW image under
+  addons/qemu/&lt;dest&gt; instead, leaving the base untouched. Admin only —
+  both write appliance-global state. Fails if the node is running.
+- networks: add/edit/delete a cloud/bridge; p2p (body src_id,
+  src_if, dest_id, dest_if) wires two nodes point-to-point in one
+  call.
+- interfaces: edit connects/disconnects node interfaces (body id +
+  interface map); setquality applies WAN impairment (delay, jitter,
+  loss, rate) to a link; setSuspend / setSuspendtwo_way
+  administratively suspend one or both directions; style/styles
+  persist link styling.
+- configs.edit saves a node startup-config (body id, data).
+- lab.lock / lab.unlock toggle the lab&#x27;s edit lock.
+- textobjects / pictures / line: canvas annotations.
+- workbook: guided-workbook page management.
+- validation: additional task checks stored outside lab XML. save takes
+  {base_revision,tasks}; import takes {base_revision,yaml,node_mapping}
+  with optional explicit node mapping; export returns {filename,mime,yaml}.
+  import with preview:true returns proposed node bindings without saving.
+  save and non-preview import require EDIT_TASKS and an unlocked lab; export requires
+  EDIT_TASKS. run takes {check_id}, executes one bounded check against
+  the caller&#x27;s lab node, and persists a server-derived result and score.
+  Learners can run checks and inspect failed evidence but cannot submit
+  pass/fail state or author definitions. Stale revisions fail with 409.
+  Every check is explicitly user-triggered; opening the panel runs none.
+- tasks: instructor-authored task management, backed by kind=&quot;task&quot;
+  workbook entries. Every task action requires EDIT_TASKS and an
+  unlocked open lab. Bodies and successful responses are:
+  add {&quot;name&quot;:&quot;Configure the OSPF underlay&quot;} -&gt; {&quot;message&quot;:&quot;&quot;};
+  delete {&quot;name&quot;:&quot;Configure the OSPF underlay&quot;} -&gt; {&quot;message&quot;:&quot;&quot;};
+  edit {&quot;name&quot;:&quot;Configure the OSPF underlay&quot;,&quot;new_name&quot;:&quot;Configure
+  OSPF Area 0&quot;} -&gt; {&quot;message&quot;:&quot;&quot;}; order
+  {&quot;src_name&quot;:&quot;Task A&quot;,&quot;dest_name&quot;:&quot;Task B&quot;} -&gt; {&quot;message&quot;:&quot;&quot;};
+  update {&quot;name&quot;:&quot;Configure the OSPF underlay&quot;,&quot;content&quot;:&quot;&lt;h2&gt;Objective&lt;/h2&gt;&quot;}
+  -&gt; {&quot;message&quot;:{&quot;id&quot;:&quot;Configure the OSPF underlay&quot;,&quot;html&quot;:&quot;&lt;h2&gt;Objective&lt;/h2&gt;&quot;}}.
+  Task titles are 1-160 Unicode letters/digits/whitespace plus
+  _-.,:;&#x27;&quot;()&amp;/; content is sanitized to a rich-text subset (headings,
+  lists, tables, dividers, links, inline emphasis) and capped at
+  256 KB after sanitization.
+- wireshark: capture definitions - add, capture (start a capture),
+  delete, focus, wifiview.
+- multi_cfg: named config sets - add, active, edit, rename, delete,
+  import, export.
+- ai: the in-app agent assist - access, progress, plan, build.
+- sdwan: versions/build of the SD-WAN controller-set factory.
+- background.edit: canvas background flags (darkmode, 3D, grid).
+All actions require an open session (factory/create first) and lab
+edit permission for mutations; the lab lock refuses writes while
+locked.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>object</code> <em>req</em></td><td>path</td><td>Object family (first token of the x-actions pairs).</td></tr>
+<tr><td><code>action</code> <em>req</em></td><td>path</td><td>Operation (second token of the x-actions pairs).</td></tr>
+</table>
+<pre class="curl">curl -sk -b jar.txt -H &#x27;Content-Type: application/json&#x27; \
+  -d &#x27;{&quot;id&quot;:1}&#x27; \
+  https://&lt;host&gt;/api/labs/session/nodes/start</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>ai.access</code> <code>ai.build</code> <code>ai.plan</code> <code>ai.progress</code> <code>background.edit</code> <code>configs.edit</code> <code>interfaces.edit</code> <code>interfaces.setSuspend</code> <code>interfaces.setSuspendtwo_way</code> <code>interfaces.setquality</code> <code>interfaces.style</code> <code>interfaces.styles</code> <code>lab.lock</code> <code>lab.unlock</code> <code>line.add</code> <code>line.delete</code> <code>line.edit</code> <code>line.position</code> <code>multi_cfg.active</code> <code>multi_cfg.add</code> <code>multi_cfg.delete</code> <code>multi_cfg.edit</code> <code>multi_cfg.export</code> <code>multi_cfg.import</code> <code>multi_cfg.rename</code> <code>networks.add</code> <code>networks.delete</code> <code>networks.edit</code> <code>networks.p2p</code> <code>nodes.add</code> <code>nodes.delete</code> <code>nodes.edit</code> <code>nodes.export</code> <code>nodes.freeze</code> <code>nodes.commit</code> <code>nodes.hibernate</code> <code>nodes.isolate</code> <code>nodes.lock</code> <code>nodes.port</code> <code>nodes.port_2nd</code> <code>nodes.shutdown</code> <code>nodes.start</code> <code>nodes.stop</code> <code>nodes.unlock</code> <code>nodes.wipe</code> <code>pictures.add</code> <code>pictures.delete</code> <code>pictures.edit</code> <code>sdwan.build</code> <code>sdwan.versions</code> <code>textobjects.add</code> <code>textobjects.delete</code> <code>textobjects.edit</code> <code>tasks.add</code> <code>tasks.delete</code> <code>tasks.edit</code> <code>tasks.order</code> <code>tasks.update</code> <code>validation.save</code> <code>validation.import</code> <code>validation.export</code> <code>validation.run</code> <code>wireshark.add</code> <code>wireshark.capture</code> <code>wireshark.delete</code> <code>wireshark.focus</code> <code>wireshark.wifiview</code> <code>workbook.add</code> <code>workbook.delete</code> <code>workbook.edit</code> <code>workbook.order</code> <code>workbook.update</code></p>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/nodestatus</code></h3>
+<p class="sum">Node status of every session of the caller.</p>
+<pre class="desc">Returns the engine status code per node (0 stopped, 1 stopped+locked,
+2 running, 3 running+locked, 6 hibernated, 7 frozen) across sessions.</pre>
+</article>
+</section>
+<section class="tag" id="tag-import-export">
+<h2>import-export</h2>
+<p class="tagdesc">Lab archive export/import and icon listing.</p>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/export</code></h3>
+<p class="sum">Export labs/folders to a downloadable archive.</p>
+<pre class="desc">Body {&quot;0&quot;: path, &quot;1&quot;: path, ..., &quot;path&quot;: parent-folder}. Builds a zip
+under /Exports and returns its URL in data.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/icons</code></h3>
+<p class="sum">List node icon files.</p>
+<pre class="desc">Flat list of usable node icon filenames.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/import</code></h3>
+<p class="sum">Import a lab archive.</p>
+<pre class="desc">multipart/form-data upload (file field) plus &quot;path&quot; - imports the
+archive&#x27;s labs into the target folder.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/workbook/pdf/{name}</code></h3>
+<p class="sum">Fetch a session-buffered workbook PDF.</p>
+<pre class="desc">Streams a workbook PDF previously rendered into the caller&#x27;s PHP
+session under this name.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>name</code> <em>req</em></td><td>path</td><td>Session buffer key from the workbook exporter.</td></tr>
+</table>
+</article>
+</section>
+<section class="tag" id="tag-status">
+<h2>status</h2>
+<p class="tagdesc">Host status, KSM/CPU toggles, network config, power, telemetry history (sub-app: /status/api.php).</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/status/api.php</code></h3>
+<p class="sum">Host status reads (dispatch via ?action=).</p>
+<pre class="desc">Engine-cookie authenticated. Reads: system (ram/swap + admin cpu/
+disk), nodes (running-node counts per type, admin), info (qemu
+version, cores, KSM/cpulimit state, idle_timeout seconds), version
+(engine release),
+sessions (running lab sessions, admin), getSystemInfo /
+getRunningNodes / getInfo / getClusterInfo (compatibility envelope
+variants of the same), ksm / uksm / cpulimit (toggle state reads),
+netcfg_get (management-interface config, admin), history_sys /
+history_nodes (telemetry history, admin - see below).
+history_sys: query range=1h|6h|24h|7d|30d - host CPU/RAM/swap/disk/
+load series from the telemetry collector (10 s raw for 1h/6h, 5 min
+rollups beyond); data.collector reports &quot;down&quot; when the daemon is not
+sampling. history_nodes: same ranges plus optional lab=&lt;session-id&gt; -
+top-10 per-node CPU/RAM series.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+<tr><td><code>range</code></td><td>query</td><td>history_sys / history_nodes: 1h, 6h, 24h, 7d or 30d.</td></tr>
+<tr><td><code>lab</code></td><td>query</td><td>history_nodes: restrict to one lab session id.</td></tr>
+</table>
+<pre class="curl">curl -sk -b jar.txt \
+  &#x27;https://&lt;host&gt;/status/api.php?action=history_sys&amp;range=1h&#x27;</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/status/api.php</code></h3>
+<p class="sum">Host maintenance writes (dispatch via ?action=).</p>
+<pre class="desc">Admin-only writes: ksm / uksm / cpulimit (body {&quot;state&quot;: bool}) and
+their compatibility twins apiSetKsm / apiSetUksm / apiSetCpuLimit;
+idle_timeout (body {&quot;seconds&quot;: int}, 60-86400 - the site-wide idle/
+session timeout every authenticated request slides forward; read back
+via ?action=info&#x27;s idle_timeout field); netcfg_set (management
+interface reconfiguration); power (body {&quot;op&quot;: &quot;reboot&quot;|&quot;poweroff&quot;});
+disk_expand (grow the root filesystem into new free space).</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>apiSetCpuLimit</code> <code>apiSetKsm</code> <code>apiSetUksm</code> <code>cpulimit</code> <code>disk_expand</code> <code>getClusterInfo</code> <code>getInfo</code> <code>getRunningNodes</code> <code>getSystemInfo</code> <code>history_nodes</code> <code>history_sys</code> <code>idle_timeout</code> <code>info</code> <code>ksm</code> <code>netcfg_get</code> <code>netcfg_set</code> <code>nodes</code> <code>power</code> <code>sessions</code> <code>system</code> <code>uksm</code> <code>version</code></p>
+</section>
+<section class="tag" id="tag-users">
+<h2>users</h2>
+<p class="tagdesc">User and role management, self-service settings, external-authentication administration (sub-app: /users/api.php).</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/users/api.php</code></h3>
+<p class="sum">User/role reads and self-service (dispatch via ?action=).</p>
+<pre class="desc">Self-service (any authenticated user): myworkspace (own workspace
+path), change_password, set_html5 (console preference). Admin reads:
+users (user list incl. role, quotas, ext_auth flag), roles,
+permcatalog (the permission catalog roles are built from),
+extauth_get (external-authentication settings - secrets are
+redacted to set/unset booleans, never returned).</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/users/api.php</code></h3>
+<p class="sum">User/role writes (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: user_add / user_edit (fields incl. username, password,
+role, pod, quotas, access windows, and ext_auth = radius|ldap|null to
+flag an account for external authentication), user_delete, role_add /
+role_edit / role_delete (custom roles from the permission catalog),
+extauth_set (external-auth settings write - accepts radius.secret /
+ldap.bind_pw on input only; they land in a root-only config via the
+privilege broker), extauth_test (live directory test with a
+username/password; returns diagnostics, never secrets).</pre>
+<pre class="curl">curl -sk -b jar.txt -H &#x27;Content-Type: application/json&#x27; \
+  -d &#x27;{&quot;proto&quot;:&quot;ldap&quot;,&quot;username&quot;:&quot;u&quot;,&quot;password&quot;:&quot;p&quot;}&#x27; \
+  &#x27;https://&lt;host&gt;/users/api.php?action=extauth_test&#x27;</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>change_password</code> <code>extauth_get</code> <code>extauth_set</code> <code>extauth_test</code> <code>myworkspace</code> <code>permcatalog</code> <code>role_add</code> <code>role_delete</code> <code>role_edit</code> <code>roles</code> <code>set_html5</code> <code>user_add</code> <code>user_delete</code> <code>user_edit</code> <code>users</code></p>
+</section>
+<section class="tag" id="tag-mcp-admin">
+<h2>mcp-admin</h2>
+<p class="tagdesc">MCP server administration - status, settings, bearer tokens (sub-app: /mcp/api.php). The MCP protocol endpoint itself is /mcp/.</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/mcp/api.php</code></h3>
+<p class="sum">MCP server administration reads (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: status (service state), health (probe the MCP HTTP
+listener), settings (current MCP configuration, redacted), usage
+(per-token request counters). The MCP protocol endpoint itself is
+POST /mcp/ (streamable HTTP, Authorization Bearer token) - see
+mcp-tools.json for the 35-tool table.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/mcp/api.php</code></h3>
+<p class="sum">MCP server administration writes (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: service (start/stop/enable the MCP service), settings
+(write configuration), token_new (mint a bearer token; the secret is
+shown once), token_del (revoke a token).</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>health</code> <code>service</code> <code>settings</code> <code>status</code> <code>token_del</code> <code>token_new</code> <code>usage</code></p>
+</section>
+<section class="tag" id="tag-cluster">
+<h2>cluster</h2>
+<p class="tagdesc">Satellite cluster membership and image sync (sub-app: /cluster/api.php).</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/cluster/api.php</code></h3>
+<p class="sum">Cluster reads (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: status (members + health), sync_status (image sync
+progress), list_images / check_images (what a satellite carries vs
+the master).</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/cluster/api.php</code></h3>
+<p class="sum">Cluster writes (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: genpsk (mint the join PSK), join (enroll a satellite),
+remove, deploy (push engine config to a satellite), push_image /
+sync_sat (image distribution).</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>check_images</code> <code>deploy</code> <code>genpsk</code> <code>join</code> <code>list_images</code> <code>push_image</code> <code>remove</code> <code>status</code> <code>sync_sat</code> <code>sync_status</code></p>
+</section>
+<section class="tag" id="tag-images">
+<h2>images</h2>
+<p class="tagdesc">Image management - browse/upload/delete images, icon scan, device factory, ishare2 catalog (sub-apps: /images-manage/, /images-icons/, /devices-factory/, /ishare2/).</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/devices-factory/api.php</code></h3>
+<p class="sum">Container-node factory reads (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: filter / get (catalog of buildable container node
+types), images (locally present container images).</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/devices-factory/api.php</code></h3>
+<p class="sum">Container-node factory operations (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: pull (fetch a container image), process (build/register a
+node type), delete (remove a factory entry), rmi (remove a container
+image).</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>delete</code> <code>filter</code> <code>get</code> <code>images</code> <code>process</code> <code>pull</code> <code>rmi</code></p>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/images-icons/api.php</code></h3>
+<p class="sum">Icon rescan (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: scan re-indexes the node icon set after uploads.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>scan</code></p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/images-manage/api.php</code></h3>
+<p class="sum">Image store browser (dispatch via ?action=).</p>
+<pre class="desc">Admin-only management of /opt/unetlab/addons: list (browse qemu/iol/
+dynamips image trees), download_file / download_folder.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/images-manage/api.php</code></h3>
+<p class="sum">Image store mutations (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: mkdir, rename, delete, and the chunked upload pipeline
+upload_init -&gt; upload_chunk (repeat) -&gt; upload_finish (or
+upload_cancel).</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>delete</code> <code>download_file</code> <code>download_folder</code> <code>list</code> <code>mkdir</code> <code>rename</code> <code>upload_cancel</code> <code>upload_chunk</code> <code>upload_finish</code> <code>upload_init</code></p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/ishare2/api.php</code></h3>
+<p class="sum">Community image catalog reads (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: catalog (browse the ishare2 image index), status
+(download progress).</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/ishare2/api.php</code></h3>
+<p class="sum">Community image catalog operations (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: download (fetch an image from the catalog), delete.</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>catalog</code> <code>delete</code> <code>download</code> <code>status</code></p>
+</section>
+<section class="tag" id="tag-lab-import">
+<h2>lab-import</h2>
+<p class="tagdesc">Bulk lab-archive import pipeline (sub-app: /import/api.php).</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/import/api.php</code></h3>
+<p class="sum">Lab-archive import pipeline reads (dispatch via ?action=).</p>
+<pre class="desc">discover (inspect an uploaded archive - labs found, target
+collisions), status (progress of a running import).</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/import/api.php</code></h3>
+<p class="sum">Run a lab-archive import (dispatch via ?action=).</p>
+<pre class="desc">import - commit a discovered archive into the labs tree.</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>discover</code> <code>import</code> <code>status</code></p>
+</section>
+<section class="tag" id="tag-pki">
+<h2>pki</h2>
+<p class="tagdesc">Lab PKI - certificate authorities, issuance, revocation (sub-app: /pki/api.php, admin-only).</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pki/api.php</code></h3>
+<p class="sum">Lab PKI reads (dispatch via ?action=).</p>
+<pre class="desc">Admin-only. profiles (issuance profiles), list (CAs and issued
+certs), export (download cert/key/chain; format pem|p12), crl
+(current revocation list).</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/pki/api.php</code></h3>
+<p class="sum">Lab PKI mutations (dispatch via ?action=).</p>
+<pre class="desc">Admin-only, X-Requested-With header required: ca_create, issue (leaf
+cert from a profile), sign_csr, revoke, delete_ca. All operations
+run in the privilege broker; the web tier never touches CA keys.</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>ca_create</code> <code>crl</code> <code>delete_ca</code> <code>export</code> <code>issue</code> <code>list</code> <code>profiles</code> <code>revoke</code> <code>sign_csr</code></p>
+</section>
+<section class="tag" id="tag-sdwan">
+<h2>sdwan</h2>
+<p class="tagdesc">SD-WAN controller-set builder job control (sub-app: /sdwan/api.php).</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/sdwan/api.php</code></h3>
+<p class="sum">SD-WAN builder job status (dispatch via ?action=).</p>
+<pre class="desc">status - progress of the running controller-set build job.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/sdwan/api.php</code></h3>
+<p class="sum">SD-WAN builder job control (dispatch via ?action=).</p>
+<pre class="desc">cancel - abort the running build job. (Builds are launched from the
+lab session fan-out: sdwan.versions / sdwan.build.)</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>cancel</code> <code>status</code></p>
+</section>
+<section class="tag" id="tag-branding">
+<h2>branding</h2>
+<p class="tagdesc">Appliance branding - logo and UI text overrides (sub-app: /branding/api.php).</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/branding/api.php</code></h3>
+<p class="sum">Branding reads (dispatch via ?action=).</p>
+<pre class="desc">logo (current logo image), config (title/text overrides).</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/branding/api.php</code></h3>
+<p class="sum">Branding writes (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: save (text/color overrides), upload_logo, reset
+(restore defaults).</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>config</code> <code>logo</code> <code>reset</code> <code>save</code> <code>save_theme</code> <code>upload_logo</code></p>
+</section>
+<section class="tag" id="tag-system">
+<h2>system</h2>
+<p class="tagdesc">Maintenance helpers (sub-app: /system/api.php).</p>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/system/api.php</code></h3>
+<p class="sum">Maintenance helpers (dispatch via ?action=).</p>
+<pre class="desc">Admin-only: fixPermission - run the engine&#x27;s filesystem permission
+repair (unl_wrapper -a fixpermissions) via the privilege broker.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code> <em>req</em></td><td>query</td><td>One of the x-actions values.</td></tr>
+</table>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>fixPermission</code></p>
+</section>
+<section class="tag" id="tag-node-errors">
+<h2>node-errors</h2>
+<p class="tagdesc">Node launch-failure classifier for the lab page (sub-app: /node-errors/api.php).</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/node-errors/api.php</code></h3>
+<p class="sum">Classify launch failures of the caller&#x27;s session nodes.</p>
+<pre class="desc">Action-less GET/POST (optional lab_session pin). Returns, per failed
+node id, {kind, title, message, suggestion, action} where action is
+one of edit_image | wipe_reload | add_license | none - the lab page
+renders these as guided fix-it hints.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/node-errors/api.php</code></h3>
+<p class="sum">Same classifier with a POSTed lab_session pin.</p>
+<pre class="desc">Identical to GET; POST bodies carry lab_session when the page pins a
+specific joined session.</pre>
+</article>
+</section>
+<section class="tag" id="tag-lab-tools">
+<h2>lab-tools</h2>
+<p class="tagdesc">Lab-page helper endpoints (/pnq-*.php) - live link statistics, per-node telemetry, protocol overlays, packet watcher, Wi-Fi painter. All are scoped to the caller&#x27;s own open lab session.</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pnq-bgppath.php</code></h3>
+<p class="sum">BGP best-path waterfall data.</p>
+<pre class="desc">?list=1 returns candidate BGP speaker nodes; ?action=table&amp;node=&lt;id&gt;
+parses the node&#x27;s BGP table into the best-path decision waterfall.</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>table</code></p>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/pnq-labstate-token.php</code></h3>
+<p class="sum">Mint a single-use token for the lab-state push socket.</p>
+<pre class="desc">Session-gated mint for wss://&lt;host&gt;/labstate/ - the live topology
+status push channel. The token is bound to the caller&#x27;s tenant and
+lab session and is consumed on connect.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pnq-linkhide.php</code></h3>
+<p class="sum">Read the caller&#x27;s hidden-link list for the open lab.</p>
+<pre class="desc">Server-side persistence for the canvas &quot;hide link&quot; preference.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/pnq-linkhide.php</code></h3>
+<p class="sum">Save the hidden-link list.</p>
+<pre class="desc">Body carries the network ids the caller chose to hide.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pnq-linkstats.php</code></h3>
+<p class="sum">Per-link packet/byte counters of the caller&#x27;s session.</p>
+<pre class="desc">Returns cumulative rx/tx packet and byte counters per tap interface
+of the open session plus interface metadata (node_id, network_id).
+The canvas egress-glow and link-utilization overlays poll it and
+derive rates client-side.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/pnq-linkwatch.php</code></h3>
+<p class="sum">Start/stop the per-link packet watcher.</p>
+<pre class="desc">Body {&quot;action&quot;: &quot;start&quot;, &quot;filters&quot;: [{id, preset, src_ip?, dst_ip?,
+port?, proto?}]} spawns a scoped capture watcher over the session&#x27;s
+links and returns match counters; {&quot;action&quot;: &quot;stop&quot;} tears it down.</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>start</code> <code>stop</code></p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pnq-nodestats.php</code></h3>
+<p class="sum">Live per-node CPU/RAM of the caller&#x27;s session.</p>
+<pre class="desc">Returns {&quot;data&quot;: {&quot;&lt;node-id&gt;&quot;: {&quot;cpu&quot;: pct, &quot;mem&quot;: MB}}} for the
+open lab session. 3 s shared cache; the Nodes modal usage columns
+poll it.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pnq-overlay.php</code></h3>
+<p class="sum">Topology overlays - computed protocol state on the canvas.</p>
+<pre class="desc">?list=1 returns the overlay-capable running nodes. ?action=&lt;proto&gt;
+computes an overlay from read-only &quot;show&quot; commands on node consoles:
+ospf (default), bgp, eigrp, route, stp, mst plus detail actions
+(bgp-prefixes, eigrp-prefixes, route-prefixes, stp-vlans, stp-roots,
+stp-why, mst-instances, cdp-warm, rack, rack-traffic).</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>action</code></td><td>query</td><td>Overlay protocol or detail action; see x-actions.</td></tr>
+<tr><td><code>list</code></td><td>query</td><td>list=1 enumerates candidate overlay root nodes.</td></tr>
+</table>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>bgp</code> <code>bgp-prefixes</code> <code>cdp-warm</code> <code>eigrp</code> <code>eigrp-prefixes</code> <code>mst</code> <code>mst-instances</code> <code>ospf</code> <code>rack</code> <code>rack-traffic</code> <code>route</code> <code>route-prefixes</code> <code>stp</code> <code>stp-roots</code> <code>stp-vlans</code> <code>stp-why</code></p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pnq-placements.php</code></h3>
+<p class="sum">Which session nodes run on a cluster satellite.</p>
+<pre class="desc">Returns {&quot;nodes&quot;: {&quot;&lt;node-id&gt;&quot;: host-id}} for satellite-hosted nodes
+of the open session; empty on non-clustered installs.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pnq-prototrace.php</code></h3>
+<p class="sum">Protocol Inspector - list inspectable links.</p>
+<pre class="desc">?list=1 returns the point-to-point links a packet ladder can be drawn
+for.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/pnq-prototrace.php</code></h3>
+<p class="sum">Protocol Inspector - start/stop a per-link packet ladder.</p>
+<pre class="desc">Body {&quot;action&quot;: &quot;start&quot;, &quot;network_id&quot;: N, &quot;proto&quot;: &quot;bgp&quot;} starts the
+ladder capture; {&quot;action&quot;: &quot;stop&quot;} ends it.</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>start</code> <code>stop</code></p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pnq-roce.php</code></h3>
+<p class="sum">RXE endpoints in the active lab.</p>
+<pre class="desc">Returns only nodes whose template is exactly rxe, with lab-local id,
+name, power state and bounded control-identity errors. Runtime UUIDs,
+vsock CIDs, commands and paths are never exposed to the browser.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/pnq-roce.php</code></h3>
+<p class="sum">RXE health and bounded pair-workload lifecycle.</p>
+<pre class="desc">Authenticated, active-lab operations for one-node health checks and
+the fixed rping, ib_write_lat and ib_write_bw pair sequence. Prepare
+accepts only two lab-local RXE ids, an allowlisted tool and a bounded
+lease; later operations accept only the broker-issued run id. The
+endpoint never accepts runtime identities, commands, executable paths,
+argument vectors, filesystem paths or shell text from the browser.</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>cancel</code> <code>health</code> <code>prepare</code> <code>readiness</code> <code>reset-pair</code> <code>result</code> <code>start-client</code> <code>start-server</code> <code>status</code></p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pnq-sysmon.php</code></h3>
+<p class="sum">Tiny host CPU/RAM/disk gauge (unauthenticated).</p>
+<pre class="desc">Returns {&quot;cpu&quot;: pct, &quot;mem&quot;: pct, &quot;disk&quot;: pct} (or -1 when a value is
+unavailable) for the topology-page monitor widget. Deliberately
+unauthenticated - it exposes only three percentages.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pnq-telemetry.php</code></h3>
+<p class="sum">Per-node CPU/RAM history of the caller&#x27;s session.</p>
+<pre class="desc">query nid=&lt;node-id&gt; and range=15m|1h|2h. Returns {&quot;data&quot;: {&quot;nid&quot;,
+&quot;step&quot;: 30, &quot;range&quot;, &quot;collector&quot;: &quot;ok&quot;|&quot;down&quot;, &quot;series&quot;: [{&quot;ts&quot;,
+&quot;cpu&quot;, &quot;mem_mb&quot;}]}} from the on-appliance telemetry collector. The
+nid must belong to the caller&#x27;s own open lab session (404
+otherwise); 2h is the maximum range because per-node raw retention
+is two hours. Feeds the canvas Resource-graph panel.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>nid</code> <em>req</em></td><td>query</td><td>Node id inside the caller&#x27;s open session.</td></tr>
+<tr><td><code>range</code></td><td>query</td><td>15m (default), 1h or 2h.</td></tr>
+</table>
+<pre class="curl">curl -sk -b jar.txt \
+  &#x27;https://&lt;host&gt;/pnq-telemetry.php?nid=1&amp;range=15m&#x27;</pre>
+</article>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/pnq-wifi.php</code></h3>
+<p class="sum">Wi-Fi painter - wireless nodes of the session.</p>
+<pre class="desc">Returns the session&#x27;s wireless AP/STA nodes (id, name, role, ssid,
+status) for the RF painter.</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/pnq-wifi.php</code></h3>
+<p class="sum">Wi-Fi painter - apply association/capture decisions.</p>
+<pre class="desc">Body {&quot;action&quot;: &quot;sync&quot;, &quot;assoc&quot;: [{sta, ap|null}]} makes the emulated
+radios follow the painter&#x27;s association picture; reset restores
+automatic behaviour; capture toggles an RF capture.</pre>
+</article>
+<p class="fan"><strong>Actions:</strong> <code>capture</code> <code>reset</code> <code>sync</code></p>
+</section>
+<section class="tag" id="tag-mail">
+<h2>mail</h2>
+<p class="tagdesc">SMTP settings, editable email templates, and admin-initiated password resets - core Slim routes under /api/admin/mail and /api/admin/users/{pod}/password-reset, plus the two public unauthenticated routes under /api/password-reset used by the emailed set-password link.</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/admin/mail</code></h3>
+<p class="sum">Read SMTP settings and the three editable email templates.</p>
+<pre class="desc">Admin-only. Returns enabled/host/port/encryption/auth/username,
+password_set (the stored SMTP password is write-only - never
+returned), from_email/from_name, public_url (the HTTPS base used to
+build password-reset links), and templates.{welcome,request,test}
+(each {subject, body} - the built-in default until customized once).</pre>
+<pre class="curl">curl -sk -b jar.txt https://&lt;host&gt;/api/admin/mail</pre>
+</article>
+<article class="op">
+<h3><span class="m m-put">PUT</span> <code>/api/admin/mail</code></h3>
+<p class="sum">Save SMTP settings.</p>
+<pre class="desc">Admin-only. Body: {enabled, auth, host, port, encryption
+(&quot;none&quot;|&quot;ssl&quot;|&quot;tls&quot;), username, from_email, from_name, public_url,
+password?}. password is optional and write-only - omit it (or send
+&quot;&quot;) to keep the currently stored one; every other field is required
+on every save (an absent field is NOT treated as &quot;leave unchanged&quot;).
+public_url must be an HTTPS origin with no path/query/credentials
+when non-empty. 400 on validation failure (bad host/port/encryption/
+email, or enabled=true without host+from_email, or auth=true without
+a resolvable username+password).</pre>
+<pre class="curl">curl -sk -b jar.txt -H &#x27;Content-Type: application/json&#x27; \
+  -X PUT -d &#x27;{&quot;enabled&quot;:true,&quot;auth&quot;:true,&quot;host&quot;:&quot;smtp.example.com&quot;,
+  &quot;port&quot;:587,&quot;encryption&quot;:&quot;tls&quot;,&quot;username&quot;:&quot;noreply&quot;,&quot;password&quot;:&quot;...&quot;,
+  &quot;from_email&quot;:&quot;noreply@example.com&quot;,&quot;from_name&quot;:&quot;PNETLab&quot;,
+  &quot;public_url&quot;:&quot;https://pnetlab.example.com&quot;}&#x27; \
+  https://&lt;host&gt;/api/admin/mail</pre>
+</article>
+<article class="op">
+<h3><span class="m m-put">PUT</span> <code>/api/admin/mail/template/{kind}</code></h3>
+<p class="sum">Save one of the three editable email templates.</p>
+<pre class="desc">Admin-only. {kind} is &quot;welcome&quot; (account-creation &quot;set your
+password&quot; link), &quot;request&quot; (default Reset-password-button email, an
+existing user), or &quot;test&quot; (the Send-a-test-email fields&#x27; saved
+default). Body: {subject, body} (body is HTML; both required,
+non-blank). Placeholders {{username}}, {{link}}, {{hours}} are
+substituted server-side when the email is actually sent.</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>kind</code> <em>req</em></td><td>path</td><td>One of welcome, request, test.</td></tr>
+</table>
+<pre class="curl">curl -sk -b jar.txt -H &#x27;Content-Type: application/json&#x27; \
+  -X PUT -d &#x27;{&quot;subject&quot;:&quot;Set your PNETLab password&quot;,&quot;body&quot;:&quot;&lt;p&gt;Hi
+  {{username}}...&lt;/p&gt;&quot;}&#x27; \
+  https://&lt;host&gt;/api/admin/mail/template/welcome</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/admin/mail/test</code></h3>
+<p class="sum">Send a real test email through the saved SMTP settings.</p>
+<pre class="desc">Admin-only. Body: {to, subject?, body?} - subject/body default to
+the saved &quot;test&quot; template (or its built-in default) when omitted.
+502 with the underlying SMTP error text on delivery failure (bad
+auth, unreachable host, rejected recipient, ...).</pre>
+<pre class="curl">curl -sk -b jar.txt -H &#x27;Content-Type: application/json&#x27; \
+  -X POST -d &#x27;{&quot;to&quot;:&quot;you@example.com&quot;}&#x27; \
+  https://&lt;host&gt;/api/admin/mail/test</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/admin/users/{pod}/password-reset</code></h3>
+<p class="sum">Issue and email a password-reset link for an existing user.</p>
+<pre class="desc">Admin-only. Generates a fresh single-use token (invalidating that
+user&#x27;s older unused tokens), emails it using the &quot;request&quot; template,
+and returns {ok, email}. Does NOT change the user&#x27;s current
+password - it stays valid until the emailed link is actually used.
+404 if the pod doesn&#x27;t exist; 409 if the target account is
+directory-authenticated (RADIUS/LDAP - those must reset in the
+directory, not here); 502 with the SMTP error text on delivery
+failure (the token is still issued even if the email fails to send).</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>pod</code> <em>req</em></td><td>path</td><td>Target user&#x27;s pod (tenant) id.</td></tr>
+</table>
+<pre class="curl">curl -sk -b jar.txt -X POST https://&lt;host&gt;/api/admin/users/5/password-reset</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/password-reset/check</code></h3>
+<p class="sum">Validate a password-reset token (public, unauthenticated).</p>
+<pre class="desc">No auth cookie required or checked. Body: {token}. The landing page
+keeps the emailed token in its URL fragment and sends it in this JSON
+body so it does not enter HTTP access logs. Returns {username} on a still-valid, unused,
+unexpired token, or 404 with an explanatory message otherwise (used
+already / expired / invalid). Read-only - does not consume the
+token.</pre>
+<pre class="curl">curl -sk -H &#x27;Content-Type: application/json&#x27; \
+  -X POST -d &#x27;{&quot;token&quot;:&quot;...&quot;}&#x27; \
+  https://&lt;host&gt;/api/password-reset/check</pre>
+</article>
+<article class="op">
+<h3><span class="m m-post">POST</span> <code>/api/password-reset/consume</code></h3>
+<p class="sum">Set a new password from a reset token (public, unauthenticated).</p>
+<pre class="desc">No auth cookie required or checked. Body: {token, password}.
+Atomically consumes the token (single-use - a concurrent second
+request with the same token cannot also succeed), sets the new
+password, and signs out that user&#x27;s other active sessions. 400 on
+an invalid/expired/already-used token or a password that fails the
+minimum-length check.</pre>
+<pre class="curl">curl -sk -H &#x27;Content-Type: application/json&#x27; \
+  -X POST -d &#x27;{&quot;token&quot;:&quot;...&quot;,&quot;password&quot;:&quot;a-new-password&quot;}&#x27; \
+  https://&lt;host&gt;/api/password-reset/consume</pre>
+</article>
+</section>
+<section class="tag" id="tag-audit">
+<h2>audit</h2>
+<p class="tagdesc">Admin-only lab, node and authenticated-session audit history.</p>
+<article class="op">
+<h3><span class="m m-get">GET</span> <code>/api/admin/activity</code></h3>
+<p class="sum">Read the audit log (lab/node activity and user sessions).</p>
+<pre class="desc">Admin-only. data.data is up to `limit` (max 200) rows newest-first,
+data.total is the full matching row count for pagination. categories
+is a comma-separated subset of lab, node, session (unrecognized
+values are ignored; an empty/all-unrecognized list falls back to all
+three). Session logout rows carry duration_seconds computed against
+that session&#x27;s own login row (session_id, a hash of the session
+token - not just username, so concurrent sessions for one user don&#x27;t
+cross-pair).</pre>
+<table><tr><th>Parameter</th><th>In</th><th>Description</th></tr>
+<tr><td><code>categories</code></td><td>query</td><td>Comma-separated subset of lab, node, session.</td></tr>
+<tr><td><code>limit</code></td><td>query</td><td>Rows per page, 1-200 (default 100).</td></tr>
+<tr><td><code>offset</code></td><td>query</td><td>Row offset for paging (default 0).</td></tr>
+</table>
+<pre class="curl">curl -sk -b jar.txt &quot;https://&lt;host&gt;/api/admin/activity?categories=lab,node&amp;limit=10&quot;</pre>
+</article>
+</section>
+<section class="tag" id="mcp-tools"><h2>MCP tools</h2>
+<p class="tagdesc">The MCP endpoint (/mcp/, streamable-HTTP, bearer token minted in the dashboard) exposes 35 tools for AI agents. The full table with parameters lives in mcp-tools.json; summaries below.</p>
+<table><tr><th>Tool</th><th>Description</th></tr>
+<tr><td><code>list_templates</code></td><td>List the PNetLab node templates installed on this server. Each entry has slug, description, type, config_capable, and image_available. config_capable marks the config_script family (vIOS / vIOSL2 / IOL / XRd / NX-OSv9...</td></tr>
+<tr><td><code>list_node_images</code></td><td>List the installed images for a template. Each entry is {name, default, and (for IOL) role}. For IOL an L2 image has role &#x27;switch&#x27; and an L3 image has role &#x27;router&#x27; — use this to pick a specific image, or just pass ro...</td></tr>
+<tr><td><code>get_lab</code></td><td>Read a lab&#x27;s full topology: id, name, the description/body documentation, all nodes and all networks. lab_path is relative to the labs root (e.g. &quot;/Folder/My Lab.unl&quot;); leave empty to use the lab this client currently...</td></tr>
+<tr><td><code>list_nodes</code></td><td>List the nodes in a lab (id, name, template, type, status, interfaces). lab_path is relative to the labs root; empty = the open lab.</td></tr>
+<tr><td><code>get_running_config</code></td><td>Get the saved startup-configuration for the lab&#x27;s nodes (all nodes, or a single node_id). lab_path is relative to the labs root; empty = the open lab. (Live device-scrape of a running node is added at the agent level ...</td></tr>
+<tr><td><code>create_lab</code></td><td>Create a new empty lab and bind this client to it. name is the lab title (no path/extension); path is an optional folder under the labs root (defaults to your own workspace). Returns the new lab_path and a `bound` fla...</td></tr>
+<tr><td><code>open_lab</code></td><td>Open an existing lab (relative to the labs root, e.g. &quot;/Folder/My Lab.unl&quot;) and bind this client to it, so later build tools default to it. Returns the lab&#x27;s current topology plus a `bound` flag: if bound is false, yo...</td></tr>
+<tr><td><code>save_lab</code></td><td>Persist the open lab to disk. Each build tool already saves, so this is normally a no-op for explicit completeness. (Mutating.)</td></tr>
+<tr><td><code>set_lab_documentation</code></td><td>Set the lab&#x27;s documentation: a short objectives summary (the lab description) and an ordered list of task strings (the lab body). (Mutating.)</td></tr>
+<tr><td><code>add_text</code></td><td>Place a TEXT ANNOTATION directly on the topology canvas (a draggable text box on the lab layout), e.g. a title, legend, or the lab details/notes. left/top position it; font_size/color style it; name labels it. This is...</td></tr>
+<tr><td><code>add_node</code></td><td>Add a node to the open lab. template is a slug from list_templates; name is the node hostname (auto-uniquified); left/top place it on the canvas. ram/cpu/ethernet override the template defaults when &gt; 0. For IOL, role...</td></tr>
+<tr><td><code>edit_node</code></td><td>Edit an existing node&#x27;s parameters (e.g. {&quot;name&quot;:&quot;R1&quot;,&quot;ram&quot;:1024}). params keys mirror the node edit form. (Mutating.)</td></tr>
+<tr><td><code>set_node_position</code></td><td>Move a node to canvas coordinates (left, top). (Mutating.)</td></tr>
+<tr><td><code>delete_node</code></td><td>Delete a node from the open lab. Destructive — pass confirm=true to proceed. (Mutating, destructive.)</td></tr>
+<tr><td><code>add_network</code></td><td>Add a network to the open lab. type is bridge (isolated L2), cloud (pnet0 management bridge), nat, or an explicit pnetN/natN/dot1q/wireless. Returns the new network id. (Mutating.)</td></tr>
+<tr><td><code>connect_nodes</code></td><td>Create a DIRECT point-to-point link between two nodes (drawn as a line, no cloud icon). Omit a_if/b_if (or pass -1) to auto-use each node&#x27;s first free interface; pass explicit 0-based indexes to choose a specific port...</td></tr>
+<tr><td><code>connect_node_to_network</code></td><td>Connect a node&#x27;s interface (iface, 0-based) to an existing network (net_id from add_network / get_lab). (Mutating.)</td></tr>
+<tr><td><code>disconnect</code></td><td>Unlink a node&#x27;s interface (iface, 0-based) from whatever network it is attached to. (Mutating.)</td></tr>
+<tr><td><code>set_startup_config</code></td><td>Set a node&#x27;s day-0 startup-configuration and flag it for delivery at next boot. Only works on config_capable templates (see list_templates); refuses others. (Mutating.)</td></tr>
+<tr><td><code>provide_config</code></td><td>Offer a node&#x27;s day-0 config to the USER as a downloadable .txt to paste into the node&#x27;s console themselves — the PREFERRED way to configure IOS-family nodes (vIOS, IOL, ...). It does NOT import/modify the node, so the...</td></tr>
+<tr><td><code>host_capacity</code></td><td>Host resources for sizing a build: cpu_count, ram_total_mb, ram_free_mb, plus this user&#x27;s per-user caps (max_cpu, max_ram_mb; 0 = unlimited). The engine refuses a node start that would exceed the caps, so plan a lab t...</td></tr>
+<tr><td><code>list_networks_types</code></td><td>List the network types add_network accepts (bridge, cloud, nat, dot1q, wireless) with a one-line description of each.</td></tr>
+<tr><td><code>list_links</code></td><td>List every link in the lab, derived from node interfaces and the networks they attach to: each entry has the network id/name/type, whether it is a point-to-point link, and its endpoints. lab_path empty = open lab.</td></tr>
+<tr><td><code>list_configurable_nodes</code></td><td>List the lab&#x27;s nodes that accept a day-0 startup-config (the config_capable templates) — the ones set_startup_config / export_running_ config can target. lab_path empty = open lab.</td></tr>
+<tr><td><code>get_node_interfaces</code></td><td>List one node&#x27;s interfaces (0-based index, name, type, the network it is connected to, and whether it is connected) — use it to pick free interfaces before wiring links. lab_path empty = open lab.</td></tr>
+<tr><td><code>start_node</code></td><td>Start a node in the open lab. Consumes CPU/RAM — pass confirm=true. The engine refuses the start if it would exceed your per-user CPU/RAM cap (see host_capacity). (Mutating; running session required.)</td></tr>
+<tr><td><code>stop_node</code></td><td>Stop a running node in the open lab. (Mutating; running session required.)</td></tr>
+<tr><td><code>wipe_node</code></td><td>Wipe a node&#x27;s NVRAM/working dir back to its day-0 state. Destructive — pass confirm=true. (Mutating; running session required.)</td></tr>
+<tr><td><code>export_running_config</code></td><td>Scrape the LIVE running-configuration off a started, config_capable node (config_&lt;x&gt;.py -a get) and return it as text. This is the export half of the import/export pair (set_startup_config is import). (Running session...</td></tr>
+<tr><td><code>apply_config_console</code></td><td>Apply a node&#x27;s day-0 config the RELIABLE way: drive the running node&#x27;s serial console like a human — abort autoinstall / the setup dialog, log in, paste the config in config mode, and (save=true) &#x27;write memory&#x27; then e...</td></tr>
+<tr><td><code>set_link_impairment</code></td><td>Apply WAN impairment (netem) to a running node&#x27;s interface (iface, 0-based). delay/jitter in ms, loss in %, rate in Kbit. Any knob you omit (leave -1) is cleared — this replaces the interface&#x27;s whole impairment, so pa...</td></tr>
+<tr><td><code>link_up</code></td><td>Bring a running node&#x27;s interface (iface, 0-based) administratively UP (un-suspend the link). (Mutating; running session required.)</td></tr>
+<tr><td><code>link_down</code></td><td>Bring a running node&#x27;s interface (iface, 0-based) administratively DOWN (suspend the link) to simulate a cable pull / failure. (Mutating; running session required.)</td></tr>
+<tr><td><code>build_topology</code></td><td>Build a WHOLE topology (many nodes, networks, links, and the lab docs) in ONE call — one engine bootstrap, one lab lock, one HTTP round-trip — instead of dozens of add_node/connect_* calls. This is the efficient way t...</td></tr>
+<tr><td><code>usage_status</code></td><td>Report this user&#x27;s AI token usage today and the per-user daily cap (0 = unlimited), so a large build can be sized against what is left.</td></tr>
+</table></section>
+<section class="tag" id="artifacts"><h2>Machine-readable artifacts</h2><ul>
+<li><a href="openapi.yaml">openapi.yaml</a> — OpenAPI 3.0.3 reference (this page is generated from it)</li>
+<li><a href="api-ai.md">api-ai.md</a> — agent-oriented guide: auth walkthrough, task recipes, throttling notes</li>
+<li><a href="mcp-tools.json">mcp-tools.json</a> — MCP tool table (35 tools) extracted from the server source</li>
+</ul></section>
+</main>
+<footer class="ft">Generated by scripts/gen-apidocs.py from openapi.yaml — do not edit index.html by hand.</footer>

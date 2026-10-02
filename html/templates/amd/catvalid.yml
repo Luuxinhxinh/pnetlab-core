@@ -1,0 +1,22 @@
+---
+# Cisco Catalyst SD-WAN Validator (vBond) — day-0 prestaged via device_catvalid.php
+# (cloud-init cidata seed). Version-agnostic: addons/qemu/catvalid-<version>/ auto-discovered.
+# Single IDE OS disk (catvalid-<ver>/hda.qcow2), no data volume.
+type: qemu
+name: vBond
+description: Cisco Catalyst SD-WAN Validator
+cpulimit: 1
+icon: Server.png
+cpu: 2
+ram: 2048
+ethernet: 4
+console: telnet
+qemu_arch: x86_64
+qemu_nic: virtio-net-pci
+qemu_options: -machine type=pc,accel=kvm -serial mon:stdio -nographic -enable-kvm
+Initial_startup_config:
+  type: checkbox
+  value: 1
+  width: 6
+  restart: 1
+...

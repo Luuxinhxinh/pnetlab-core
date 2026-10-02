@@ -1,0 +1,24 @@
+# PNetLab "VoIP Lab" node — Asterisk (chan_pjsip) + WebRTC browser softphones
+# (SIP.js) + live RTP call-quality stats. Image: pnet-voip (offline-install via
+# the Dashboard Docker Devices page, id 65).
+# console: https → the engine publishes container port 443 (native https console
+# routing since engine 6.8.43). WebRTC getUserMedia REQUIRES a secure context,
+# which is why this node is the one https console in the set. Plain http on :80
+# redirects to https. Leave dock_args EMPTY so device_docker takes the GUI-docker
+# path (publishes the console port + busybox-managed lab interface). Per-interface
+# networking (DHCP / static) is set in the normal node edit; SIP/RTP bind 0.0.0.0
+# so lab devices reach them over eth1: SIP udp/5060, RTP udp/10000-10200.
+# Template stem "voip" must stay a substring of the image name (pnet-voip).
+type: docker
+config_script: config_aaa.py
+name: VoIP Lab
+description: VoIP Lab (Asterisk)
+cpulimit: 1
+icon: UC-2D-CUCM-S.svg
+ethernet: 2
+console: https
+console_2nd: telnet
+cpu: 2
+ram: 2048
+mtu: 1500
+docker_shell: echo "VoIP Lab — use the https console GUI (admin/pnet). Live native configs:"; echo "--- /etc/asterisk/pjsip.conf ---"; cat /etc/asterisk/pjsip.conf 2>/dev/null; echo "--- /etc/asterisk/extensions.conf ---"; cat /etc/asterisk/extensions.conf 2>/dev/null; exec /bin/bash

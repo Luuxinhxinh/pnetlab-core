@@ -1,0 +1,13 @@
+---
+type: iol
+config_script: embedded
+description: Cisco IOL Switch L3
+name: SW
+cpulimit: 1
+icon: Switch-Green.png
+nvram: 1024
+ram: 256
+ethernet: 3
+serial: 0
+keepalive: 1
+...

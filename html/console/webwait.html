@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PNetLab Web Console — starting…</title>
+<!--
+  webwait.html — loader page opened INSTEAD of the raw http(s)://host:port
+  console URL for docker nodes whose console type is http/https. The
+  container starts instantly but its in-container web GUI daemon can take
+  10-15s (firstboot wait + daemon boot) to actually listen, so opening the
+  raw URL immediately used to land on a browser connection-refused error
+  page. This page polls the session-gated /api/labs/session/(:object)
+  portcheck endpoint (server-side TCP probe — the browser itself can't probe
+  the target: cross-origin port + self-signed https certs) and only
+  redirects once the port answers.
+
+  CSP is enforced (script-src 'self'): all JS is the external webwait.js,
+  no inline script, no inline handlers. Styling is inline <style> — that's
+  CSP-safe (style-src 'self' 'unsafe-inline' or equivalent already allows
+  the console pages' own inline <style> blocks, see console.html).
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #1e1e1e; color: #ddd;
+               font: 14px/1.4 system-ui, sans-serif; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center;
+          height: 100%; gap: 14px; padding: 20px; box-sizing: border-box; text-align: center; }
+  .spinner { width: 34px; height: 34px; border-radius: 50%;
+             border: 3px solid rgba(255,255,255,.15); border-top-color: #7ac8a0;
+             animation: pnq-spin 0.9s linear infinite; }
+  .spinner.hidden { display: none; }
+  @keyframes pnq-spin { to { transform: rotate(360deg); } }
+  #title { font-size: 15px; font-weight: 600; color: #e8f0ea; max-width: 480px; }
+  #elapsed { font-size: 12px; color: #888; }
+  #actions { display: none; gap: 10px; margin-top: 4px; }
+  #actions.show { display: flex; }
+  button.pnq-btn { font: 13px/1 system-ui, sans-serif; color: #cfe; background: rgba(255,255,255,.06);
+                   border: 1px solid rgba(255,255,255,.18); border-radius: 6px; padding: 9px 16px; cursor: pointer; }
+  button.pnq-btn:hover { background: rgba(255,255,255,.14); }
+  button.pnq-btn.primary { background: rgba(120,200,160,.35); border-color: rgba(120,200,160,.6); color: #fff; }
+  button.pnq-btn.primary:hover { background: rgba(120,200,160,.5); }
+  #status-line { font-size: 12px; color: #d99; max-width: 480px; }
+  #status-line.hidden { display: none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="spinner" id="spinner"></div>
+  <div id="title">Starting…</div>
+  <div id="elapsed"></div>
+  <div id="status-line" class="hidden"></div>
+  <div id="actions">
+    <button type="button" class="pnq-btn" id="btn-retry">Retry</button>
+    <button type="button" class="pnq-btn primary" id="btn-open">Open anyway</button>
+  </div>
+</div>
+<script src="webwait.js?v=f5e0b20d"></script>
+</body>
+</html>

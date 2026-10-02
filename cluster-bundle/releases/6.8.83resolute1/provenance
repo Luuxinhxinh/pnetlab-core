@@ -1,0 +1,7 @@
+release=6.8.83resolute1
+manifest_sha256=2dbf61a9855a52f79b90cf35455affe49d7f53c270090e513892ea7fee20941a
+manifest_sequence=83
+manifest_reissue=0
+staged_utc=2026-09-24T04:05:34Z
+source=netinstall
+profile=satellite

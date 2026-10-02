@@ -1,0 +1,1382 @@
+# openapi.yaml — PNetLab REST API reference (hand-authored).
+#
+# Kept honest by scripts/gen-apidocs.py: the script extracts the live route
+# table and every ?action= dispatch literal from the PHP source and FAILS the
+# build when something here is missing (drift gate). Action-dispatch endpoints
+# use the x-actions extension (flattened "object.action" pairs for the lab
+# session fan-out) and x-objects for the read fan-out; the generator renders
+# doc/ai/index.html from this file.
+#
+# Formatting contract (parsed by a deliberate stdlib-only YAML subset parser):
+# plain block style, 2-space indents, | / >- block scalars, simple inline
+# [a, b] lists, no anchors/aliases/flow mappings, no trailing comments.
+openapi: 3.0.3
+info:
+  title: PNetLab REST API
+  version: "27H1-v8.2"
+  summary: HTTP interface of the PNetLab network-emulation appliance
+  description: |
+    Every interactive feature of the PNetLab web UI rides this same-origin
+    REST surface, so anything the UI can do, a script or AI agent can do too.
+    The surface has three layers:
+
+    1. The core Slim application at /api/... (labs, nodes, networks, folders,
+       templates, import/export, authentication).
+    2. Per-feature sub-applications at /<app>/api.php?action=... (status,
+       users, cluster, images, PKI, MCP administration, ...). These are plain
+       PHP dispatchers keyed on an "action" request parameter.
+    3. Lab-page helper endpoints at /pnq-*.php (live link statistics, per-node
+       telemetry history, protocol overlays, packet watchers, ...) scoped to
+       the caller's open lab session.
+
+    Authentication is a session cookie: POST /api/auth with username/password
+    sets an HttpOnly, Secure, SameSite=Strict "token" cookie which every other
+    endpoint validates. The appliance is served over HTTPS only (HTTP 301s to
+    HTTPS for non-loopback clients) and the cookie is Secure-flagged, so
+    clients MUST talk https and keep a cookie jar.
+
+    Two response envelopes exist, for historical reasons:
+    - Engine envelope (most endpoints): {"code": int, "status":
+      "success"|"fail"|"unauthorized", "message": str, "data": any}
+    - Compatibility envelope (a few status/api.php actions): {"result": bool,
+      "message": str, "data": any}
+    A machine agent should key on the HTTP status first, then "status" or
+    "result".
+
+    A separate MCP (Model Context Protocol) endpoint at /mcp/ exposes the
+    build-and-run surface as typed tools for AI agents; see mcp-tools.json
+    and the MCP administration tag below.
+servers:
+  - url: /
+    description: Same origin as the web UI (HTTPS)
+components:
+  securitySchemes:
+    tokenCookie:
+      type: apiKey
+      in: cookie
+      name: token
+      description: |
+        Session cookie set by POST /api/auth. HttpOnly + Secure +
+        SameSite=Strict; expires with the engine session lifetime. All
+        endpoints except /api/health, /api/auth (POST), the two
+        /api/password-reset routes and /pnq-sysmon.php require it.
+  schemas:
+    EngineEnvelope:
+      type: object
+      description: Standard engine response envelope.
+      properties:
+        code:
+          type: integer
+          description: Mirrors the HTTP status code.
+        status:
+          type: string
+          description: success, fail, forbidden or unauthorized.
+        message:
+          type: string
+          description: "Human-readable text, often suffixed with an engine message id such as (90013)."
+        data:
+          description: Payload; shape depends on the endpoint.
+    CompatEnvelope:
+      type: object
+      description: >-
+        Compatibility envelope used by the dashboard-era actions of
+        /status/api.php (getSystemInfo, getRunningNodes, getInfo,
+        getClusterInfo, apiSet*).
+      properties:
+        result:
+          type: boolean
+        message:
+          type: string
+        data:
+          description: Payload; shape depends on the action.
+    AuthThrottle:
+      type: object
+      description: >-
+        429 body returned by POST /api/auth when an IP exceeds 10 failed
+        logins inside 300 s; blocked for 300 s, Retry-After header set.
+      properties:
+        code:
+          type: integer
+        status:
+          type: string
+        message:
+          type: string
+security:
+  - tokenCookie: []
+tags:
+  - name: auth
+    description: Login, logout and session introspection.
+  - name: templates
+    description: Node templates, template icons and per-template defaults.
+  - name: folders
+    description: Lab-folder tree management inside the labs root.
+  - name: labs
+    description: Lab files - create, clone, read, edit, move, delete.
+  - name: lab-session
+    description: >-
+      Running-lab sessions - open/join/leave/destroy a session, read topology
+      objects, and drive every canvas mutation through the object/action
+      fan-out.
+  - name: import-export
+    description: Lab archive export/import and icon listing.
+  - name: status
+    description: "Host status, KSM/CPU toggles, network config, power, telemetry history (sub-app: /status/api.php)."
+  - name: users
+    description: "User and role management, self-service settings, external-authentication administration (sub-app: /users/api.php)."
+  - name: mcp-admin
+    description: "MCP server administration - status, settings, bearer tokens (sub-app: /mcp/api.php). The MCP protocol endpoint itself is /mcp/."
+  - name: cluster
+    description: "Satellite cluster membership and image sync (sub-app: /cluster/api.php)."
+  - name: images
+    description: "Image management - browse/upload/delete images, icon scan, device factory, ishare2 catalog (sub-apps: /images-manage/, /images-icons/, /devices-factory/, /ishare2/)."
+  - name: lab-import
+    description: "Bulk lab-archive import pipeline (sub-app: /import/api.php)."
+  - name: pki
+    description: "Lab PKI - certificate authorities, issuance, revocation (sub-app: /pki/api.php, admin-only)."
+  - name: sdwan
+    description: "SD-WAN controller-set builder job control (sub-app: /sdwan/api.php)."
+  - name: branding
+    description: "Appliance branding - logo and UI text overrides (sub-app: /branding/api.php)."
+  - name: system
+    description: "Maintenance helpers (sub-app: /system/api.php)."
+  - name: node-errors
+    description: "Node launch-failure classifier for the lab page (sub-app: /node-errors/api.php)."
+  - name: lab-tools
+    description: >-
+      Lab-page helper endpoints (/pnq-*.php) - live link statistics, per-node
+      telemetry, protocol overlays, packet watcher, Wi-Fi painter. All are
+      scoped to the caller's own open lab session.
+  - name: mail
+    description: >-
+      SMTP settings, editable email templates, and admin-initiated password
+      resets - core Slim routes under /api/admin/mail and
+      /api/admin/users/{pod}/password-reset, plus the two public
+      unauthenticated routes under /api/password-reset used by the emailed
+      set-password link.
+  - name: audit
+    description: Admin-only lab, node and authenticated-session audit history.
+paths:
+  /api/health:
+    get:
+      tags: [auth]
+      summary: Liveness probe (no authentication).
+      description: |
+        Returns 200 with a tiny JSON body when the web tier and database are
+        answering. Safe to poll; used by installers and load balancers.
+      x-curl: |
+        curl -sk https://<host>/api/health
+  /api/admin/mail:
+    get:
+      tags: [mail]
+      summary: Read SMTP settings and the three editable email templates.
+      description: |
+        Admin-only. Returns enabled/host/port/encryption/auth/username,
+        password_set (the stored SMTP password is write-only - never
+        returned), from_email/from_name, public_url (the HTTPS base used to
+        build password-reset links), and templates.{welcome,request,test}
+        (each {subject, body} - the built-in default until customized once).
+      x-curl: |
+        curl -sk -b jar.txt https://<host>/api/admin/mail
+    put:
+      tags: [mail]
+      summary: Save SMTP settings.
+      description: |
+        Admin-only. Body: {enabled, auth, host, port, encryption
+        ("none"|"ssl"|"tls"), username, from_email, from_name, public_url,
+        password?}. password is optional and write-only - omit it (or send
+        "") to keep the currently stored one; every other field is required
+        on every save (an absent field is NOT treated as "leave unchanged").
+        public_url must be an HTTPS origin with no path/query/credentials
+        when non-empty. 400 on validation failure (bad host/port/encryption/
+        email, or enabled=true without host+from_email, or auth=true without
+        a resolvable username+password).
+      x-curl: |
+        curl -sk -b jar.txt -H 'Content-Type: application/json' \
+          -X PUT -d '{"enabled":true,"auth":true,"host":"smtp.example.com",
+          "port":587,"encryption":"tls","username":"noreply","password":"...",
+          "from_email":"noreply@example.com","from_name":"PNETLab",
+          "public_url":"https://pnetlab.example.com"}' \
+          https://<host>/api/admin/mail
+  /api/admin/mail/template/{kind}:
+    put:
+      tags: [mail]
+      summary: Save one of the three editable email templates.
+      description: |
+        Admin-only. {kind} is "welcome" (account-creation "set your
+        password" link), "request" (default Reset-password-button email, an
+        existing user), or "test" (the Send-a-test-email fields' saved
+        default). Body: {subject, body} (body is HTML; both required,
+        non-blank). Placeholders {{username}}, {{link}}, {{hours}} are
+        substituted server-side when the email is actually sent.
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          description: One of welcome, request, test.
+      x-curl: |
+        curl -sk -b jar.txt -H 'Content-Type: application/json' \
+          -X PUT -d '{"subject":"Set your PNETLab password","body":"<p>Hi
+          {{username}}...</p>"}' \
+          https://<host>/api/admin/mail/template/welcome
+  /api/admin/mail/test:
+    post:
+      tags: [mail]
+      summary: Send a real test email through the saved SMTP settings.
+      description: |
+        Admin-only. Body: {to, subject?, body?} - subject/body default to
+        the saved "test" template (or its built-in default) when omitted.
+        502 with the underlying SMTP error text on delivery failure (bad
+        auth, unreachable host, rejected recipient, ...).
+      x-curl: |
+        curl -sk -b jar.txt -H 'Content-Type: application/json' \
+          -X POST -d '{"to":"you@example.com"}' \
+          https://<host>/api/admin/mail/test
+  /api/admin/activity:
+    get:
+      tags: [audit]
+      summary: Read the audit log (lab/node activity and user sessions).
+      description: |
+        Admin-only. data.data is up to `limit` (max 200) rows newest-first,
+        data.total is the full matching row count for pagination. categories
+        is a comma-separated subset of lab, node, session (unrecognized
+        values are ignored; an empty/all-unrecognized list falls back to all
+        three). Session logout rows carry duration_seconds computed against
+        that session's own login row (session_id, a hash of the session
+        token - not just username, so concurrent sessions for one user don't
+        cross-pair).
+      parameters:
+        - name: categories
+          in: query
+          required: false
+          description: Comma-separated subset of lab, node, session.
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page, 1-200 (default 100).
+        - name: offset
+          in: query
+          required: false
+          description: Row offset for paging (default 0).
+      x-curl: |
+        curl -sk -b jar.txt "https://<host>/api/admin/activity?categories=lab,node&limit=10"
+  /api/admin/users/{pod}/password-reset:
+    post:
+      tags: [mail]
+      summary: Issue and email a password-reset link for an existing user.
+      description: |
+        Admin-only. Generates a fresh single-use token (invalidating that
+        user's older unused tokens), emails it using the "request" template,
+        and returns {ok, email}. Does NOT change the user's current
+        password - it stays valid until the emailed link is actually used.
+        404 if the pod doesn't exist; 409 if the target account is
+        directory-authenticated (RADIUS/LDAP - those must reset in the
+        directory, not here); 502 with the SMTP error text on delivery
+        failure (the token is still issued even if the email fails to send).
+      parameters:
+        - name: pod
+          in: path
+          required: true
+          description: Target user's pod (tenant) id.
+      x-curl: |
+        curl -sk -b jar.txt -X POST https://<host>/api/admin/users/5/password-reset
+  /api/password-reset/check:
+    post:
+      tags: [mail]
+      security: []
+      summary: Validate a password-reset token (public, unauthenticated).
+      description: |
+        No auth cookie required or checked. Body: {token}. The landing page
+        keeps the emailed token in its URL fragment and sends it in this JSON
+        body so it does not enter HTTP access logs. Returns {username} on a still-valid, unused,
+        unexpired token, or 404 with an explanatory message otherwise (used
+        already / expired / invalid). Read-only - does not consume the
+        token.
+      x-curl: |
+        curl -sk -H 'Content-Type: application/json' \
+          -X POST -d '{"token":"..."}' \
+          https://<host>/api/password-reset/check
+  /api/password-reset/consume:
+    post:
+      tags: [mail]
+      security: []
+      summary: Set a new password from a reset token (public, unauthenticated).
+      description: |
+        No auth cookie required or checked. Body: {token, password}.
+        Atomically consumes the token (single-use - a concurrent second
+        request with the same token cannot also succeed), sets the new
+        password, and signs out that user's other active sessions. 400 on
+        an invalid/expired/already-used token or a password that fails the
+        minimum-length check.
+      x-curl: |
+        curl -sk -H 'Content-Type: application/json' \
+          -X POST -d '{"token":"...","password":"a-new-password"}' \
+          https://<host>/api/password-reset/consume
+  /api/auth:
+    get:
+      tags: [auth]
+      summary: Current session and user profile.
+      description: |
+        Returns the logged-in user's profile (username, role, pod/tenant id,
+        html5 console preference, workspace folder, language table) in the
+        engine envelope. 401 when the token cookie is missing or stale - use
+        this as the cheap "am I still logged in?" probe. Query parameter
+        "lang" selects the UI language table merged into data.lang.
+      parameters:
+        - name: lang
+          in: query
+          required: false
+          description: Optional UI language code merged into the reply.
+      x-curl: |
+        curl -sk -b jar.txt https://<host>/api/auth
+    post:
+      tags: [auth]
+      summary: Log in and receive the session cookie.
+      description: |
+        Body: {"username": str, "password": str, "html5": "0"|"1" (optional
+        initial console preference)}. On success (200, message id 90013) the
+        response sets the "token" cookie (HttpOnly, Secure, SameSite=Strict).
+        Failure modes:
+        - 401 (90002) invalid credentials - counts one failed attempt for the
+          client IP.
+        - 403 (90003..90006) correct password but the account is contained:
+          not yet active, expired, outside its scheduled days, or disabled.
+          Does NOT count against the throttle.
+        - 429 (90007) the IP exceeded 10 failures in 300 s; blocked 300 s,
+          Retry-After header carries the remaining seconds.
+        - 503 (90020) the account is flagged for external authentication
+          (RADIUS/LDAP), the directory is unreachable, and local-hash
+          fallback is disabled. Not a credential failure - retry later or
+          contact the administrator. No throttle strike.
+        Accounts flagged external (users.ext_auth = radius|ldap) are verified
+        against the configured directory; every other account authenticates
+        against its local password hash.
+      x-curl: |
+        curl -sk -c jar.txt -H 'Content-Type: application/json' \
+          -d '{"username":"admin","password":"..."}' \
+          https://<host>/api/auth
+  /api/auth/logout:
+    get:
+      tags: [auth]
+      summary: Log out and clear the session cookie.
+      description: |
+        Invalidates the server-side session and expires the token cookie.
+      x-curl: |
+        curl -sk -b jar.txt https://<host>/api/auth/logout
+  /api/list/templates/{template}:
+    get:
+      tags: [templates]
+      summary: List node templates, or the form schema of one template.
+      description: |
+        Without a template slug: data maps every installed template slug to
+        its display name; templates whose image is missing are suffixed
+        ".missing". With a slug (e.g. iol, vios, docker): data.options is the
+        add-node form schema (name, type, image list, cpu, ram, ethernet, and
+        per-type extras) - the exact field set POST
+        /api/labs/session/nodes/add accepts.
+      parameters:
+        - name: template
+          in: path
+          required: false
+          description: Template slug; empty for the full template map.
+      x-curl: |
+        curl -sk -b jar.txt https://<host>/api/list/templates/
+  /api/list/template-icons:
+    get:
+      tags: [templates]
+      summary: List selectable node icons.
+      description: |
+        Returns the icon filenames under /opt/unetlab/html/images/icons that
+        the node editor offers.
+  /api/list/template-types:
+    get:
+      tags: [templates]
+      summary: List the node type families.
+      description: |
+        Returns the engine's node type map (iol, qemu, docker, dynamips,
+        vpcs).
+  /api/templatedefaults/{template}:
+    get:
+      tags: [templates]
+      summary: Read saved per-template form defaults.
+      description: |
+        Returns the admin-saved default values applied when the add-node form
+        opens for this template.
+    post:
+      tags: [templates]
+      summary: Save per-template form defaults.
+      description: |
+        Body is the field/value map to preset. Admin only.
+    delete:
+      tags: [templates]
+      summary: Reset per-template form defaults.
+      description: |
+        Removes the stored defaults for the template. Admin only.
+  /api/list/networks:
+    get:
+      tags: [templates]
+      summary: List network/cloud types available to the caller.
+      description: |
+        Admins see every network type including host-bridged clouds
+        (pnetN/bridge interfaces); non-admin users get the restricted list.
+  /api/folders:
+    get:
+      tags: [folders]
+      summary: List a folder of the labs tree.
+      description: |
+        Query parameter "path" (default "/") selects the folder. data
+        contains "folders" and "labs" arrays. Non-admin users are jailed to
+        their own workspace subtree.
+      parameters:
+        - name: path
+          in: query
+          required: false
+          description: Folder path relative to the labs root.
+      x-curl: |
+        curl -sk -b jar.txt 'https://<host>/api/folders?path=/'
+  /api/folders/{action}:
+    post:
+      tags: [folders]
+      summary: Create, rename/move or delete a folder.
+      description: |
+        add - body {"name": str, "path": parent}; edit - body {"path": old,
+        "new_path": new}; delete - body {"path": str}. Permission-gated per
+        role (add/edit/delete folder permissions).
+      parameters:
+        - name: action
+          in: path
+          required: true
+          description: One of the x-actions values.
+    x-actions:
+      - add
+      - delete
+      - edit
+  /api/labs:
+    post:
+      tags: [labs]
+      summary: Create a new lab, or clone an existing one.
+      description: |
+        Create - body {"path": folder, "name": str, "version": str,
+        "description": str, "body": str}. Clone - body {"source":
+        "/Folder/Lab.unl", "name": new-name}; presence of "source" selects
+        the clone path. Returns the new lab in data.
+      x-curl: |
+        curl -sk -b jar.txt -H 'Content-Type: application/json' \
+          -d '{"path":"/","name":"demo","version":"1"}' \
+          https://<host>/api/labs
+    delete:
+      tags: [labs]
+      summary: Delete a lab file.
+      description: |
+        Body {"path": "/Folder/Lab.unl"}. Also removes a corrupt lab file
+        that can no longer be parsed.
+  /api/labs/{action}:
+    post:
+      tags: [labs]
+      summary: Read or modify one lab file.
+      description: |
+        Body always carries {"path": "/Folder/Lab.unl"} plus per-action
+        fields. get - lab metadata; preview - one-shot bundle of labinfo +
+        nodes + networks + text objects + lines (what the preview pane
+        renders); edit - body.data carries the changed lab attributes
+        (name, description, body, version, ...); move - body.new_path is the
+        destination folder.
+      parameters:
+        - name: action
+          in: path
+          required: true
+          description: One of the x-actions values.
+    x-actions:
+      - edit
+      - get
+      - move
+      - preview
+  /api/labs/session/factory/{action}:
+    post:
+      tags: [lab-session]
+      summary: Lab-session lifecycle (open/join/leave/destroy/stop).
+      description: |
+        create - body {"path": "/Folder/Lab.unl"}; opens (or re-opens) a
+        session for the lab and points the caller's account at it. join -
+        body {"lab_session": id} joins a shared session. leave - leaves the
+        caller's current session. destroy - body {"lab_session": id} tears
+        the session down (stops its nodes, frees resources); also repairs
+        half-broken sessions. stopNodes - body {"lab_session": id} stops all
+        nodes but keeps the session. Resource limits (per-user CPU/RAM caps,
+        running-node limits) are enforced on create/start.
+      parameters:
+        - name: action
+          in: path
+          required: true
+          description: One of the x-actions values.
+      x-curl: |
+        curl -sk -b jar.txt -H 'Content-Type: application/json' \
+          -d '{"path":"/demo.unl"}' \
+          https://<host>/api/labs/session/factory/create
+    x-actions:
+      - create
+      - destroy
+      - join
+      - leave
+      - stopNodes
+  /api/labs/session/{object}:
+    get:
+      tags: [lab-session]
+      summary: Read one object family of the caller's open lab session.
+      description: |
+        The read fan-out of the lab page. object selects what is returned
+        (see x-objects): info - lab metadata; topology - the full canvas
+        bundle; nodes - node list with status, console host/port and url;
+        networks - network list; links - wiring; interfaces /
+        networkints / interface - per-node and per-network interface detail
+        (query: id); configs - saved startup-configs; textobjects /
+        pictures / picturemapped / picturedata - canvas annotations (query:
+        id where applicable); line - drawn line objects; workbook - workbook
+        pages; tasks - the kind="task" view of workbook storage (optional
+        query: name); wireshark - capture definitions; multi_cfg_list /
+        multi_cfg_detail - config sets; portcheck - console-port
+        reachability; console_guac_link - HTML5 console link mint; html -
+        rendered lab description. Most object families accept an "id" query
+        parameter to select a single element. GET /api/labs/session/tasks with
+        no name returns {"message":{"tasks":[{"id":"Configure the OSPF
+        underlay","weight":"1723486210001"}],"can_edit":true}; with
+        name=... it returns {"message":{"id":"Configure the OSPF
+        underlay","weight":"1723486210001","html":"<h2>...</h2>"}}.
+        validation returns separate YAML-backed validation activities, node
+        bindings, legacy task references, author capability, and the caller's
+        persisted check results and weighted completion. It never modifies
+        embedded text tasks or includes definitions in existing lab ZIPs.
+      parameters:
+        - name: object
+          in: path
+          required: true
+          description: One of the x-objects values.
+        - name: id
+          in: query
+          required: false
+          description: Element id, where the object family supports it.
+        - name: name
+          in: query
+          required: false
+          description: Task title for GET /api/labs/session/tasks.
+      x-curl: |
+        curl -sk -b jar.txt https://<host>/api/labs/session/nodes
+    x-objects:
+      - configs
+      - console_guac_link
+      - html
+      - info
+      - interface
+      - interfaces
+      - line
+      - links
+      - multi_cfg_detail
+      - multi_cfg_list
+      - networkints
+      - networks
+      - nodes
+      - picturedata
+      - picturemapped
+      - pictures
+      - portcheck
+      - textobjects
+      - topology
+      - tasks
+      - validation
+      - wireshark
+      - workbook
+  /api/labs/session/{object}/{action}:
+    post:
+      tags: [lab-session]
+      summary: Mutate the caller's open lab session (object/action fan-out).
+      description: |
+        The write fan-out of the lab page: object picks the family, action
+        the operation (flattened "object.action" pairs in x-actions). The
+        important families for an agent:
+        - nodes: add (body = the template form fields from
+          /api/list/templates/{t} plus left/top), edit, delete, start, stop,
+          shutdown, wipe, export (save running-config back into the lab),
+          hibernate, freeze, isolate, lock/unlock, port/port_2nd (console
+          port reassignment). start/stop/etc take {"id": node-id}.
+          commit takes {"id", "mode"} and persists a STOPPED qemu node's disk
+          overlay: mode=commit folds it into the shared base image every other
+          lab is linked-cloned from (destructive, retroactive), mode=save_as
+          additionally takes {"dest"} and writes a NEW image under
+          addons/qemu/<dest> instead, leaving the base untouched. Admin only —
+          both write appliance-global state. Fails if the node is running.
+        - networks: add/edit/delete a cloud/bridge; p2p (body src_id,
+          src_if, dest_id, dest_if) wires two nodes point-to-point in one
+          call.
+        - interfaces: edit connects/disconnects node interfaces (body id +
+          interface map); setquality applies WAN impairment (delay, jitter,
+          loss, rate) to a link; setSuspend / setSuspendtwo_way
+          administratively suspend one or both directions; style/styles
+          persist link styling.
+        - configs.edit saves a node startup-config (body id, data).
+        - lab.lock / lab.unlock toggle the lab's edit lock.
+        - textobjects / pictures / line: canvas annotations.
+        - workbook: guided-workbook page management.
+        - validation: additional task checks stored outside lab XML. save takes
+          {base_revision,tasks}; import takes {base_revision,yaml,node_mapping}
+          with optional explicit node mapping; export returns {filename,mime,yaml}.
+          import with preview:true returns proposed node bindings without saving.
+          save and non-preview import require EDIT_TASKS and an unlocked lab; export requires
+          EDIT_TASKS. run takes {check_id}, executes one bounded check against
+          the caller's lab node, and persists a server-derived result and score.
+          Learners can run checks and inspect failed evidence but cannot submit
+          pass/fail state or author definitions. Stale revisions fail with 409.
+          Every check is explicitly user-triggered; opening the panel runs none.
+        - tasks: instructor-authored task management, backed by kind="task"
+          workbook entries. Every task action requires EDIT_TASKS and an
+          unlocked open lab. Bodies and successful responses are:
+          add {"name":"Configure the OSPF underlay"} -> {"message":""};
+          delete {"name":"Configure the OSPF underlay"} -> {"message":""};
+          edit {"name":"Configure the OSPF underlay","new_name":"Configure
+          OSPF Area 0"} -> {"message":""}; order
+          {"src_name":"Task A","dest_name":"Task B"} -> {"message":""};
+          update {"name":"Configure the OSPF underlay","content":"<h2>Objective</h2>"}
+          -> {"message":{"id":"Configure the OSPF underlay","html":"<h2>Objective</h2>"}}.
+          Task titles are 1-160 Unicode letters/digits/whitespace plus
+          _-.,:;'"()&/; content is sanitized to a rich-text subset (headings,
+          lists, tables, dividers, links, inline emphasis) and capped at
+          256 KB after sanitization.
+        - wireshark: capture definitions - add, capture (start a capture),
+          delete, focus, wifiview.
+        - multi_cfg: named config sets - add, active, edit, rename, delete,
+          import, export.
+        - ai: the in-app agent assist - access, progress, plan, build.
+        - sdwan: versions/build of the SD-WAN controller-set factory.
+        - background.edit: canvas background flags (darkmode, 3D, grid).
+        All actions require an open session (factory/create first) and lab
+        edit permission for mutations; the lab lock refuses writes while
+        locked.
+      parameters:
+        - name: object
+          in: path
+          required: true
+          description: Object family (first token of the x-actions pairs).
+        - name: action
+          in: path
+          required: true
+          description: Operation (second token of the x-actions pairs).
+      x-curl: |
+        curl -sk -b jar.txt -H 'Content-Type: application/json' \
+          -d '{"id":1}' \
+          https://<host>/api/labs/session/nodes/start
+    x-actions:
+      - ai.access
+      - ai.build
+      - ai.plan
+      - ai.progress
+      - background.edit
+      - configs.edit
+      - interfaces.edit
+      - interfaces.setSuspend
+      - interfaces.setSuspendtwo_way
+      - interfaces.setquality
+      - interfaces.style
+      - interfaces.styles
+      - lab.lock
+      - lab.unlock
+      - line.add
+      - line.delete
+      - line.edit
+      - line.position
+      - multi_cfg.active
+      - multi_cfg.add
+      - multi_cfg.delete
+      - multi_cfg.edit
+      - multi_cfg.export
+      - multi_cfg.import
+      - multi_cfg.rename
+      - networks.add
+      - networks.delete
+      - networks.edit
+      - networks.p2p
+      - nodes.add
+      - nodes.delete
+      - nodes.edit
+      - nodes.export
+      - nodes.freeze
+      - nodes.commit
+      - nodes.hibernate
+      - nodes.isolate
+      - nodes.lock
+      - nodes.port
+      - nodes.port_2nd
+      - nodes.shutdown
+      - nodes.start
+      - nodes.stop
+      - nodes.unlock
+      - nodes.wipe
+      - pictures.add
+      - pictures.delete
+      - pictures.edit
+      - sdwan.build
+      - sdwan.versions
+      - textobjects.add
+      - textobjects.delete
+      - textobjects.edit
+      - tasks.add
+      - tasks.delete
+      - tasks.edit
+      - tasks.order
+      - tasks.update
+      - validation.save
+      - validation.import
+      - validation.export
+      - validation.run
+      - wireshark.add
+      - wireshark.capture
+      - wireshark.delete
+      - wireshark.focus
+      - wireshark.wifiview
+      - workbook.add
+      - workbook.delete
+      - workbook.edit
+      - workbook.order
+      - workbook.update
+  /api/labs/session/network/manage:
+    put:
+      tags: [lab-session]
+      summary: Save a network's managed settings (wireless cell WLANs).
+      description: |
+        Persists managed network attributes for the open session - primarily
+        the wireless-cell WLAN list - and live-applies the change by
+        restarting cabled, cell-driven access points.
+  /api/nodestatus:
+    post:
+      tags: [lab-session]
+      summary: Node status of every session of the caller.
+      description: |
+        Returns the engine status code per node (0 stopped, 1 stopped+locked,
+        2 running, 3 running+locked, 6 hibernated, 7 frozen) across sessions.
+  /api/labs/session/nodestatus:
+    post:
+      tags: [lab-session]
+      summary: Node status of the caller's open lab session.
+      description: |
+        The topology page's status poll. Optional body field lab_session pins
+        a specific joined session (protects a second tab of the same account
+        from repointing the poll).
+  /api/export:
+    post:
+      tags: [import-export]
+      summary: Export labs/folders to a downloadable archive.
+      description: |
+        Body {"0": path, "1": path, ..., "path": parent-folder}. Builds a zip
+        under /Exports and returns its URL in data.
+  /api/import:
+    post:
+      tags: [import-export]
+      summary: Import a lab archive.
+      description: |
+        multipart/form-data upload (file field) plus "path" - imports the
+        archive's labs into the target folder.
+  /api/icons:
+    get:
+      tags: [import-export]
+      summary: List node icon files.
+      description: |
+        Flat list of usable node icon filenames.
+  /api/workbook/pdf/{name}:
+    get:
+      tags: [import-export]
+      summary: Fetch a session-buffered workbook PDF.
+      description: |
+        Streams a workbook PDF previously rendered into the caller's PHP
+        session under this name.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Session buffer key from the workbook exporter.
+  /status/api.php:
+    get:
+      tags: [status]
+      summary: Host status reads (dispatch via ?action=).
+      description: |
+        Engine-cookie authenticated. Reads: system (ram/swap + admin cpu/
+        disk), nodes (running-node counts per type, admin), info (qemu
+        version, cores, KSM/cpulimit state, idle_timeout seconds), version
+        (engine release),
+        sessions (running lab sessions, admin), getSystemInfo /
+        getRunningNodes / getInfo / getClusterInfo (compatibility envelope
+        variants of the same), ksm / uksm / cpulimit (toggle state reads),
+        netcfg_get (management-interface config, admin), history_sys /
+        history_nodes (telemetry history, admin - see below).
+
+        history_sys: query range=1h|6h|24h|7d|30d - host CPU/RAM/swap/disk/
+        load series from the telemetry collector (10 s raw for 1h/6h, 5 min
+        rollups beyond); data.collector reports "down" when the daemon is not
+        sampling. history_nodes: same ranges plus optional lab=<session-id> -
+        top-10 per-node CPU/RAM series.
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+        - name: range
+          in: query
+          required: false
+          description: "history_sys / history_nodes: 1h, 6h, 24h, 7d or 30d."
+        - name: lab
+          in: query
+          required: false
+          description: "history_nodes: restrict to one lab session id."
+      x-curl: |
+        curl -sk -b jar.txt \
+          'https://<host>/status/api.php?action=history_sys&range=1h'
+    post:
+      tags: [status]
+      summary: Host maintenance writes (dispatch via ?action=).
+      description: |
+        Admin-only writes: ksm / uksm / cpulimit (body {"state": bool}) and
+        their compatibility twins apiSetKsm / apiSetUksm / apiSetCpuLimit;
+        idle_timeout (body {"seconds": int}, 60-86400 - the site-wide idle/
+        session timeout every authenticated request slides forward; read back
+        via ?action=info's idle_timeout field); netcfg_set (management
+        interface reconfiguration); power (body {"op": "reboot"|"poweroff"});
+        disk_expand (grow the root filesystem into new free space).
+    x-actions:
+      - apiSetCpuLimit
+      - apiSetKsm
+      - apiSetUksm
+      - cpulimit
+      - disk_expand
+      - getClusterInfo
+      - getInfo
+      - getRunningNodes
+      - getSystemInfo
+      - history_nodes
+      - history_sys
+      - idle_timeout
+      - info
+      - ksm
+      - netcfg_get
+      - netcfg_set
+      - nodes
+      - power
+      - sessions
+      - system
+      - uksm
+      - version
+  /users/api.php:
+    get:
+      tags: [users]
+      summary: User/role reads and self-service (dispatch via ?action=).
+      description: |
+        Self-service (any authenticated user): myworkspace (own workspace
+        path), change_password, set_html5 (console preference). Admin reads:
+        users (user list incl. role, quotas, ext_auth flag), roles,
+        permcatalog (the permission catalog roles are built from),
+        extauth_get (external-authentication settings - secrets are
+        redacted to set/unset booleans, never returned).
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    post:
+      tags: [users]
+      summary: User/role writes (dispatch via ?action=).
+      description: |
+        Admin-only: user_add / user_edit (fields incl. username, password,
+        role, pod, quotas, access windows, and ext_auth = radius|ldap|null to
+        flag an account for external authentication), user_delete, role_add /
+        role_edit / role_delete (custom roles from the permission catalog),
+        extauth_set (external-auth settings write - accepts radius.secret /
+        ldap.bind_pw on input only; they land in a root-only config via the
+        privilege broker), extauth_test (live directory test with a
+        username/password; returns diagnostics, never secrets).
+      x-curl: |
+        curl -sk -b jar.txt -H 'Content-Type: application/json' \
+          -d '{"proto":"ldap","username":"u","password":"p"}' \
+          'https://<host>/users/api.php?action=extauth_test'
+    x-actions:
+      - change_password
+      - extauth_get
+      - extauth_set
+      - extauth_test
+      - myworkspace
+      - permcatalog
+      - role_add
+      - role_delete
+      - role_edit
+      - roles
+      - set_html5
+      - user_add
+      - user_delete
+      - user_edit
+      - users
+  /mcp/api.php:
+    get:
+      tags: [mcp-admin]
+      summary: MCP server administration reads (dispatch via ?action=).
+      description: |
+        Admin-only: status (service state), health (probe the MCP HTTP
+        listener), settings (current MCP configuration, redacted), usage
+        (per-token request counters). The MCP protocol endpoint itself is
+        POST /mcp/ (streamable HTTP, Authorization Bearer token) - see
+        mcp-tools.json for the 35-tool table.
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    post:
+      tags: [mcp-admin]
+      summary: MCP server administration writes (dispatch via ?action=).
+      description: |
+        Admin-only: service (start/stop/enable the MCP service), settings
+        (write configuration), token_new (mint a bearer token; the secret is
+        shown once), token_del (revoke a token).
+    x-actions:
+      - health
+      - service
+      - settings
+      - status
+      - token_del
+      - token_new
+      - usage
+  /cluster/api.php:
+    get:
+      tags: [cluster]
+      summary: Cluster reads (dispatch via ?action=).
+      description: |
+        Admin-only: status (members + health), sync_status (image sync
+        progress), list_images / check_images (what a satellite carries vs
+        the master).
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    post:
+      tags: [cluster]
+      summary: Cluster writes (dispatch via ?action=).
+      description: |
+        Admin-only: genpsk (mint the join PSK), join (enroll a satellite),
+        remove, deploy (push engine config to a satellite), push_image /
+        sync_sat (image distribution).
+    x-actions:
+      - check_images
+      - deploy
+      - genpsk
+      - join
+      - list_images
+      - push_image
+      - remove
+      - status
+      - sync_sat
+      - sync_status
+  /images-manage/api.php:
+    get:
+      tags: [images]
+      summary: Image store browser (dispatch via ?action=).
+      description: |
+        Admin-only management of /opt/unetlab/addons: list (browse qemu/iol/
+        dynamips image trees), download_file / download_folder.
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    post:
+      tags: [images]
+      summary: Image store mutations (dispatch via ?action=).
+      description: |
+        Admin-only: mkdir, rename, delete, and the chunked upload pipeline
+        upload_init -> upload_chunk (repeat) -> upload_finish (or
+        upload_cancel).
+    x-actions:
+      - delete
+      - download_file
+      - download_folder
+      - list
+      - mkdir
+      - rename
+      - upload_cancel
+      - upload_chunk
+      - upload_finish
+      - upload_init
+  /images-icons/api.php:
+    post:
+      tags: [images]
+      summary: Icon rescan (dispatch via ?action=).
+      description: |
+        Admin-only: scan re-indexes the node icon set after uploads.
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    x-actions:
+      - scan
+  /devices-factory/api.php:
+    get:
+      tags: [images]
+      summary: Container-node factory reads (dispatch via ?action=).
+      description: |
+        Admin-only: filter / get (catalog of buildable container node
+        types), images (locally present container images).
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    post:
+      tags: [images]
+      summary: Container-node factory operations (dispatch via ?action=).
+      description: |
+        Admin-only: pull (fetch a container image), process (build/register a
+        node type), delete (remove a factory entry), rmi (remove a container
+        image).
+    x-actions:
+      - delete
+      - filter
+      - get
+      - images
+      - process
+      - pull
+      - rmi
+  /ishare2/api.php:
+    get:
+      tags: [images]
+      summary: Community image catalog reads (dispatch via ?action=).
+      description: |
+        Admin-only: catalog (browse the ishare2 image index), status
+        (download progress).
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    post:
+      tags: [images]
+      summary: Community image catalog operations (dispatch via ?action=).
+      description: |
+        Admin-only: download (fetch an image from the catalog), delete.
+    x-actions:
+      - catalog
+      - delete
+      - download
+      - status
+  /import/api.php:
+    get:
+      tags: [lab-import]
+      summary: Lab-archive import pipeline reads (dispatch via ?action=).
+      description: |
+        discover (inspect an uploaded archive - labs found, target
+        collisions), status (progress of a running import).
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    post:
+      tags: [lab-import]
+      summary: Run a lab-archive import (dispatch via ?action=).
+      description: |
+        import - commit a discovered archive into the labs tree.
+    x-actions:
+      - discover
+      - import
+      - status
+  /pki/api.php:
+    get:
+      tags: [pki]
+      summary: Lab PKI reads (dispatch via ?action=).
+      description: |
+        Admin-only. profiles (issuance profiles), list (CAs and issued
+        certs), export (download cert/key/chain; format pem|p12), crl
+        (current revocation list).
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    post:
+      tags: [pki]
+      summary: Lab PKI mutations (dispatch via ?action=).
+      description: |
+        Admin-only, X-Requested-With header required: ca_create, issue (leaf
+        cert from a profile), sign_csr, revoke, delete_ca. All operations
+        run in the privilege broker; the web tier never touches CA keys.
+    x-actions:
+      - ca_create
+      - crl
+      - delete_ca
+      - export
+      - issue
+      - list
+      - profiles
+      - revoke
+      - sign_csr
+  /sdwan/api.php:
+    get:
+      tags: [sdwan]
+      summary: SD-WAN builder job status (dispatch via ?action=).
+      description: |
+        status - progress of the running controller-set build job.
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    post:
+      tags: [sdwan]
+      summary: SD-WAN builder job control (dispatch via ?action=).
+      description: |
+        cancel - abort the running build job. (Builds are launched from the
+        lab session fan-out: sdwan.versions / sdwan.build.)
+    x-actions:
+      - cancel
+      - status
+  /branding/api.php:
+    get:
+      tags: [branding]
+      summary: Branding reads (dispatch via ?action=).
+      description: |
+        logo (current logo image), config (title/text overrides).
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    post:
+      tags: [branding]
+      summary: Branding writes (dispatch via ?action=).
+      description: |
+        Admin-only: save (text/color overrides), upload_logo, reset
+        (restore defaults).
+    x-actions:
+      - config
+      - logo
+      - reset
+      - save
+      - save_theme
+      - upload_logo
+  /system/api.php:
+    post:
+      tags: [system]
+      summary: Maintenance helpers (dispatch via ?action=).
+      description: |
+        Admin-only: fixPermission - run the engine's filesystem permission
+        repair (unl_wrapper -a fixpermissions) via the privilege broker.
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: One of the x-actions values.
+    x-actions:
+      - fixPermission
+  /node-errors/api.php:
+    get:
+      tags: [node-errors]
+      summary: Classify launch failures of the caller's session nodes.
+      description: |
+        Action-less GET/POST (optional lab_session pin). Returns, per failed
+        node id, {kind, title, message, suggestion, action} where action is
+        one of edit_image | wipe_reload | add_license | none - the lab page
+        renders these as guided fix-it hints.
+    post:
+      tags: [node-errors]
+      summary: Same classifier with a POSTed lab_session pin.
+      description: |
+        Identical to GET; POST bodies carry lab_session when the page pins a
+        specific joined session.
+  /pnq-nodestats.php:
+    get:
+      tags: [lab-tools]
+      summary: Live per-node CPU/RAM of the caller's session.
+      description: |
+        Returns {"data": {"<node-id>": {"cpu": pct, "mem": MB}}} for the
+        open lab session. 3 s shared cache; the Nodes modal usage columns
+        poll it.
+  /pnq-telemetry.php:
+    get:
+      tags: [lab-tools]
+      summary: Per-node CPU/RAM history of the caller's session.
+      description: |
+        query nid=<node-id> and range=15m|1h|2h. Returns {"data": {"nid",
+        "step": 30, "range", "collector": "ok"|"down", "series": [{"ts",
+        "cpu", "mem_mb"}]}} from the on-appliance telemetry collector. The
+        nid must belong to the caller's own open lab session (404
+        otherwise); 2h is the maximum range because per-node raw retention
+        is two hours. Feeds the canvas Resource-graph panel.
+      parameters:
+        - name: nid
+          in: query
+          required: true
+          description: Node id inside the caller's open session.
+        - name: range
+          in: query
+          required: false
+          description: 15m (default), 1h or 2h.
+      x-curl: |
+        curl -sk -b jar.txt \
+          'https://<host>/pnq-telemetry.php?nid=1&range=15m'
+  /pnq-linkstats.php:
+    get:
+      tags: [lab-tools]
+      summary: Per-link packet/byte counters of the caller's session.
+      description: |
+        Returns cumulative rx/tx packet and byte counters per tap interface
+        of the open session plus interface metadata (node_id, network_id).
+        The canvas egress-glow and link-utilization overlays poll it and
+        derive rates client-side.
+  /pnq-linkwatch.php:
+    post:
+      tags: [lab-tools]
+      summary: Start/stop the per-link packet watcher.
+      description: |
+        Body {"action": "start", "filters": [{id, preset, src_ip?, dst_ip?,
+        port?, proto?}]} spawns a scoped capture watcher over the session's
+        links and returns match counters; {"action": "stop"} tears it down.
+      x-actions:
+        - start
+        - stop
+    x-actions:
+      - start
+      - stop
+  /pnq-overlay.php:
+    get:
+      tags: [lab-tools]
+      summary: Topology overlays - computed protocol state on the canvas.
+      description: |
+        ?list=1 returns the overlay-capable running nodes. ?action=<proto>
+        computes an overlay from read-only "show" commands on node consoles:
+        ospf (default), bgp, eigrp, route, stp, mst plus detail actions
+        (bgp-prefixes, eigrp-prefixes, route-prefixes, stp-vlans, stp-roots,
+        stp-why, mst-instances, cdp-warm, rack, rack-traffic).
+      parameters:
+        - name: action
+          in: query
+          required: false
+          description: Overlay protocol or detail action; see x-actions.
+        - name: list
+          in: query
+          required: false
+          description: list=1 enumerates candidate overlay root nodes.
+    x-actions:
+      - bgp
+      - bgp-prefixes
+      - cdp-warm
+      - eigrp
+      - eigrp-prefixes
+      - mst
+      - mst-instances
+      - ospf
+      - rack
+      - rack-traffic
+      - route
+      - route-prefixes
+      - stp
+      - stp-roots
+      - stp-vlans
+      - stp-why
+  /pnq-prototrace.php:
+    get:
+      tags: [lab-tools]
+      summary: Protocol Inspector - list inspectable links.
+      description: |
+        ?list=1 returns the point-to-point links a packet ladder can be drawn
+        for.
+    post:
+      tags: [lab-tools]
+      summary: Protocol Inspector - start/stop a per-link packet ladder.
+      description: |
+        Body {"action": "start", "network_id": N, "proto": "bgp"} starts the
+        ladder capture; {"action": "stop"} ends it.
+    x-actions:
+      - start
+      - stop
+  /pnq-bgppath.php:
+    get:
+      tags: [lab-tools]
+      summary: BGP best-path waterfall data.
+      description: |
+        ?list=1 returns candidate BGP speaker nodes; ?action=table&node=<id>
+        parses the node's BGP table into the best-path decision waterfall.
+    x-actions:
+      - table
+  /pnq-wifi.php:
+    get:
+      tags: [lab-tools]
+      summary: Wi-Fi painter - wireless nodes of the session.
+      description: |
+        Returns the session's wireless AP/STA nodes (id, name, role, ssid,
+        status) for the RF painter.
+    post:
+      tags: [lab-tools]
+      summary: Wi-Fi painter - apply association/capture decisions.
+      description: |
+        Body {"action": "sync", "assoc": [{sta, ap|null}]} makes the emulated
+        radios follow the painter's association picture; reset restores
+        automatic behaviour; capture toggles an RF capture.
+    x-actions:
+      - capture
+      - reset
+      - sync
+  /pnq-roce.php:
+    get:
+      tags: [lab-tools]
+      summary: RXE endpoints in the active lab.
+      description: |
+        Returns only nodes whose template is exactly rxe, with lab-local id,
+        name, power state and bounded control-identity errors. Runtime UUIDs,
+        vsock CIDs, commands and paths are never exposed to the browser.
+    post:
+      tags: [lab-tools]
+      summary: RXE health and bounded pair-workload lifecycle.
+      description: |
+        Authenticated, active-lab operations for one-node health checks and
+        the fixed rping, ib_write_lat and ib_write_bw pair sequence. Prepare
+        accepts only two lab-local RXE ids, an allowlisted tool and a bounded
+        lease; later operations accept only the broker-issued run id. The
+        endpoint never accepts runtime identities, commands, executable paths,
+        argument vectors, filesystem paths or shell text from the browser.
+    x-actions:
+      - cancel
+      - health
+      - prepare
+      - readiness
+      - reset-pair
+      - result
+      - start-client
+      - start-server
+      - status
+  /pnq-linkhide.php:
+    get:
+      tags: [lab-tools]
+      summary: Read the caller's hidden-link list for the open lab.
+      description: |
+        Server-side persistence for the canvas "hide link" preference.
+    post:
+      tags: [lab-tools]
+      summary: Save the hidden-link list.
+      description: |
+        Body carries the network ids the caller chose to hide.
+  /pnq-placements.php:
+    get:
+      tags: [lab-tools]
+      summary: Which session nodes run on a cluster satellite.
+      description: |
+        Returns {"nodes": {"<node-id>": host-id}} for satellite-hosted nodes
+        of the open session; empty on non-clustered installs.
+  /pnq-labstate-token.php:
+    post:
+      tags: [lab-tools]
+      summary: Mint a single-use token for the lab-state push socket.
+      description: |
+        Session-gated mint for wss://<host>/labstate/ - the live topology
+        status push channel. The token is bound to the caller's tenant and
+        lab session and is consumed on connect.
+  /pnq-sysmon.php:
+    get:
+      tags: [lab-tools]
+      summary: Tiny host CPU/RAM/disk gauge (unauthenticated).
+      description: |
+        Returns {"cpu": pct, "mem": pct, "disk": pct} (or -1 when a value is
+        unavailable) for the topology-page monitor widget. Deliberately
+        unauthenticated - it exposes only three percentages.

@@ -1,0 +1,10 @@
+---
+type: docker
+name: cEOS
+description: cEOS Arista Switch
+icon: AristaSW3.png
+ethernet: 10
+console: telnet
+console_2nd: bash
+docker_options: '--privileged '
+...

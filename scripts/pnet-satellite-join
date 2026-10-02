@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+# pnet-satellite-join — join THIS host to a PNetLab cluster as a satellite.
+#
+#   pnet-satellite-join --master <ip> --id <1|2> --name "Satellite 1" \
+#                       --psk <64-hex> [--ip <self_ip>]
+#
+# Run as root on a host with the pnetlab-satellite deb installed. The PSK is
+# generated once on the master (System -> Cluster -> Generate PSK). The whole
+# flow is idempotent — re-running refreshes the PSK/DB credentials in place,
+# which is also the PSK-rotation path.
+#
+# What it does:
+#   1. writes /etc/pnetlab-satellite/satd.conf (0600: master_ip/host_id/name/psk)
+#   2. generates the satd TLS keypair if absent (self-signed, 10y)
+#   3. POSTs an HMAC-signed join to https://<master>/cluster/api.php?action=join
+#      (TLS unverified — the master cert is self-signed; the HMAC + the ±300 s
+#      timestamp window are the actual authentication)
+#   4. on success: writes /etc/pnetlab/cluster-db.conf (engine PHP connects to
+#      the MASTER MySQL), pins the master's rsync key in root's authorized_keys
+#      (rrsync-jailed to /opt/unetlab), restarts pnetlab-satd
+
+import argparse
+import hashlib
+import hmac
+import json
+import os
+import re
+import socket
+import ssl
+import subprocess
+import sys
+import time
+import urllib.request
+
+CONF_DIR = "/etc/pnetlab-satellite"
+CONF_PATH = CONF_DIR + "/satd.conf"
+CERT_PATH = CONF_DIR + "/satd-cert.pem"
+KEY_PATH = CONF_DIR + "/satd-key.pem"
+DB_CONF_DIR = "/etc/pnetlab"
+DB_CONF_PATH = DB_CONF_DIR + "/cluster-db.conf"
+AUTH_KEYS = "/root/.ssh/authorized_keys"
+RRSYNC = "/usr/bin/rrsync"
+
+
+def die(msg):
+    print("ERROR: " + msg, file=sys.stderr)
+    sys.exit(1)
+
+
+def canonical(obj):
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"))
+
+
+def self_ip_toward(master):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect((master, 443))
+        return s.getsockname()[0]
+    finally:
+        s.close()
+
+
+def ensure_cert(host_id):
+    if os.path.isfile(CERT_PATH) and os.path.isfile(KEY_PATH):
+        return
+    rc = subprocess.run([
+        "openssl", "req", "-x509", "-newkey", "ed25519", "-nodes",
+        "-days", "3650", "-subj", "/CN=pnetlab-sat%d" % host_id,
+        "-keyout", KEY_PATH, "-out", CERT_PATH,
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    if rc.returncode != 0:
+        die("cert generation failed: " + rc.stderr.decode(errors="replace"))
+    os.chmod(KEY_PATH, 0o600)
+
+
+def cert_fingerprint():
+    with open(CERT_PATH) as f:
+        der = ssl.PEM_cert_to_DER_cert(f.read())
+    return "sha256:" + hashlib.sha256(der).hexdigest()
+
+
+def pkg_version():
+    for pkg in ("pnetlab-satellite", "pnetlab"):
+        p = subprocess.run(["dpkg-query", "-W", "-f", "${Version}", pkg],
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        if p.returncode == 0 and p.stdout:
+            return p.stdout.decode().strip()
+    return "unknown"
+
+
+def pin_rsync_key(pubkey):
+    os.makedirs(os.path.dirname(AUTH_KEYS), mode=0o700, exist_ok=True)
+    entry = 'command="%s /opt/unetlab",restrict %s' % (RRSYNC, pubkey.strip())
+    lines = []
+    if os.path.isfile(AUTH_KEYS):
+        with open(AUTH_KEYS) as f:
+            lines = f.read().splitlines()
+    # drop any previous pnetlab-cluster pin (key comment marks ours)
+    lines = [l for l in lines if "pnetlab-cluster" not in l]
+    lines.append(entry)
+    with open(AUTH_KEYS, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    os.chmod(AUTH_KEYS, 0o600)
+
+
+def main():
+    ap = argparse.ArgumentParser(description="join this host to a PNetLab cluster")
+    ap.add_argument("--master", required=True, help="master IP/hostname")
+    ap.add_argument("--id", required=True, type=int, choices=(1, 2),
+                    help="satellite slot (1 or 2)")
+    ap.add_argument("--name", default=None, help='display name (default "Satellite <id>")')
+    ap.add_argument("--psk", required=True,
+                    help="cluster PSK from the master, or '-' to read it from stdin "
+                         "(used by the master's push-deploy so the PSK never hits argv)")
+    ap.add_argument("--ip", default=None, help="this host's IP as the master should dial it")
+    args = ap.parse_args()
+
+    if os.geteuid() != 0:
+        die("must run as root")
+    if args.psk == "-":
+        args.psk = sys.stdin.readline().strip()
+    if not re.match(r"^[0-9a-f]{64}$", args.psk):
+        die("PSK must be the 64-hex string shown on the master")
+    name = args.name or ("Satellite %d" % args.id)
+    ip = args.ip or self_ip_toward(args.master)
+
+    os.makedirs(CONF_DIR, mode=0o700, exist_ok=True)
+    ensure_cert(args.id)
+
+    body = {
+        "host_id": args.id,
+        "name": name,
+        "ip": ip,
+        "cert_fp": cert_fingerprint(),
+        "version": pkg_version(),
+        "ts": int(time.time()),
+    }
+    mac = hmac.new(args.psk.encode(), canonical(body).encode(),
+                   hashlib.sha256).hexdigest()
+    payload = json.dumps({"body": body, "hmac": mac}).encode()
+
+    ctx = ssl._create_unverified_context()
+    url = "https://%s/cluster/api.php?action=join" % args.master
+    req = urllib.request.Request(
+        url, data=payload, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30, context=ctx) as r:
+            resp = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.loads(e.read()).get("error", "")
+        except Exception:
+            err = ""
+        die("master rejected the join (%d): %s" % (e.code, err or e.reason))
+    except Exception as e:
+        die("cannot reach the master: %r" % e)
+
+    if not resp.get("db_pass") or not resp.get("rsync_pubkey"):
+        die("master returned an incomplete join response")
+
+    with open(CONF_PATH, "w") as f:
+        json.dump({"master_ip": args.master, "host_id": args.id,
+                   "name": name, "psk": args.psk}, f, indent=2)
+    os.chmod(CONF_PATH, 0o600)
+
+    os.makedirs(DB_CONF_DIR, mode=0o755, exist_ok=True)
+    with open(DB_CONF_PATH, "w") as f:
+        json.dump({"host": args.master, "pass": resp["db_pass"]}, f, indent=2)
+    os.chmod(DB_CONF_PATH, 0o600)
+
+    pin_rsync_key(resp["rsync_pubkey"])
+
+    subprocess.run(["systemctl", "enable", "--now", "pnetlab-satd"],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["systemctl", "restart", "pnetlab-satd"])
+
+    print("Joined cluster on %s as host %d (%s, %s)." %
+          (args.master, args.id, name, ip))
+    print("satd listening on :9050; verify on the master under System -> Cluster.")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="50px" height="50px" viewBox="0 0 50 50" version="1.1">
+  <title>Azure Region Simulator</title>
+  <defs>
+    <linearGradient id="az-region" x1="0" y1="0" x2="50" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0078d4"/>
+      <stop offset="1" stop-color="#3ccbf4"/>
+    </linearGradient>
+  </defs>
+  <g fill-rule="evenodd">
+    <rect x="1" y="1" width="48" height="48" rx="6" fill="url(#az-region)"/>
+    <path d="M25 12 L36 37 H30 L25 25 L20 37 H14 Z" fill="#ffffff"/>
+  </g>
+</svg>

@@ -1,0 +1,49 @@
+#!/bin/sh
+# Offline personality slot.  There is deliberately no configuration
+# kill-switch: the owner ruled that the personality is always on.
+set -u
+
+if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ] && [ -n "${TERM:-}" ]; then
+    BOLD=$(printf '\033[1m')
+    MAGENTA=$(printf '\033[35m')
+    DIM=$(printf '\033[90m')
+    RESET=$(printf '\033[0m')
+else
+    BOLD=
+    MAGENTA=
+    DIM=
+    RESET=
+fi
+
+TODAY=${PNETLAB_MOTD_DATE:-$(date +%m%d)}
+if [ "$TODAY" = 0401 ]; then
+    LINE='pigeon0: RFC 1149 carrier detected, MTU 256 bytes, latency variable (weather).'
+else
+    POOL=${PNETLAB_FORTUNE_FILE:-/opt/unetlab/scripts/motd-fortunes.txt}
+    COUNT=$(wc -l < "$POOL" 2>/dev/null || printf '0')
+    case "$COUNT" in
+        ''|*[!0-9]*) COUNT=0 ;;
+    esac
+    if [ "$COUNT" -gt 0 ]; then
+        DAY=$(date +%j)
+        LINE=$(sed -n "$(( (DAY * 7 + $$) % COUNT + 1 ))p" "$POOL")
+    else
+        LINE='The network is quiet; check the route table.'
+    fi
+fi
+
+printf '\n   %s%s-- %s%s\n\n' "$BOLD" "$MAGENTA" "$LINE" "$RESET"
+
+# Show the centurion line once per boot after 100 days.  pam_motd normally
+# runs these scripts as root; if /run is not writable, the decorative hint is
+# simply omitted rather than slowing or failing login.
+UPTIME_SECONDS=$(awk -F. '{ print $1 }' /proc/uptime 2>/dev/null || printf '0')
+case "$UPTIME_SECONDS" in
+    ''|*[!0-9]*) UPTIME_SECONDS=0 ;;
+esac
+if [ "$UPTIME_SECONDS" -ge 8640000 ]; then
+    MARKER=/run/pnetlab-motd-centurion
+    if ( set -C; : > "$MARKER" ) 2>/dev/null; then
+        printf '%s%s%s\n' "$DIM" ' 100 days of uptime. This box holds the SLA better than most ISPs.' "$RESET"
+    fi
+fi

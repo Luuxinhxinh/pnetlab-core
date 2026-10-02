@@ -1,0 +1,26 @@
+---
+# Cisco/CML Wireless Client (GRAPHICAL) on the airduct RF medium — pairs with the cVAP.
+# CML wireless-client refplat (Ubuntu 24.04, native airduct + mac80211_hwsim) + a lean
+# openbox desktop + NetworkManager/nm-applet. Handler: device_cwificlient.php. Image dir
+# auto-discovered as addons/qemu/cwificlient-<version>/ ; disk MUST be named virtioa.qcow2.
+# Boots via UEFI (OVMF.fd) — the image was virt-resized so its BIOS MBR is gone; the ESP
+# is intact. Console is VNC: autologin cisco -> openbox, wallpaper + nm-applet tray. Pick
+# the SSID a joined cVAP beacons in nm-applet. airduct virtio-serial port is injected by
+# the handler; the host airhandler is ensured on start.
+type: qemu
+name: cWiFi Client
+description: CML Wireless Client GUI (airduct) — associates to a cVAP
+cpulimit: 1
+icon: Desktop_linux.png
+cpu: 2
+ram: 3072
+ethernet: 4
+console: vnc
+qemu_arch: x86_64
+qemu_nic: virtio-net-pci
+qemu_options: -machine type=pc,accel=kvm -enable-kvm -bios /opt/qemu/share/qemu/OVMF.fd -vga virtio -device qemu-xhci,id=xhci -device usb-tablet,bus=xhci.0
+Wifi_SSID:
+  type: text
+  value: ''
+  width: 6
+...

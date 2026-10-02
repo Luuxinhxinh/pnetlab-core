@@ -1,0 +1,24 @@
+# PNetLab "Multicast Tester" node — ffmpeg multicast video sender(s) + a
+# GUI-owned ASM/SSM receiver with TS continuity-counter loss stats and a live
+# browser preview, for IGMP/PIM/SSM labs. A lab typically uses TWO of these
+# nodes across a PIM network: one sending, one receiving.
+# Image: pnet-mcast (offline-install via the Dashboard Docker Devices page;
+# template stem "mcast" is a substring of the image name -> engine binding).
+# console: http maps the node console to the container's web GUI on :80
+# (default admin/pnet). Leave dock_args EMPTY so device_docker takes the
+# GUI-docker path. Per-interface networking (DHCP / static IP) is set in the
+# normal node edit; streams flow over the lab interface (eth1) — the GUI
+# installs the 224.0.0.0/4 route itself when a sender/receiver starts.
+type: docker
+config_script: config_aaa.py
+name: Multicast Tester
+description: Multicast Tester
+cpulimit: 1
+icon: UC-2D-CMS-MeetingServer-S.svg
+ethernet: 2
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 2048
+mtu: 1500
+docker_shell: echo "Multicast Tester — configure via the http console GUI (admin/pnet)."; echo "State blob:"; cat /firstboot.cfg 2>/dev/null; echo; echo "--- multicast route ---"; ip -4 route show 224.0.0.0/4 2>/dev/null; exec /bin/bash

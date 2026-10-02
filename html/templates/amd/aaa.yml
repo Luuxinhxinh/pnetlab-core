@@ -1,0 +1,27 @@
+# PNetLab unified "AAA Suite" node — FreeRADIUS + Shrubbery TACACS+ + rsyslog in
+# ONE Debian container, configured through a self-contained web GUI served on the
+# node's HTTP console (the Go GUI listens on container :80; console: http maps to
+# container 80 and the engine reverse-proxies it same-origin into the lab page).
+# Image: pnet-aaa (offline-install via the Dashboard Docker Devices page).
+# Handler: device_docker (no device_aaa.php). console_2nd: telnet gives a shell
+# console (docker_shell below) beside the web GUI, like the librenms node.
+# Leave dock_args EMPTY so device_docker takes the GUI-docker path (adds
+# --net=bridge -p <host>:80 + the busybox-managed lab interface). Per-interface
+# networking (DHCP / static IP / DNS / route) is set in the normal node edit; the
+# AAA services bind 0.0.0.0 so lab devices reach them over the lab interface (eth1):
+# RADIUS udp/1812-1813, TACACS+ tcp/49, Syslog udp+tcp/514. Binds to any image
+# whose repo name contains "aaa" (matches pnet-aaa). config_script keeps the run
+# LED working (clears the start lock) and pushes the Startup-config blob in.
+type: docker
+config_script: config_aaa.py
+name: AAA Suite
+description: AAA Suite (RADIUS / TACACS+ / Syslog)
+cpulimit: 1
+icon: Server-2D-SEC-S.svg
+ethernet: 2
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 1024
+mtu: 1500
+docker_shell: echo "AAA Suite — configure via the web GUI on the http console (container :80, login admin/admin; also http://<lab-ip>/)."; echo "Live native configs:"; echo "--- /etc/tac_plus.conf ---"; cat /etc/tac_plus.conf 2>/dev/null; echo "--- /etc/freeradius/3.0/clients.conf ---"; cat /etc/freeradius/3.0/clients.conf 2>/dev/null; echo "--- /etc/rsyslog.d/10-aaa.conf ---"; cat /etc/rsyslog.d/10-aaa.conf 2>/dev/null; exec /bin/bash

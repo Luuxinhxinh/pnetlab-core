@@ -1,0 +1,33 @@
+[Unit]
+# PNetLab historical telemetry collector. Samples host CPU/RAM/swap/disk every
+# 10s and per-node CPU/RAM every 30s (via /proc deltas + one docker stats pass)
+# into /opt/unetlab/data/telemetry/telemetry.db (SQLite, 50MB-capped, tiered
+# retention). Read by status/api.php?action=history_* (dashboard History view)
+# and pnq-telemetry.php (lab-canvas per-node graphs) — both READONLY.
+# Shipped as a DATA file under /opt/unetlab/scripts/; the installer/postinst
+# copies it to /etc/systemd/system and enables it (release follow-up — on the
+# gate branch it is enabled by hand).
+Description=PNetLab telemetry history collector
+After=network.target mysql.service docker.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/unetlab/scripts/pnq-telemetryd.py
+Restart=on-failure
+RestartSec=10
+# mysql reads /root/.my.cnf via HOME (systemd units start with HOME unset)
+Environment=HOME=/root
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=128M
+NoNewPrivileges=yes
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

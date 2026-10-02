@@ -1,0 +1,48 @@
+hostname inserthostname-here
+echo 'from cli import cli' > set_boot.py
+echo 'import json' >> set_boot.py
+echo 'import os' >> set_boot.py
+echo 'import time' >> set_boot.py
+echo 'info = json.loads(cli("show version | json"))' >> set_boot.py
+echo 'bootimage = info.get("nxos_file_name", "")' >> set_boot.py
+echo '# nxos_file_name is whatever file the loader AUTOBOOTED. Some images ship a' >> set_boot.py
+echo '# stray truncated duplicate of the system image (e.g. nxos64- next to' >> set_boot.py
+echo '# nxos64-cs.10.6.2.F.bin); it sorts first, wins the autoboot, and blindly' >> set_boot.py
+echo '# persisting it writes a fragile "boot nxos bootflash:/nxos64-" statement.' >> set_boot.py
+echo '# Prefer the real nxos*.bin on bootflash, matching the running version.' >> set_boot.py
+echo 'def _bfsize(f):' >> set_boot.py
+echo '    try:' >> set_boot.py
+echo '        return os.path.getsize("/bootflash/" + f)' >> set_boot.py
+echo '    except OSError:' >> set_boot.py
+echo '        return 0' >> set_boot.py
+echo 'try:' >> set_boot.py
+echo '    ver = info.get("nxos_ver_str", "").replace("(", ".").replace(")", ".").strip(".")' >> set_boot.py
+echo '    bins = [f for f in os.listdir("/bootflash") if f.startswith("nxos") and f.endswith(".bin")]' >> set_boot.py
+echo '    # size-sort BOTH branches (largest first = the real system image, never a' >> set_boot.py
+echo '    # truncated stub) so a multi-.bin bootflash is deterministic, not listdir-' >> set_boot.py
+echo '    # order dependent. _bfsize swallows a per-file getsize race so one vanished' >> set_boot.py
+echo '    # file cannot abort the whole block and silently revert to nxos_file_name.' >> set_boot.py
+echo '    matched = sorted([f for f in bins if ver and ver in f], key=_bfsize, reverse=True)' >> set_boot.py
+echo '    pick = matched or sorted(bins, key=_bfsize, reverse=True)' >> set_boot.py
+echo '    if pick:' >> set_boot.py
+echo '        bootimage = "bootflash:/" + pick[0]' >> set_boot.py
+echo 'except Exception:' >> set_boot.py
+echo '    pass' >> set_boot.py
+echo 'set_boot = cli("conf t ; boot nxos {} ; no event manager applet BOOTCONFIG".format(bootimage))' >> set_boot.py
+echo 'i = 0' >> set_boot.py
+echo 'while i < 10:' >> set_boot.py
+echo '    try:' >> set_boot.py
+echo '        save_config = cli("copy running-config startup-config")' >> set_boot.py
+echo '        break' >> set_boot.py
+echo '    except Exception:' >> set_boot.py
+echo '        i += 1' >> set_boot.py
+echo '        time.sleep(1)' >> set_boot.py
+echo 'os.remove("/bootflash/set_boot.py")' >> set_boot.py
+event manager applet BOOTCONFIG
+ event syslog pattern "Configured from vty"
+ action 1.0 cli python bootflash:set_boot.py
+no password strength-check
+username admin role network-admin
+username admin password cisco role network-admin
+username cisco role network-admin
+username cisco password cisco role network-admin

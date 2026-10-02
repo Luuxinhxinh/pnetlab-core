@@ -1,0 +1,19 @@
+{
+  "mcp": {
+    "enabled": false,
+    "bind": "127.0.0.1",
+    "port": 5701,
+    "bridge_secret": "c0cb2059235d218243381c836dd0faf5ae381b60789fc3c95da558f53abbcfce",
+    "tokens": []
+  },
+  "provider": {
+    "provider": "anthropic",
+    "base_url": "",
+    "model": "claude-opus-4-8",
+    "api_key": ""
+  },
+  "limits": {
+    "per_user_daily_tokens": 200000,
+    "ai_allowed_roles": []
+  }
+}

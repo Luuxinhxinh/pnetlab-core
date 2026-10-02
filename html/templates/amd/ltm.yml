@@ -1,0 +1,19 @@
+# Independent LTM learning simulator. PNetLab labels the two lab adapters eth1
+# and eth2; their API adapter IDs remain 0 and 1. eth0 is console management.
+# Leave dock_args absent so device_docker selects the GUI-docker console path.
+type: docker
+config_script: config_aaa.py
+name: LTM Simulator
+description: Independent LTM learning simulator
+cpulimit: 2
+icon: Misc-2D-LTM-Simulator-S.svg
+ethernet: 2
+eth_name:
+  - eth1
+  - eth2
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 2048
+mtu: 1500
+docker_options: '--cap-add=NET_ADMIN'

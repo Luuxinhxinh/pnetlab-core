@@ -1,0 +1,40 @@
+# PNetLab Splunk Enterprise node (Splunk 9.4, Cisco CML reference image).
+#
+# IMAGE IS USER-IMPORTED (not bundled): load the CML refplat splunk-9-4.tar.gz
+# (Z:\...\virl-base-images\splunk-9-4\) onto the box — drop it in
+# /opt/unetlab/addons/docker/ for the image watcher to `docker load`, or use
+# Import Data. The template binds to any image whose repo name contains "splunk".
+#
+# Headless start: SPLUNK_START_ARGS/--accept-license + the general-terms ack +
+# SPLUNK_PASSWORD let splunkd come up with no interaction (matches the CML
+# node-definition). These env vars now ride the generic docker.yml
+# "docker_options" field instead of dock_args: device_docker.php concatenates
+# $this->docker_options into `docker create` whenever a template's dock_args
+# is empty (the GUI-docker branch, ~line 314) — no engine change needed.
+#
+# Web UI: the console click now opens it as a browser tab — console=http,
+# map_port=8000 (bridge-published via -p, device_docker.php ~line 226/242).
+# The upstream splunk/splunk Docker image defaults SplunkWeb to plain HTTP
+# (http_enableSSL=0) unless SPLUNK_HTTP_ENABLESSL is set, which this template
+# does not set, so http (not https) is correct.
+# CLI shell stays reachable via console_2nd=telnet — PNetLab's internal
+# docker-exec pseudo-console (no port published for it; map_port_2nd is
+# unset so it lands on the default port-23 path, same as the old console).
+# Two ethernet interfaces by default. config_aaa.py clears the start lock so the
+# status LED (and 3D pedestal) turns green once the container is running.
+---
+type: docker
+config_script: config_aaa.py
+description: Splunk Enterprise server
+name: Splunk
+cpulimit: 1
+icon: Misc-2D-Network-Analyzer-S.svg
+ethernet: 2
+console: http
+console_2nd: telnet
+map_port: 8000
+cpu: 0
+ram: 4096
+mtu: 1500
+docker_options: --privileged --env SPLUNK_START_ARGS=--accept-license --env SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com --env SPLUNK_PASSWORD=Cisc0123#
+docker_shell: echo "Splunk Enterprise 9.4"; echo "Web UI -> click the node's console icon (opens http://<host>:<mapped-port>, admin / Cisc0123#)."; echo "----------"; /opt/splunk/bin/splunk status 2>/dev/null || echo "splunkd is still initialising (first boot takes 1-2 min)."; echo "----------"; exec /bin/bash

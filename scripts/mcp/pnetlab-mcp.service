@@ -1,0 +1,76 @@
+[Unit]
+# PNetLab MCP server (AI Lab Builder tool surface). Shipped as a DATA file under
+# /opt/unetlab/scripts/mcp/ — NOT /lib/systemd/system — so the deb's
+# dh_installsystemd never auto-enables it. The broker (mcp_service verb) copies
+# this into /etc/systemd/system on the first dashboard "enable", so the service
+# is genuinely disabled by default and only runs once an admin turns it on.
+Description=PNetLab MCP server (AI Lab Builder tool surface)
+After=network.target apache2.service
+Wants=apache2.service
+
+[Service]
+Type=simple
+# Runs as a dedicated UNPRIVILEGED system user (pnetlab-mcp), created by the
+# package postinst. The server only READS data/ai/config.json (token hashes +
+# bridge secret + LLM key) and data/ai/usage.json — both re-permed to
+# 0640 root:pnetlab-mcp so this user can read them while they stay unreadable to
+# www-data and the world. It binds the unprivileged port from config.json
+# (default 127.0.0.1:5701), so neither root nor any capability is required.
+User=pnetlab-mcp
+Group=pnetlab-mcp
+ExecStart=/usr/bin/python3 /opt/unetlab/scripts/mcp/pnetlab-mcp.py --http
+Restart=on-failure
+RestartSec=3
+
+# ── Systemd sandboxing (F4 hardening) ────────────────────────────────────────
+# Defence-in-depth for a network-facing ASGI server. It now runs unprivileged,
+# so these directives are the second layer AFTER dropping root, not the only one.
+
+# No path back to privilege (blocks setuid helpers, sudo, fs capabilities). This
+# matters even more now that the process is non-root — it can never re-escalate.
+NoNewPrivileges=yes
+
+# The service needs ZERO capabilities: the port is unprivileged (>1024) and it
+# opens no raw sockets, so drop the whole bounding set — a code-exec bug cannot
+# acquire one. (As root this set was implicitly full; being non-root plus an empty
+# bounding set means no capability is ever available.)
+CapabilityBoundingSet=
+
+# ProtectSystem=strict makes the entire filesystem read-only (except /dev,/proc,
+# /sys) and hides /home. The service only READS /opt/unetlab/{scripts,data/ai},
+# so NO ReadWritePaths are needed: the broker (running as root) owns every write
+# to config.json/usage.json; the service never writes under /opt. The former
+# ReadWritePaths=/opt/unetlab/data/ai existed only for the root-era "maybe writes
+# usage" hedge and is deliberately removed — least privilege for a non-root svc.
+ProtectSystem=strict
+
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+
+# AF_INET/AF_INET6: bind the HTTP port (default 127.0.0.1:5701, optionally
+# 0.0.0.0).  AF_UNIX: CPython stdlib (logging, threading) and httpx use Unix
+# sockets internally; also needed for the loopback bridge call to Apache.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+RestrictNamespaces=yes
+LockPersonality=yes
+
+# CPython does not use a JIT, so W^X is safe.  If a native C extension that
+# needs executable writable memory is ever added, this must be removed.
+MemoryDenyWriteExecute=yes
+
+# @system-service covers the syscalls a normal long-running daemon needs.
+# EPERM is returned (instead of SIGSYS/SIGKILL) so Python can catch it and
+# log a clean error rather than crashing with a signal.
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+# ─────────────────────────────────────────────────────────────────────────────
+
+[Install]
+WantedBy=multi-user.target

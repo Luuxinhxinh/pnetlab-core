@@ -1,0 +1,30 @@
+# PNet / EVE-NG Git Ignore
+# Tránh commit các file nặng làm nghẽn Git và lệch nhịp môi trường
+
+# Images giả lập (Dung lượng hàng chục GB - chia sẻ qua Drive/NAS riêng)
+addons/qemu/*
+addons/iol/bin/*
+addons/dynamips/*
+!addons/**/.gitkeep
+
+# Temporary & runtime data
+tmp/*
+*.log
+*.pid
+/run/pnetlab/*
+
+# User Labs cá nhân thử nghiệm
+labs/test_*
+labs/tmp_*
+
+# OS & Editor generated files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~
+
+# Environment specific configurations
+.env
+config.local.php

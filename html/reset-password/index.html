@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" data-brand-title="%s — Reset password">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="referrer" content="no-referrer">
+	<title>PNetLab — Reset password</title>
+	<link rel="icon" href="/branding/api.php?action=logo">
+	<link rel="stylesheet" href="/login/login.css?v=d39c01b9">
+	<link rel="stylesheet" href="/reset-password/reset-password.css?v=b330f005">
+</head>
+<body>
+	<main class="login-wrap">
+		<div class="brand">
+			<img class="brand-logo" data-brand-logo src="/branding/api.php?action=logo" alt="PNetLab">
+			<span class="brand-text" data-brand-name>PNetLab</span>
+		</div>
+
+		<section class="login-card reset-card" id="checking-card" aria-live="polite">
+			<h1>Checking reset link</h1>
+			<p>Please wait while this one-time link is validated.</p>
+		</section>
+
+		<form class="login-card reset-card" id="reset-form" autocomplete="on" hidden>
+			<h1>Set a new password</h1>
+			<p id="account-line"></p>
+			<div class="field">
+				<label for="new-password">New password</label>
+				<input id="new-password" name="new-password" type="password"
+					autocomplete="new-password" minlength="8" maxlength="1024" required>
+			</div>
+			<div class="field">
+				<label for="confirm-password">Confirm new password</label>
+				<input id="confirm-password" name="confirm-password" type="password"
+					autocomplete="new-password" minlength="8" maxlength="1024" required>
+			</div>
+			<div class="alert" id="reset-alert" role="alert" hidden></div>
+			<button class="btn" id="reset-submit" type="submit">
+				<span class="btn-label">Set password</span>
+				<span class="btn-spin" aria-hidden="true"></span>
+			</button>
+		</form>
+
+		<section class="login-card reset-card" id="invalid-card" hidden>
+			<h1>Reset link unavailable</h1>
+			<p id="invalid-message">This link is invalid, expired, or has already been used.</p>
+			<a class="reset-link" href="/login/">Return to sign in</a>
+		</section>
+
+		<section class="login-card reset-card" id="success-card" hidden>
+			<h1>Password changed</h1>
+			<p>Your password was updated and existing sessions were signed out.</p>
+			<a class="reset-link" href="/login/">Continue to sign in</a>
+		</section>
+		<p class="footnote">Administrator-issued links expire after 48 hours and can be used once.</p>
+	</main>
+
+	<script src="/assets-common/js/pnq-branding.js?v=fa685e58"></script>
+	<script src="/reset-password/reset-password.js?v=e39c0d8a"></script>
+</body>
+</html>

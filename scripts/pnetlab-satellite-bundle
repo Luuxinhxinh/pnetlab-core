@@ -1,0 +1,1017 @@
+#!/usr/bin/env bash
+# Root-only publisher for the release-scoped satellite push-deploy bundle.
+#
+# The updater prepares a release before apt changes the master and activates it
+# only after the installed master package has reached that release. Keeping
+# preparation and activation separate leaves the existing current pointer
+# usable if apt fails.
+set -Eeuo pipefail
+
+readonly PROGRAM="${0##*/}"
+readonly DEFAULT_BUNDLE_ROOT='/opt/unetlab/cluster-bundle'
+readonly DEFAULT_ASSET_CACHE_ROOT='/var/cache/pnetlab/cluster-assets'
+readonly DEFAULT_SOURCE_LIST='/etc/apt/sources.list.d/pnetlab-codeberg.list'
+readonly DEFAULT_REPOSITORY_URL='https://codeberg.org/api/packages/netkillui/debian'
+readonly DEFAULT_GENERIC_API_BASE='https://codeberg.org/api/packages'
+readonly DEFAULT_GENERIC_OWNER='netkillui'
+readonly DEFAULT_GENERIC_PACKAGE='pnetlab-core-assets'
+readonly APT_CACHE='/var/cache/apt/archives'
+readonly -a SATELLITE_HARD_PACKAGES=(
+    pnetlab-docker pnetlab-qemu pnetlab-satellite pnetlab-vpcs
+)
+readonly -a SATELLITE_ZOO_VERSIONS=(2.4.0 2.12.0 4.1.0 5.2.0)
+
+BUNDLE_ROOT="${PNETLAB_CLUSTER_BUNDLE_ROOT:-$DEFAULT_BUNDLE_ROOT}"
+ASSET_CACHE_ROOT="${PNETLAB_CLUSTER_ASSET_CACHE_ROOT:-$DEFAULT_ASSET_CACHE_ROOT}"
+SOURCE_LIST="${PNETLAB_SATELLITE_BUNDLE_SOURCE_LIST:-$DEFAULT_SOURCE_LIST}"
+REPOSITORY_URL="${PNETLAB_SATELLITE_BUNDLE_REPOSITORY_URL:-$DEFAULT_REPOSITORY_URL}"
+GENERIC_API_BASE="${PNETLAB_GENERIC_API_BASE:-$DEFAULT_GENERIC_API_BASE}"
+LOG_FILE="${PNETLAB_SATELLITE_BUNDLE_LOG:-}"
+
+die() {
+    printf 'ERROR: %s\n' "$*" >&2
+    exit 1
+}
+
+log() {
+    printf '%s\n' "$*"
+    if [ -n "$LOG_FILE" ]; then
+        printf '%s\n' "$*" >>"$LOG_FILE" 2>/dev/null || true
+    fi
+}
+
+warn() {
+    printf 'WARNING: %s\n' "$*" >&2
+    if [ -n "$LOG_FILE" ]; then
+        printf 'WARNING: %s\n' "$*" >>"$LOG_FILE" 2>/dev/null || true
+    fi
+}
+
+usage() {
+    cat <<EOF
+Usage:
+  $PROGRAM prepare --manifest FILE --release VERSION [options]
+  $PROGRAM activate --release VERSION [options]
+  $PROGRAM validate-current [options]
+  $PROGRAM restore-current --state-file FILE [options]
+
+  prepare options:
+  --manifest FILE          already signature-verified release manifest
+  --release VERSION        exact 6.8.<NN>resolute1 release
+  --manifest-sequence N   sequence recorded in provenance
+  --manifest-reissue N    reissue recorded in provenance
+  --manifest-sha256 SHA   digest recorded in provenance
+  --asset-cache DIRECTORY use an already verified release asset cache
+  --source-list FILE       scoped Codeberg apt source list
+  --repository URL         scoped Codeberg apt repository
+  --source NAME            provenance source label (update or netinstall)
+  --log FILE               append diagnostics to FILE
+
+All operations are root-only. prepare never changes cluster-bundle/current.
+EOF
+}
+
+require_root() {
+    [ "$(id -u)" = 0 ] || die "$PROGRAM must be run as root"
+}
+
+require_commands() {
+    local command_name
+    for command_name in apt-cache apt-get curl dpkg-deb dpkg-query find flock install ln mktemp mv python3 readlink sha256sum stat tar; do
+        command -v "$command_name" >/dev/null 2>&1 \
+            || die "required command is missing: $command_name"
+    done
+}
+
+valid_release() {
+    [[ "$1" =~ ^6\.8\.[0-9]+resolute1$ ]]
+}
+
+complete_marker_value() {
+    local key="$1" marker="$2"
+    awk -F= -v key="$key" '$1 == key { print substr($0, index($0, "=") + 1); exit }' "$marker"
+}
+
+manifest_satellite_selection() {
+    local manifest="$1"
+    python3 - "$manifest" <<'PY'
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+for field in ("debs", "best_effort_debs"):
+    for package in manifest["install_profiles"]["satellite"][field]:
+        print(field + "\t" + package + "\t" + manifest[field][package])
+PY
+}
+
+validate_manifest_input() {
+    local manifest="$1" release="$2"
+    [ -f "$manifest" ] || die "verified release manifest is missing: $manifest"
+    valid_release "$release" || die "invalid satellite bundle release: $release"
+    python3 - "$manifest" "$release" <<'PY'
+import json
+import re
+import sys
+
+path, release = sys.argv[1:]
+m = json.load(open(path, encoding="utf-8"))
+if m.get("release") != release:
+    raise SystemExit("manifest release does not match requested bundle release")
+profiles = m.get("install_profiles")
+if not isinstance(profiles, dict) or set(profiles) != {"master", "satellite"}:
+    raise SystemExit("manifest install_profiles schema is invalid")
+sat = profiles["satellite"]
+if not isinstance(sat, dict) or set(sat) != {"debs", "best_effort_debs"}:
+    raise SystemExit("manifest satellite profile schema is invalid")
+hard = {"pnetlab-docker", "pnetlab-qemu", "pnetlab-satellite", "pnetlab-vpcs"}
+if set(sat["debs"]) != hard:
+    raise SystemExit("manifest satellite profile does not contain the exact hard package set")
+if not all(p in m.get("debs", {}) and m["debs"][p] == release for p in hard):
+    raise SystemExit("manifest satellite hard packages do not match the release")
+for package in sat["best_effort_debs"]:
+    if package not in m.get("best_effort_debs", {}) or m["best_effort_debs"][package] != release:
+        raise SystemExit("manifest satellite optional package does not match the release")
+core = m.get("core_assets")
+if not isinstance(core, dict):
+    raise SystemExit("manifest does not provide core assets required by satellite deployment")
+if set(core) != {"archive", "index", "sha256", "url"}:
+    raise SystemExit("manifest core_assets schema is invalid")
+if not re.fullmatch(r"[0-9a-f]{64}", core["sha256"]):
+    raise SystemExit("manifest core_assets sha256 is invalid")
+if not isinstance(core["url"], str) or not core["url"].startswith("https://"):
+    raise SystemExit("manifest core_assets URL is not HTTPS")
+if not re.fullmatch(r"[A-Za-z0-9._+-]+", core["archive"]):
+    raise SystemExit("manifest core_assets archive name is invalid")
+installer = m.get("satellite_installer")
+if installer is not None:
+    expected_name = "pnetlab-install-resolute-satellite-" + release + ".sh"
+    if not isinstance(installer, dict) or set(installer) != {"name", "sha256", "url"}:
+        raise SystemExit("manifest satellite_installer schema is invalid")
+    if installer["name"] != expected_name or not re.fullmatch(r"[0-9a-f]{64}", installer["sha256"]):
+        raise SystemExit("manifest satellite installer name or sha256 is invalid")
+    if not isinstance(installer["url"], str) or not installer["url"].startswith("https://"):
+        raise SystemExit("manifest satellite installer URL is not HTTPS")
+PY
+}
+
+asset_cache_is_complete() {
+    local cache="$1"
+    python3 - "$cache" <<'PY'
+import csv
+import hashlib
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+expected = {
+    "qemu-compat-libs.tgz": "deps/qemu-compat-libs.tgz",
+    "qemu-zoo-2.4.0-net.tgz": "qemu-zoo/qemu-zoo-2.4.0-net.tgz",
+    "qemu-zoo-2.12.0-net.tgz": "qemu-zoo/qemu-zoo-2.12.0-net.tgz",
+    "qemu-zoo-4.1.0-net.tgz": "qemu-zoo/qemu-zoo-4.1.0-net.tgz",
+    "qemu-zoo-5.2.0-net.tgz": "qemu-zoo/qemu-zoo-5.2.0-net.tgz",
+}
+if root.is_symlink() or not root.is_dir():
+    raise SystemExit(1)
+inventory = root / "asset-inventory.tsv"
+if inventory.is_symlink() or not inventory.is_file():
+    raise SystemExit(1)
+rows = list(csv.reader(inventory.open(newline=""), delimiter="\t"))
+if not rows or rows[0] != ["asset", "sha256", "size", "path"]:
+    raise SystemExit(1)
+parsed = {}
+for row in rows[1:]:
+    if len(row) != 4 or row[0] in parsed or row[0] not in expected or row[3] != expected[row[0]]:
+        raise SystemExit(1)
+    if len(row[1]) != 64 or any(c not in "0123456789abcdef" for c in row[1]) or not row[2].isdigit():
+        raise SystemExit(1)
+    parsed[row[0]] = (row[1], int(row[2]), row[3])
+if set(parsed) != set(expected):
+    raise SystemExit(1)
+for asset, (digest, size, relative) in parsed.items():
+    path = root / relative
+    if path.is_symlink() or not path.is_file():
+        raise SystemExit(1)
+    if path.stat().st_size != size or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        raise SystemExit(1)
+PY
+}
+
+publish_asset_cache() {
+    local staging="$1" destination="$2" tombstone=''
+    if [ -e "$destination" ] || [ -L "$destination" ]; then
+        if asset_cache_is_complete "$destination"; then
+            rm -rf -- "$staging"
+            return 0
+        fi
+        tombstone="$destination.superseded.$$.$RANDOM"
+        [ ! -e "$tombstone" ] && [ ! -L "$tombstone" ] \
+            || die "asset cache tombstone already exists: $tombstone"
+        mv -T -- "$destination" "$tombstone" \
+            || die "could not move the incomplete asset cache aside: $destination"
+    fi
+    if ! mv -T -- "$staging" "$destination"; then
+        if [ -n "$tombstone" ] && [ ! -e "$destination" ] && [ ! -L "$destination" ]; then
+            mv -T -- "$tombstone" "$destination" || true
+        fi
+        rm -rf -- "$staging"
+        die "could not publish the verified asset cache: $destination"
+    fi
+    [ -z "$tombstone" ] || rm -rf -- "$tombstone"
+}
+
+fetch_asset_cache() {
+    local manifest="$1" release="$2"
+    local url sha archive_name work staging id file member_sha target asset_name asset_size
+    local destination="$ASSET_CACHE_ROOT/$release"
+    if asset_cache_is_complete "$destination"; then
+        printf '%s\n' "$destination"
+        return 0
+    fi
+    read -r url sha archive_name < <(python3 - "$manifest" <<'PY'
+import json
+import sys
+m = json.load(open(sys.argv[1], encoding="utf-8"))["core_assets"]
+print(m["url"], m["sha256"], m["archive"])
+PY
+    )
+    work="$(mktemp -d /tmp/pnetlab-satellite-assets.XXXXXX)"
+    staging=''
+    if ! curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 \
+        --output "$work/$archive_name" "$url"; then
+        rm -rf -- "$work"
+        die "core-assets download failed: $url"
+    fi
+    printf '%s  %s\n' "$sha" "$archive_name" >"$work/archive.sha256"
+    (cd "$work" && sha256sum --check --status -- archive.sha256) \
+        || { rm -rf -- "$work"; die "core-assets archive checksum failed"; }
+    while IFS= read -r member; do
+        case "$member" in
+            .|./|./*) [[ "$member" != *'..'* ]] || { rm -rf -- "$work"; die "unsafe core-assets archive path: $member"; } ;;
+            *) rm -rf -- "$work"; die "unsafe core-assets archive path: $member" ;;
+        esac
+    done < <(tar --zstd -tf "$work/$archive_name")
+    while IFS= read -r listing; do
+        case "${listing:0:1}" in
+            -|d) ;;
+            *) rm -rf -- "$work"; die "core-assets archive contains a non-regular member" ;;
+        esac
+    done < <(tar --zstd -tvf "$work/$archive_name")
+    tar --zstd -xf "$work/$archive_name" -C "$work" \
+        || { rm -rf -- "$work"; die "core-assets archive extraction failed"; }
+    [ -f "$work/core-assets.index.json" ] \
+        || { rm -rf -- "$work"; die "core-assets archive index is missing"; }
+    install -d -m 0755 "$ASSET_CACHE_ROOT"
+    staging="$(mktemp -d "$ASSET_CACHE_ROOT/.${release}.staging.XXXXXX")"
+    install -d -m 0755 "$staging/qemu-zoo" "$staging/deps"
+    printf 'asset\tsha256\tsize\tpath\n' >"$staging/asset-inventory.tsv"
+    while IFS=$'\t' read -r id file member_sha; do
+        [ -n "$id" ] || continue
+        case "$file" in
+            /*|../*|*/../*|*'/..'|*'/../'*) rm -rf -- "$work" "$staging"; die "unsafe core-assets member path: $file" ;;
+        esac
+        [ -f "$work/$file" ] || { rm -rf -- "$work" "$staging"; die "core-assets member is missing: $file"; }
+        printf '%s  %s\n' "$member_sha" "$file" >"$work/member.sha256"
+        (cd "$work" && sha256sum --check --status -- member.sha256) \
+            || { rm -rf -- "$work" "$staging"; die "core-assets member checksum failed: $id"; }
+        case "$id" in
+            qemu-compat-libs)
+                asset_name='qemu-compat-libs.tgz'
+                target="$staging/deps/$asset_name"
+                asset_size="$(stat -c '%s' "$work/$file")"
+                install -m 0644 "$work/$file" "$target"
+                printf '%s\t%s\t%s\t%s\n' "$asset_name" "$member_sha" "$asset_size" "deps/$asset_name" \
+                    >>"$staging/asset-inventory.tsv"
+                ;;
+            qemu-zoo-*-net)
+                asset_name="qemu-zoo-${id#qemu-zoo-}.tgz"
+                target="$staging/qemu-zoo/$asset_name"
+                asset_size="$(stat -c '%s' "$work/$file")"
+                install -m 0644 "$work/$file" "$target"
+                printf '%s\t%s\t%s\t%s\n' "$asset_name" "$member_sha" "$asset_size" "qemu-zoo/$asset_name" \
+                    >>"$staging/asset-inventory.tsv"
+                ;;
+        esac
+done < <(python3 - "$work/core-assets.index.json" <<'PY'
+import json
+import re
+import sys
+expected = {"qemu-compat-libs": ("deps/qemu-compat-libs.tgz", "/opt/qemu-compat-libs")}
+for version in ("2.4.0", "2.12.0", "4.1.0", "5.2.0"):
+    expected["qemu-zoo-" + version + "-net"] = ("qemu-zoo/qemu-zoo-" + version + "-net.tgz", "/opt")
+entries = json.load(open(sys.argv[1], encoding="utf-8"))
+if not isinstance(entries, list) or len(entries) != len(expected):
+    raise SystemExit("core-assets index does not contain the expected satellite asset set")
+seen = set()
+for entry in entries:
+    if not isinstance(entry, dict) or set(entry) != {"id", "file", "sha256", "extract_to"}:
+        raise SystemExit("core-assets index entry schema is invalid")
+    if entry["id"] in seen or entry["id"] not in expected or tuple(entry[key] for key in ("file", "extract_to")) != expected[entry["id"]]:
+        raise SystemExit("core-assets index contains an unexpected satellite asset")
+    if not isinstance(entry["sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", entry["sha256"]):
+        raise SystemExit("core-assets index contains an invalid asset digest")
+    seen.add(entry["id"])
+if seen != set(expected):
+    raise SystemExit("core-assets index is missing a satellite asset")
+for entry in entries:
+    print(entry["id"], entry["file"], entry["sha256"], sep="\t")
+PY
+    )
+    rm -rf -- "$work"
+    if ! asset_cache_is_complete "$staging"; then
+        rm -rf -- "$staging"
+        die "core-assets archive did not contain the complete satellite asset set"
+    fi
+    chown -R root:root "$staging"
+    find "$staging" -type d -exec chmod 0755 {} +
+    find "$staging" -type f -exec chmod 0644 {} +
+    publish_asset_cache "$staging" "$destination"
+    printf '%s\n' "$destination"
+}
+
+metadata_record() {
+    local package="$1" version="$2" architecture="$3"
+    LC_ALL=C apt-cache \
+        -o "Dir::Etc::sourcelist=$SOURCE_LIST" \
+        -o 'Dir::Etc::sourceparts=-' \
+        -o 'APT::Get::List-Cleanup=0' \
+        show "$package=$version" 2>/dev/null \
+        | awk -v want_pkg="$package" -v want_ver="$version" -v want_arch="$architecture" '
+            BEGIN { RS=""; FS="\n"; OFS="\t" }
+            {
+                delete value
+                for (i = 1; i <= NF; i++) {
+                    pos = index($i, ":")
+                    if (pos > 0) {
+                        key = substr($i, 1, pos - 1)
+                        val = substr($i, pos + 1)
+                        sub(/^[[:space:]]+/, "", val)
+                        value[key] = val
+                    }
+                }
+                if (value["Package"] == want_pkg && value["Version"] == want_ver &&
+                    (value["Architecture"] == want_arch || value["Architecture"] == "all") &&
+                    value["SHA256"] ~ /^[[:xdigit:]]{64}$/ && value["Size"] ~ /^[0-9]+$/ &&
+                    value["Filename"] != "") {
+                    print tolower(value["SHA256"]), value["Size"], value["Filename"]
+                    exit
+                }
+            }'
+}
+
+verify_deb() {
+    local deb="$1" package="$2" version="$3" expected_sha="$4" expected_size="$5" actual_arch
+    [ -f "$deb" ] || return 1
+    [ "$(dpkg-deb -f "$deb" Package 2>/dev/null)" = "$package" ] || return 1
+    [ "$(dpkg-deb -f "$deb" Version 2>/dev/null)" = "$version" ] || return 1
+    actual_arch="$(dpkg-deb -f "$deb" Architecture 2>/dev/null)"
+    [ "$actual_arch" = amd64 ] || [ "$actual_arch" = all ] || return 1
+    [ "$(sha256sum "$deb" | awk '{print tolower($1)}')" = "${expected_sha,,}" ] || return 1
+    [ "$(stat -c '%s' "$deb")" = "$expected_size" ]
+}
+
+satellite_deb_origin_ok() {
+    local package="$1" version="$2" madison
+    madison="$(LC_ALL=C apt-cache \
+        -o "Dir::Etc::sourcelist=$SOURCE_LIST" \
+        -o 'Dir::Etc::sourceparts=-' \
+        -o 'APT::Get::List-Cleanup=0' \
+        madison "$package" 2>/dev/null || true)"
+    printf '%s\n' "$madison" | awk -F'|' -v expected="$version" -v origin="$REPOSITORY_URL" '
+        { candidate=$2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", candidate); source=$3 }
+        candidate == expected && index(source, origin) { found=1 }
+        END { exit(found ? 0 : 1) }'
+}
+
+stage_deb() {
+    local package="$1" version="$2" destination_dir="$3"
+    local record expected_sha expected_size filename source_deb download_dir candidate
+    satellite_deb_origin_ok "$package" "$version" \
+        || { warn "signed Codeberg origin is unavailable for $package=$version"; return 1; }
+    record="$(metadata_record "$package" "$version" amd64)"
+    [ -n "$record" ] \
+        || { warn "signed apt metadata is missing for $package=$version"; return 1; }
+    IFS=$'\t' read -r expected_sha expected_size filename <<<"$record"
+    filename="${filename##*/}"
+    source_deb="$APT_CACHE/$filename"
+    if [ -f "$source_deb" ] \
+        && verify_deb "$source_deb" "$package" "$version" "$expected_sha" "$expected_size"; then
+        install -m 0644 "$source_deb" "$destination_dir/$filename"
+    else
+        download_dir="$(mktemp -d "$destination_dir/.download.XXXXXX")" || return 1
+        if ! (cd "$download_dir" && apt-get \
+            -o "Dir::Etc::sourcelist=$SOURCE_LIST" \
+            -o 'Dir::Etc::sourceparts=-' \
+            -o 'APT::Get::List-Cleanup=0' \
+            download "$package=$version") >>"${LOG_FILE:-/dev/null}" 2>&1; then
+            rm -rf -- "$download_dir"
+            return 1
+        fi
+        candidate="$(find "$download_dir" -maxdepth 1 -type f -name '*.deb' -print -quit || true)"
+        [ -n "$candidate" ] || { rm -rf -- "$download_dir"; return 1; }
+        install -m 0644 "$candidate" "$destination_dir/$filename" || {
+            rm -rf -- "$download_dir"
+            return 1
+        }
+        rm -rf -- "$download_dir"
+    fi
+    verify_deb "$destination_dir/$filename" "$package" "$version" "$expected_sha" "$expected_size"
+}
+
+validate_release_dir() {
+    local root="$1" release="$2"
+    python3 - "$root" "$release" <<'PY'
+import csv
+import hashlib
+import pathlib
+import re
+import stat
+import subprocess
+import sys
+
+root = pathlib.Path(sys.argv[1])
+release = sys.argv[2]
+hard = ["pnetlab-docker", "pnetlab-qemu", "pnetlab-satellite", "pnetlab-vpcs"]
+zoo = [
+    "qemu-zoo-2.4.0-net.tgz",
+    "qemu-zoo-2.12.0-net.tgz",
+    "qemu-zoo-4.1.0-net.tgz",
+    "qemu-zoo-5.2.0-net.tgz",
+]
+
+def reject(message):
+    print(message, file=sys.stderr)
+    raise SystemExit(1)
+
+def owned_mode(path, mode, label):
+    try:
+        item = path.lstat()
+    except OSError as exc:
+        reject(label + ": " + str(exc))
+    if item.st_uid != 0 or item.st_gid != 0:
+        reject(label + ": not root-owned")
+    if stat.S_IMODE(item.st_mode) != mode:
+        reject(label + ": mode differs from expected")
+    return item
+
+if not re.fullmatch(r"6\.8\.[0-9]+resolute1", release):
+    reject("invalid bundle release")
+if root.is_symlink() or not root.is_dir():
+    reject("release directory is missing or is a symlink")
+owned_mode(root, 0o755, "release directory")
+marker = root / "COMPLETE"
+owned_mode(marker, 0o644, "COMPLETE")
+values = {}
+for line in marker.read_text().splitlines():
+    if "=" not in line:
+        reject("COMPLETE contains a malformed line")
+    key, value = line.split("=", 1)
+    if not key or key in values:
+        reject("COMPLETE contains a duplicate or empty key")
+    values[key] = value
+required_keys = {
+    "format", "release", "packages", "optional_packages", "assets",
+    "inventory_sha256", "asset_inventory_sha256",
+}
+if set(values) != required_keys or values["format"] != "1" or values["release"] != release:
+    reject("COMPLETE is absent, incomplete, or release-mismatched")
+if values["packages"] != ",".join(p + "=" + release for p in hard):
+    reject("COMPLETE hard package inventory is incomplete")
+if values["optional_packages"] not in ("", "pnetlab-bridge-dkms=" + release):
+    reject("COMPLETE optional package inventory is invalid")
+if values["assets"] != ",".join(["qemu-compat-libs.tgz"] + zoo):
+    reject("COMPLETE asset inventory is incomplete")
+if not re.fullmatch(r"[0-9a-f]{64}", values["inventory_sha256"]):
+    reject("COMPLETE package inventory digest is malformed")
+if not re.fullmatch(r"[0-9a-f]{64}", values["asset_inventory_sha256"]):
+    reject("COMPLETE asset inventory digest is malformed")
+
+inventory = root / "inventory.tsv"
+owned_mode(inventory, 0o644, "package inventory")
+if hashlib.sha256(inventory.read_bytes()).hexdigest() != values["inventory_sha256"]:
+    reject("package inventory digest does not match COMPLETE")
+rows = list(csv.reader(inventory.open(newline=""), delimiter="\t"))
+header = ["package", "architecture", "version", "sha256", "size", "filename"]
+if not rows or rows[0] != header:
+    reject("package inventory header is invalid")
+parsed = {}
+for row in rows[1:]:
+    if len(row) != 6 or row[0] in parsed or row[1] not in ("amd64", "all") or row[2] != release:
+        reject("package inventory row is invalid")
+    if not re.fullmatch(r"[0-9a-f]{64}", row[3]) or not row[4].isdigit() or "/" in row[5] or not row[5].endswith(".deb"):
+        reject("package inventory digest or filename is invalid")
+    parsed[row[0]] = (row[1], row[2], row[3], int(row[4]), row[5])
+expected_inventory = set(hard)
+if values["optional_packages"]:
+    expected_inventory.add("pnetlab-bridge-dkms")
+if set(parsed) != expected_inventory:
+    reject("package inventory does not match COMPLETE")
+deb_dir = root / "pnetlab-debs"
+owned_mode(deb_dir, 0o755, "satellite deb directory")
+actual_debs = []
+for item in deb_dir.iterdir():
+    if item.is_symlink():
+        reject("satellite deb directory contains a symlink")
+    if item.is_file() and item.name.endswith(".deb"):
+        actual_debs.append(item.name)
+        owned_mode(item, 0o644, "satellite deb " + item.name)
+if set(actual_debs) != {row[5] for row in rows[1:]}:
+    reject("package inventory does not match staged debs")
+for package, (arch, version, digest, size, filename) in parsed.items():
+    deb = deb_dir / filename
+    actual_package = subprocess.check_output(["dpkg-deb", "-f", str(deb), "Package"], text=True).strip()
+    actual_version = subprocess.check_output(["dpkg-deb", "-f", str(deb), "Version"], text=True).strip()
+    actual_arch = subprocess.check_output(["dpkg-deb", "-f", str(deb), "Architecture"], text=True).strip()
+    if actual_package != package or actual_version != version or actual_arch not in ("amd64", "all"):
+        reject(filename + ": dpkg identity differs from inventory")
+    if deb.stat().st_size != size or hashlib.sha256(deb.read_bytes()).hexdigest() != digest:
+        reject(filename + ": digest or size differs from inventory")
+
+asset_inventory = root / "asset-inventory.tsv"
+owned_mode(asset_inventory, 0o644, "asset inventory")
+if hashlib.sha256(asset_inventory.read_bytes()).hexdigest() != values["asset_inventory_sha256"]:
+    reject("asset inventory digest does not match COMPLETE")
+asset_rows = list(csv.reader(asset_inventory.open(newline=""), delimiter="\t"))
+asset_header = ["asset", "sha256", "size", "path"]
+if not asset_rows or asset_rows[0] != asset_header:
+    reject("asset inventory header is invalid")
+expected_assets = {"qemu-compat-libs.tgz": "deps/qemu-compat-libs.tgz"}
+expected_assets.update({name: "qemu-zoo/" + name for name in zoo})
+assets = {}
+for row in asset_rows[1:]:
+    if len(row) != 4 or row[0] in assets or row[0] not in expected_assets or row[3] != expected_assets[row[0]]:
+        reject("asset inventory row is invalid")
+    if not re.fullmatch(r"[0-9a-f]{64}", row[1]) or not row[2].isdigit():
+        reject("asset inventory digest or size is invalid")
+    assets[row[0]] = (row[1], int(row[2]), row[3])
+if set(assets) != set(expected_assets):
+    reject("asset inventory is incomplete")
+for name, (digest, size, relative) in assets.items():
+    payload = root / relative
+    owned_mode(payload, 0o644, name)
+    if payload.stat().st_size != size or hashlib.sha256(payload.read_bytes()).hexdigest() != digest:
+        reject(name + ": digest or size differs from inventory")
+
+owned_mode(root / "deps", 0o755, "satellite deps directory")
+owned_mode(root / "qemu-zoo", 0o755, "QEMU zoo directory")
+owned_mode(root / "install-resolute-satellite.sh", 0o755, "satellite installer")
+for item in root.rglob("*"):
+    if item.is_symlink():
+        reject("release payload contains a symlink")
+PY
+}
+
+provenance_matches_manifest() {
+    local root="$1" release="$2" sequence="$3" manifest_sha="$4" reissue="$5"
+    local key value extra actual_release='' actual_sha='' actual_sequence='' actual_reissue=''
+    local staged_utc='' source_name='' profile=''
+    [ -f "$root/provenance" ] && [ ! -L "$root/provenance" ] || return 1
+    [ "$(stat -c '%u:%g:%a' "$root/provenance" 2>/dev/null)" = '0:0:644' ] || return 1
+    while IFS='=' read -r key value extra || [ -n "${key:-}" ]; do
+        [ -z "${extra:-}" ] || return 1
+        case "$key" in
+            release) [ -z "$actual_release" ] || return 1; actual_release="$value" ;;
+            manifest_sha256) [ -z "$actual_sha" ] || return 1; actual_sha="$value" ;;
+            manifest_sequence) [ -z "$actual_sequence" ] || return 1; actual_sequence="$value" ;;
+            manifest_reissue) [ -z "$actual_reissue" ] || return 1; actual_reissue="$value" ;;
+            staged_utc) [ -z "$staged_utc" ] || return 1; staged_utc="$value" ;;
+            source) [ -z "$source_name" ] || return 1; source_name="$value" ;;
+            profile) [ -z "$profile" ] || return 1; profile="$value" ;;
+            '') ;;
+            *) return 1 ;;
+        esac
+    done <"$root/provenance"
+    [ "$actual_release" = "$release" ] \
+        && [ "${actual_sha,,}" = "${manifest_sha,,}" ] \
+        && [ "$actual_sequence" = "$sequence" ] \
+        && [ "$actual_reissue" = "$reissue" ] \
+        && [[ "$actual_sequence" =~ ^[0-9]+$ ]] \
+        && [[ "$actual_reissue" =~ ^[0-9]+$ ]] \
+        && [[ "$actual_sha" =~ ^[0-9a-fA-F]{64}$ ]] \
+        && [[ "$staged_utc" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] \
+        && [[ "$source_name" = update || "$source_name" = netinstall ]] \
+        && [ "$profile" = satellite ]
+}
+
+write_bundle_inventory() {
+    local staging="$1" deb package arch version sha size filename
+    {
+        printf 'package\tarchitecture\tversion\tsha256\tsize\tfilename\n'
+        while IFS= read -r deb; do
+            package="$(dpkg-deb -f "$deb" Package)"
+            arch="$(dpkg-deb -f "$deb" Architecture)"
+            version="$(dpkg-deb -f "$deb" Version)"
+            sha="$(sha256sum "$deb" | awk '{print $1}')"
+            size="$(stat -c '%s' "$deb")"
+            filename="${deb##*/}"
+            printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$package" "$arch" "$version" "$sha" "$size" "$filename"
+        done < <(find "$staging/pnetlab-debs" -maxdepth 1 -type f -name '*.deb' -print | sort)
+    } >"$staging/inventory.tsv"
+}
+
+publish_release() {
+    local staging="$1" release="$2" sequence="${3:-}" manifest_sha="${4:-}" reissue="${5:-}"
+    local releases="$BUNDLE_ROOT/releases"
+    local destination="$releases/$release" tombstone='' lock_file="$releases/.publish.lock"
+    install -d -o root -g root -m 0755 "$BUNDLE_ROOT" "$releases"
+    exec 7>"$lock_file"
+    flock -x -w 600 7 || die "could not acquire satellite bundle publish lock"
+    if [ -e "$destination" ] || [ -L "$destination" ]; then
+        if validate_release_dir "$destination" "$release" \
+                && { [ -z "$sequence" ] || provenance_matches_manifest "$destination" "$release" "$sequence" "$manifest_sha" "$reissue"; }; then
+            rm -rf -- "$staging"
+            staging=''
+        else
+            [ ! -L "$destination" ] && [ -d "$destination" ] \
+                || { exec 7>&-; rm -rf -- "$staging"; die "existing release is not repairable: $destination"; }
+            tombstone="$destination.superseded.$$.$RANDOM"
+            [ ! -e "$tombstone" ] && [ ! -L "$tombstone" ] \
+                || { exec 7>&-; rm -rf -- "$staging"; die "release tombstone already exists"; }
+            mv -T -- "$destination" "$tombstone" \
+                || { exec 7>&-; rm -rf -- "$staging"; die "could not move incomplete release aside"; }
+        fi
+    fi
+    if [ -n "$staging" ]; then
+        if ! mv -T -- "$staging" "$destination"; then
+            if [ -n "$tombstone" ] && [ ! -e "$destination" ] && [ ! -L "$destination" ]; then
+                mv -T -- "$tombstone" "$destination" || true
+            fi
+            exec 7>&-
+            rm -rf -- "$staging"
+            die "could not publish release directory: $destination"
+        fi
+    fi
+    if ! validate_release_dir "$destination" "$release"; then
+        exec 7>&-
+        [ -z "$tombstone" ] || mv -T -- "$tombstone" "$destination" || true
+        die "published satellite release failed validation: $destination"
+    fi
+    [ -z "$tombstone" ] || rm -rf -- "$tombstone"
+    flock -u 7 || true
+    exec 7>&-
+}
+
+sync_data_satellite() {
+    local release_dir="$1" satellite_deb bridge_deb
+    satellite_deb="$(find "$release_dir/pnetlab-debs" -maxdepth 1 -type f \
+        -name 'pnetlab-satellite_*.deb' -print -quit || true)"
+    bridge_deb="$(find "$release_dir/pnetlab-debs" -maxdepth 1 -type f \
+        -name 'pnetlab-bridge-dkms_*.deb' -print -quit || true)"
+    [ -n "$satellite_deb" ] || die "published release is missing pnetlab-satellite"
+    install -d -o root -g root -m 0755 /opt/unetlab/data/satellite
+    install -m 0644 "$satellite_deb" /opt/unetlab/data/satellite/
+    if [ -n "$bridge_deb" ] && [ "$(dpkg-deb -f "$bridge_deb" Version)" = \
+        "$(dpkg-deb -f "$satellite_deb" Version)" ]; then
+        install -m 0644 "$bridge_deb" /opt/unetlab/data/satellite/
+    else
+        warn 'matching pnetlab-bridge-dkms was not staged; Sync Satellite may be unavailable'
+    fi
+}
+
+prune_releases() {
+    local releases="$1" active="$2" protected="${3:-}" release
+    local -a ordered=()
+    mapfile -t ordered < <(find "$releases" -mindepth 1 -maxdepth 1 -type d \
+        -printf '%f\n' | grep -E '^6\.8\.[0-9]+resolute1$' | sort -V -r || true)
+    if [ "${#ordered[@]}" -gt 0 ]; then
+        for release in "${ordered[@]}"; do
+            [ "$release" = "$active" ] || [ "$release" = "$protected" ] || {
+                rm -rf -- "$releases/$release" \
+                    || warn "could not prune superseded satellite release $release"
+            }
+        done
+    fi
+}
+
+prepare() {
+    local manifest='' release='' sequence=0 reissue=0 manifest_sha='' asset_cache=''
+    local source_name=update staging='' releases destination deb_dir package version field
+    local script_name script_url script_sha sidecar sidecar_name extra
+    local inventory_sha asset_inventory_sha package_list optional_list
+    local -A required_packages=() optional_packages=()
+
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --manifest) [ "$#" -ge 2 ] || die '--manifest requires a file'; manifest="$2"; shift ;;
+            --release) [ "$#" -ge 2 ] || die '--release requires a version'; release="$2"; shift ;;
+            --manifest-sequence) [ "$#" -ge 2 ] || die '--manifest-sequence requires a number'; sequence="$2"; shift ;;
+            --manifest-reissue) [ "$#" -ge 2 ] || die '--manifest-reissue requires a number'; reissue="$2"; shift ;;
+            --manifest-sha256) [ "$#" -ge 2 ] || die '--manifest-sha256 requires a digest'; manifest_sha="$2"; shift ;;
+            --asset-cache) [ "$#" -ge 2 ] || die '--asset-cache requires a directory'; asset_cache="$2"; shift ;;
+            --source) [ "$#" -ge 2 ] || die '--source requires a label'; source_name="$2"; shift ;;
+            --source-list) [ "$#" -ge 2 ] || die '--source-list requires a file'; SOURCE_LIST="$2"; shift ;;
+            --repository) [ "$#" -ge 2 ] || die '--repository requires a URL'; REPOSITORY_URL="$2"; shift ;;
+            --log) [ "$#" -ge 2 ] || die '--log requires a file'; LOG_FILE="$2"; shift ;;
+            --bundle-root) [ "$#" -ge 2 ] || die '--bundle-root requires a directory'; BUNDLE_ROOT="$2"; shift ;;
+            --asset-cache-root) [ "$#" -ge 2 ] || die '--asset-cache-root requires a directory'; ASSET_CACHE_ROOT="$2"; shift ;;
+            *) die "unknown prepare option: $1" ;;
+        esac
+        shift
+    done
+    [ -n "$manifest" ] || die 'prepare requires --manifest'
+    [ -n "$release" ] || die 'prepare requires --release'
+    [[ "$sequence" =~ ^[0-9]+$ ]] || die 'manifest sequence is invalid'
+    [[ "$reissue" =~ ^[0-9]+$ ]] || die 'manifest reissue is invalid'
+    [[ -z "$manifest_sha" || "$manifest_sha" =~ ^[0-9a-fA-F]{64}$ ]] \
+        || die 'manifest sha256 is invalid'
+    [[ "$source_name" = update || "$source_name" = netinstall ]] \
+        || die 'bundle source must be update or netinstall'
+    validate_manifest_input "$manifest" "$release" \
+        || die 'manifest cannot be used for satellite bundle preparation'
+    if [ -z "$manifest_sha" ]; then
+        manifest_sha="$(sha256sum "$manifest" | awk '{print $1}')"
+    elif [ "$(sha256sum "$manifest" | awk '{print $1}')" != "${manifest_sha,,}" ]; then
+        die 'manifest sha256 does not match the verified manifest bytes'
+    fi
+    destination="$BUNDLE_ROOT/releases/$release"
+    if validate_release_dir "$destination" "$release" >/dev/null 2>&1 \
+        && provenance_matches_manifest "$destination" "$release" "$sequence" "$manifest_sha" "$reissue"; then
+        log "satellite bundle already prepared: $destination (current unchanged)"
+        return 0
+    fi
+    if [ -n "$asset_cache" ]; then
+        asset_cache_is_complete "$asset_cache" \
+            || die "the supplied satellite asset cache is incomplete: $asset_cache"
+    else
+        asset_cache="$(fetch_asset_cache "$manifest" "$release")"
+    fi
+
+    releases="$BUNDLE_ROOT/releases"
+    install -d -o root -g root -m 0755 "$BUNDLE_ROOT" "$releases"
+    staging="$(mktemp -d "$releases/.${release}.staging.XXXXXX")"
+    chmod 0700 "$staging"
+    read -r script_url script_sha script_name < <(python3 - "$manifest" "$release" <<'PY'
+import json, sys
+m = json.load(open(sys.argv[1], encoding="utf-8"))
+i = m.get("satellite_installer")
+if i is None:
+    print("", "", "pnetlab-install-resolute-satellite-" + sys.argv[2] + ".sh")
+else:
+    print(i["url"], i["sha256"], i["name"])
+PY
+    )
+    if [ -n "$script_url" ]; then
+        if ! curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 \
+            --output "$staging/$script_name" "$script_url"; then
+            rm -rf -- "$staging"
+            die "signed satellite installer download failed: $script_url"
+        fi
+        printf '%s  %s\n' "$script_sha" "$script_name" >"$staging/.script.sha256"
+    else
+        script_url="${GENERIC_API_BASE%/}/$DEFAULT_GENERIC_OWNER/generic/$DEFAULT_GENERIC_PACKAGE/$release/$script_name"
+        sidecar="$staging/$script_name.sha256"
+        if ! curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 \
+            --output "$staging/$script_name" "$script_url"; then
+            rm -rf -- "$staging"
+            die "satellite installer download failed: $script_url"
+        fi
+        if ! curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 \
+            --output "$sidecar" "$script_url.sha256"; then
+            rm -rf -- "$staging"
+            die "satellite installer checksum download failed: $script_url.sha256"
+        fi
+        [ "$(wc -l <"$sidecar")" -eq 1 ] || {
+            rm -rf -- "$staging"
+            die 'satellite installer checksum file must contain one line'
+        }
+        read -r script_sha sidecar_name extra <"$sidecar"
+        [ -z "${extra:-}" ] && [ "$sidecar_name" = "$script_name" ] \
+            && [[ "$script_sha" =~ ^[0-9a-fA-F]{64}$ ]] \
+            && printf '%s  %s\n' "$script_sha" "$script_name" >"$staging/.script.sha256" || {
+                rm -rf -- "$staging"
+                die 'satellite installer checksum metadata is invalid'
+            }
+        rm -f -- "$sidecar"
+    fi
+    (cd "$staging" && sha256sum --check --status -- .script.sha256) || {
+        rm -rf -- "$staging"
+        die 'satellite installer checksum verification failed'
+    }
+    rm -f -- "$staging/.script.sha256"
+    install -m 0755 "$staging/$script_name" "$staging/install-resolute-satellite.sh"
+    rm -f -- "$staging/$script_name"
+
+    deb_dir="$staging/pnetlab-debs"
+    install -d -m 0755 "$deb_dir"
+    while IFS=$'\t' read -r field package version; do
+        [ -n "$package" ] || continue
+        if [ "$field" = debs ]; then
+            required_packages["$package"]="${version}"
+        else
+            optional_packages["$package"]="${version}"
+        fi
+    done < <(manifest_satellite_selection "$manifest")
+    for package in "${SATELLITE_HARD_PACKAGES[@]}"; do
+        version="${required_packages[$package]:-}"
+        if [ "$version" != "$release" ]; then
+            rm -rf -- "$staging"
+            die "satellite package selection is incomplete: $package"
+        fi
+        if stage_deb "$package" "$version" "$deb_dir"; then
+            :
+        else
+            rm -rf -- "$staging"
+            die "could not stage required satellite package: $package=$version"
+        fi
+    done
+    for package in "${!optional_packages[@]}"; do
+        version="${optional_packages[$package]}"
+        if stage_deb "$package" "$version" "$deb_dir"; then
+            log "optional satellite package staged: $package=$version"
+        else
+            warn "optional satellite package was not staged: $package=$version"
+        fi
+    done
+    install -d -m 0755 "$staging/qemu-zoo" "$staging/deps"
+    for version in "${SATELLITE_ZOO_VERSIONS[@]}"; do
+        install -m 0644 "$asset_cache/qemu-zoo/qemu-zoo-$version-net.tgz" \
+            "$staging/qemu-zoo/qemu-zoo-$version-net.tgz" || {
+                rm -rf -- "$staging"
+                die "could not stage QEMU zoo asset $version"
+            }
+    done
+    install -m 0644 "$asset_cache/deps/qemu-compat-libs.tgz" "$staging/deps/" || {
+        rm -rf -- "$staging"
+        die 'could not stage qemu-compat-libs.tgz'
+    }
+    install -m 0644 "$asset_cache/asset-inventory.tsv" "$staging/asset-inventory.tsv" || {
+        rm -rf -- "$staging"
+        die 'could not stage satellite asset inventory'
+    }
+    write_bundle_inventory "$staging"
+    inventory_sha="$(sha256sum "$staging/inventory.tsv" | awk '{print $1}')"
+    asset_inventory_sha="$(sha256sum "$staging/asset-inventory.tsv" | awk '{print $1}')"
+    package_list=''
+    for package in "${SATELLITE_HARD_PACKAGES[@]}"; do
+        package_list+="$package=$release,"
+    done
+    package_list="${package_list%,}"
+    optional_list=''
+    if [ -f "$deb_dir/pnetlab-bridge-dkms_$release"_all.deb ]; then
+        optional_list="pnetlab-bridge-dkms=$release"
+    fi
+    {
+        printf 'format=1\nrelease=%s\npackages=%s\noptional_packages=%s\n' \
+            "$release" "$package_list" "$optional_list"
+        printf 'assets=qemu-compat-libs.tgz,qemu-zoo-2.4.0-net.tgz,qemu-zoo-2.12.0-net.tgz,qemu-zoo-4.1.0-net.tgz,qemu-zoo-5.2.0-net.tgz\n'
+        printf 'inventory_sha256=%s\nasset_inventory_sha256=%s\n' "$inventory_sha" "$asset_inventory_sha"
+    } >"$staging/COMPLETE"
+    {
+        printf 'release=%s\nmanifest_sha256=%s\nmanifest_sequence=%s\nmanifest_reissue=%s\n' \
+            "$release" "$manifest_sha" "$sequence" "$reissue"
+        printf 'staged_utc=%s\nsource=%s\nprofile=satellite\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$source_name"
+    } >"$staging/provenance"
+    chown -R root:root "$staging"
+    find "$staging" -type d -exec chmod 0755 {} +
+    find "$staging" -type f -exec chmod 0644 {} +
+    chmod 0755 "$staging/install-resolute-satellite.sh"
+    validate_release_dir "$staging" "$release" || {
+        rm -rf -- "$staging"
+        die 'prepared satellite release failed validation'
+    }
+    publish_release "$staging" "$release" "$sequence" "$manifest_sha" "$reissue"
+    log "satellite bundle prepared: $BUNDLE_ROOT/releases/$release (current unchanged)"
+}
+
+activate() {
+    local release='' current releases pointer_tmp master_release release_dir
+    local previous_target='' previous_release=''
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --release) [ "$#" -ge 2 ] || die '--release requires a version'; release="$2"; shift ;;
+            --bundle-root) [ "$#" -ge 2 ] || die '--bundle-root requires a directory'; BUNDLE_ROOT="$2"; shift ;;
+            --log) [ "$#" -ge 2 ] || die '--log requires a file'; LOG_FILE="$2"; shift ;;
+            *) die "unknown activate option: $1" ;;
+        esac
+        shift
+    done
+    [ -n "$release" ] && valid_release "$release" || die 'activate requires a valid --release'
+    master_release="$(dpkg-query -W -f='${Version}' pnetlab 2>/dev/null || true)"
+    [ "$master_release" = "$release" ] \
+        || die "installed master release ${master_release:-missing} does not match activation release $release"
+    releases="$BUNDLE_ROOT/releases"
+    release_dir="$releases/$release"
+    current="$BUNDLE_ROOT/current"
+    install -d -o root -g root -m 0755 "$BUNDLE_ROOT" "$releases"
+    exec 7>"$releases/.publish.lock"
+    flock -x -w 600 7 || die 'could not acquire satellite bundle publish lock'
+    validate_release_dir "$release_dir" "$release" \
+        || { exec 7>&-; die "satellite release is not complete: $release_dir"; }
+    if [ -e "$current" ] || [ -L "$current" ]; then
+        [ -L "$current" ] \
+            || { exec 7>&-; die 'cluster-bundle/current exists but is not a symlink'; }
+        previous_target="$(readlink "$current")"
+        if [[ "$previous_target" =~ ^releases/6\.8\.[0-9]+resolute1$ ]]; then
+            previous_release="${previous_target#releases/}"
+        fi
+    fi
+    if [ "$previous_target" = "releases/$release" ]; then
+        sync_data_satellite "$release_dir"
+        flock -u 7 || true
+        exec 7>&-
+        log "satellite bundle already active: $release"
+        return 0
+    fi
+    sync_data_satellite "$release_dir"
+    pointer_tmp="$BUNDLE_ROOT/.current.$$"
+    rm -f -- "$pointer_tmp"
+    if ! ln -s "releases/$release" "$pointer_tmp" \
+        || ! chown -h root:root "$pointer_tmp" \
+        || ! mv -Tf -- "$pointer_tmp" "$current"; then
+        rm -f -- "$pointer_tmp"
+        exec 7>&-
+        die 'could not activate the satellite bundle current pointer'
+    fi
+    prune_releases "$releases" "$release" "$previous_release"
+    flock -u 7 || true
+    exec 7>&-
+    log "satellite bundle activated: $release"
+}
+
+validate_current() {
+    local current="$BUNDLE_ROOT/current" target release
+    [ -L "$current" ] || die 'cluster-bundle/current is missing or is not a symlink'
+    target="$(readlink "$current")"
+    [[ "$target" == releases/6.8.*resolute1 ]] \
+        || die "cluster-bundle/current has an invalid target: $target"
+    release="${target#releases/}"
+    valid_release "$release" || die "cluster-bundle/current has an invalid release: $release"
+    [ "$(readlink -f "$current")" = "$BUNDLE_ROOT/releases/$release" ] \
+        || die 'cluster-bundle/current resolves outside the release tree'
+    validate_release_dir "$BUNDLE_ROOT/releases/$release" "$release"
+    log "satellite bundle current is valid: $release"
+}
+
+restore_current() {
+    local state_file='' current="$BUNDLE_ROOT/current" state='' target='' format='' key value extra
+    local release pointer_tmp releases
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --state-file) [ "$#" -ge 2 ] || die '--state-file requires a file'; state_file="$2"; shift ;;
+            --bundle-root) [ "$#" -ge 2 ] || die '--bundle-root requires a directory'; BUNDLE_ROOT="$2"; shift ;;
+            --log) [ "$#" -ge 2 ] || die '--log requires a file'; LOG_FILE="$2"; shift ;;
+            *) die "unknown restore-current option: $1" ;;
+        esac
+        shift
+    done
+    [ -f "$state_file" ] || die 'restore-current requires an existing --state-file'
+    while IFS='=' read -r key value extra || [ -n "${key:-}" ]; do
+        [ -z "${extra:-}" ] || die 'bundle pointer state is malformed'
+        case "$key" in
+            format) [ -z "$format" ] || die 'bundle pointer state repeats format'; format="$value" ;;
+            state) [ -z "$state" ] || die 'bundle pointer state repeats state'; state="$value" ;;
+            target) [ -z "$target" ] || die 'bundle pointer state repeats target'; target="$value" ;;
+            '') ;;
+            *) die "bundle pointer state contains unknown key: $key" ;;
+        esac
+    done <"$state_file"
+    [ "$format" = 1 ] || die 'bundle pointer state has an invalid format'
+    releases="$BUNDLE_ROOT/releases"
+    install -d -o root -g root -m 0755 "$BUNDLE_ROOT" "$releases"
+    exec 7>"$releases/.publish.lock"
+    flock -x -w 600 7 || die 'could not acquire satellite bundle publish lock'
+    case "$state:$target" in
+        absent:)
+            if [ -e "$current" ] || [ -L "$current" ]; then
+                [ -L "$current" ] \
+                    || { exec 7>&-; die 'cannot restore absent pointer over a non-symlink'; }
+                rm -f -- "$current"
+            fi
+            ;;
+        symlink:releases/6.8.*resolute1)
+            release="${target#releases/}"
+            valid_release "$release" \
+                || { exec 7>&-; die "invalid saved bundle release: $release"; }
+            validate_release_dir "$releases/$release" "$release" \
+                || { exec 7>&-; die "saved bundle release is incomplete: $release"; }
+            sync_data_satellite "$releases/$release"
+            pointer_tmp="$BUNDLE_ROOT/.current.$$"
+            rm -f -- "$pointer_tmp"
+            ln -s "$target" "$pointer_tmp" && chown -h root:root "$pointer_tmp" \
+                && mv -Tf -- "$pointer_tmp" "$current" \
+                || { rm -f -- "$pointer_tmp"; exec 7>&-; die 'could not restore saved bundle pointer'; }
+            ;;
+        *) exec 7>&-; die 'bundle pointer state is invalid' ;;
+    esac
+    flock -u 7 || true
+    exec 7>&-
+    log 'satellite bundle pointer restored'
+}
+
+main() {
+    local action="${1:-}"
+    shift || true
+    require_root
+    require_commands
+    case "$action" in
+        prepare) prepare "$@" ;;
+        activate) activate "$@" ;;
+        validate-current) validate_current "$@" ;;
+        restore-current) restore_current "$@" ;;
+        -h|--help|help|'') usage ;;
+        *) usage >&2; die "unknown operation: $action" ;;
+    esac
+}
+
+main "$@"

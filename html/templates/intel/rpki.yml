@@ -1,0 +1,22 @@
+# PNetLab "RPKI Validator" node — ROA editor + StayRTR RTR server (RFC 8210)
+# for BGP origin validation labs. Image: pnet-rpki (offline-install via the
+# Dashboard Docker Devices page). Handler: device_docker — console:http maps to
+# container port 80 (the web GUI is the admin console). Leave dock_args EMPTY so
+# device_docker takes the GUI-docker path (publishes the console port + adds the
+# busybox-managed lab interface). Per-interface networking (DHCP / static IP) is
+# set in the normal node edit; stayrtr binds 0.0.0.0 so routers reach RTR
+# tcp/3323 over the lab interface (eth1). Template filename stem "rpki" must be
+# a substring of the image name (binds template -> pnet-rpki).
+type: docker
+config_script: config_aaa.py
+name: RPKI Validator
+description: RPKI Validator
+cpulimit: 1
+icon: Server-2D-SEC-S.svg
+ethernet: 2
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 2048
+mtu: 1500
+docker_shell: echo "RPKI Validator — configure via the http console GUI (or http://<lab-ip>/)."; echo "RTR server tcp/3323 · dump served VRPs with rtrdump -connect 127.0.0.1:3323 -file /tmp/dump.json"; echo "--- /var/lib/rpki/vrps.json ---"; cat /var/lib/rpki/vrps.json 2>/dev/null; exec /bin/bash

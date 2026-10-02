@@ -1,0 +1,68 @@
+---
+# Cisco Virtual Access Point (VAP) — CML supplemental refplat image. Real Cisco AP
+# COS userland (capwapd/click/hostapd) as a QEMU VM; CAPWAP-joins a Catalyst
+# 9800-CL WLC over wired0. Handler: device_vap.php. Image dir auto-discovered as
+# addons/qemu/cvap-<version>/ and the disk MUST be named sataa.qcow2 so device_qemu
+# puts it on the AHCI/SATA bus that OVMF-sata.fd + the VAP's EFI/grub expect.
+#
+# Boot shape mirrors the CML vap node def: EFI firmware (OVMF-sata.fd), SATA disk,
+# e1000 NICs. Day-0 apvirtual.env is delivered via a cidata ISO by the handler;
+# the airduct RF-medium virtio-serial port is injected in customFlag().
+type: qemu
+name: cVAP
+description: Cisco Virtual Access Point (CAPWAP → Catalyst 9800)
+cpulimit: 1
+icon: Access Point Green.png
+cpu: 2
+ram: 2048
+ethernet: 2
+console: telnet
+qemu_arch: x86_64
+qemu_nic: e1000
+qemu_options: -machine type=pc,accel=kvm -serial mon:stdio -nographic -enable-kvm -bios /opt/qemu/share/qemu/OVMF-sata.fd
+AP_Model:
+  type: list
+  value: '9178'
+  options:
+    '9178': CW9178I — Wi-Fi 7 tri-band
+    '9176': CW9176I — Wi-Fi 7
+    '9166': C9166 — Wi-Fi 6E tri-band
+    '9164': C9164 — Wi-Fi 6E
+    '9162': C9162 — Wi-Fi 6E
+    '9136': C9136 — Wi-Fi 6E tri-band
+    '9130': C9130 — Wi-Fi 6
+    '9124': C9124 — Wi-Fi 6 outdoor
+    '9120': C9120 — Wi-Fi 6
+    '9117': C9117 — Wi-Fi 6
+    '9115': C9115 — Wi-Fi 6
+    '9105': C9105 — Wi-Fi 6
+    '3800': AIR-AP3800 — Wave 2
+    '2800': AIR-AP2800 — Wave 2
+    '1815': AIR-AP1815 — Wave 2
+    '1800': AIR-AP1800 — Wave 2
+  width: 6
+WLC_IP:
+  type: text
+  value: 10.10.100.254
+  width: 6
+CAPWAP_VER:
+  type: text
+  value: 17.18.3.18
+  width: 6
+AP_WIFI7_MLO:
+  type: list
+  value: '0'
+  options:
+    '0': disabled
+    '1': enabled (9178/9176 only)
+  width: 6
+RADIO_FREQ:
+  type: text
+  value: ''
+  width: 6
+Initial_startup_config:
+  type: checkbox
+  value: 1
+  width: 6
+  restart: 1
+...

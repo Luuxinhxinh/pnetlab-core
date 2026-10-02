@@ -1,0 +1,141 @@
+#cloud-config
+# PNetLab Wireless AP day-0 seed (cloud-init NoCloud / cidata).
+# device_wifiap.php substitutes inserthostname-here, insert-ssid-here, insert-ap-mode-here
+# (bridge|routed) and insert-lan-cidr-here (routed gateway, e.g. 192.168.10.1/24).
+#
+# P1b — wired data path. This seed is SELF-CONTAINED: it owns the AP bring-up (bridge/route +
+# hostapd) so behaviour does not depend on the dev image's opaque wifi-autoconfig (which we disable).
+# The radio (wlan0) is still created by the image's baked vwifi-client unit (vsock). The wired
+# uplink NIC is AUTO-DETECTED (first non-wlan ethernet) so no ens2/ens3 hardcoding.
+#   bridge mode (default): br0 = <wired> + wlan0 via netplan/networkd; transparent L2; STAs get
+#                          addressing from the lab.
+#   routed mode: wlan0 = gateway (insert-lan-cidr-here); dnsmasq DHCP to STAs; NAT out <wired>.
+hostname: inserthostname-here
+manage_etc_hosts: True
+ssh_pwauth: True
+disable_root: false
+users:
+  - name: cisco
+    groups: [sudo]
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+    lock_passwd: false
+chpasswd:
+  expire: False
+  list: |
+    cisco:cisco
+    root:cisco
+# Disable the dev image's wifi-autoconfig EARLY (bootcmd runs before multi-user.target) so it
+# can't race our bring-up. `systemctl mask` won't work — the unit is a real file in /etc — so
+# we disable + drop the wants symlink instead.
+bootcmd:
+  - [ sh, -c, 'systemctl disable --now wifi-autoconfig.service 2>/dev/null; rm -f /etc/systemd/system/multi-user.target.wants/wifi-autoconfig.service; true' ]
+write_files:
+  - path: /home/cisco/hostapd.conf
+    permissions: '0644'
+    content: |
+      interface=wlan0
+      driver=nl80211
+      ctrl_interface=/var/run/hostapd
+      ctrl_interface_group=0
+      ssid=insert-ssid-here
+      hw_mode=insert-hwmode-here
+      channel=insert-channel-here
+      insert-security-here
+  - path: /etc/pnet-wifi/ap.env
+    permissions: '0644'
+    content: |
+      AP_MODE=insert-ap-mode-here
+      AP_LAN_CIDR=insert-lan-cidr-here
+  - path: /usr/local/sbin/pnet-wifi-ap.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      # PNetLab Wireless AP bring-up (P1b). Bridge or routed wired data path + hostapd.
+      set +e
+      . /etc/pnet-wifi/ap.env 2>/dev/null
+      [ -z "$AP_MODE" ] && AP_MODE=bridge
+      # Wait for the emulated radio (vwifi-client creates wlan0 over vsock).
+      for i in $(seq 1 60); do ip link show wlan0 >/dev/null 2>&1 && break; sleep 1; done
+      # Auto-detect the wired uplink: first ethernet that is not wlan*/lo and has a real device.
+      WIRED=""
+      for d in /sys/class/net/*; do
+        n=$(basename "$d")
+        case "$n" in lo|wlan*|br*|veth*) continue;; esac
+        [ -e "$d/device" ] || continue
+        WIRED="$n"; break
+      done
+      ip link set wlan0 up 2>/dev/null
+      HOSTAPD_CONF=/home/cisco/hostapd.conf
+      if [ "$AP_MODE" = "routed" ]; then
+        # Routed: AP is the STA gateway; NAT/route out the wired uplink.
+        GW_CIDR="${AP_LAN_CIDR:-192.168.10.1/24}"
+        GW_IP="${GW_CIDR%/*}"
+        BASE="${GW_IP%.*}"
+        if [ -n "$WIRED" ]; then
+          ip link set "$WIRED" up
+          dhclient -nw "$WIRED" 2>/dev/null || dhcpcd "$WIRED" 2>/dev/null
+        fi
+        ip addr flush dev wlan0 2>/dev/null
+        ip addr add "$GW_CIDR" dev wlan0
+        sysctl -w net.ipv4.ip_forward=1
+        command -v dnsmasq >/dev/null 2>&1 || { export DEBIAN_FRONTEND=noninteractive; apt-get install -y --no-install-recommends dnsmasq 2>/dev/null; }
+        if command -v dnsmasq >/dev/null 2>&1; then
+          mkdir -p /etc/dnsmasq.d
+          cat >/etc/dnsmasq.d/pnet-wifi.conf <<EOF
+      interface=wlan0
+      bind-interfaces
+      dhcp-range=${BASE}.50,${BASE}.150,255.255.255.0,12h
+      dhcp-option=3,${GW_IP}
+      dhcp-option=6,${GW_IP},1.1.1.1
+      EOF
+          systemctl restart dnsmasq 2>/dev/null || dnsmasq --conf-file=/etc/dnsmasq.d/pnet-wifi.conf 2>/dev/null
+        else
+          echo "pnet-wifi-ap: dnsmasq missing - STAs will not get DHCP in routed mode (bake in P5)" >&2
+        fi
+        if [ -n "$WIRED" ]; then
+          iptables -t nat -C POSTROUTING -o "$WIRED" -j MASQUERADE 2>/dev/null \
+            || iptables -t nat -A POSTROUTING -o "$WIRED" -j MASQUERADE
+        fi
+        # hostapd must NOT bridge in routed mode.
+        sed -i '/^bridge=/d' "$HOSTAPD_CONF"
+      else
+        # Bridge / AP-only (default): transparent L2 — br0 = wired NIC + wlan0.
+        # Let netplan/systemd-networkd OWN br0. A manual `ip` bridge loses a race with
+        # cloud-init's fallback DHCP config on the wired NIC (networkd re-grabs the NIC ->
+        # "carrier lost" -> the bridge dies). So we replace that fallback with a declarative
+        # bridge: networkd puts the wired NIC into br0 and DHCPs br0; hostapd adds wlan0 (bridge=br0).
+        rm -f /etc/netplan/50-cloud-init.yaml
+        if [ -n "$WIRED" ]; then
+          printf 'network:\n  version: 2\n  renderer: networkd\n  ethernets:\n    %s:\n      dhcp4: false\n      dhcp6: false\n  bridges:\n    br0:\n      interfaces: [%s]\n      dhcp4: true\n      dhcp6: false\n      parameters:\n        stp: false\n' "$WIRED" "$WIRED" > /etc/netplan/60-pnet-wifi.yaml
+        else
+          printf 'network:\n  version: 2\n  renderer: networkd\n  bridges:\n    br0:\n      dhcp4: true\n      parameters:\n        stp: false\n' > /etc/netplan/60-pnet-wifi.yaml
+        fi
+        chmod 600 /etc/netplan/60-pnet-wifi.yaml
+        netplan apply 2>/dev/null
+        # wait for br0 to acquire a lease (netplan apply is async)
+        for i in $(seq 1 25); do ip -4 addr show br0 2>/dev/null | grep -q 'inet ' && break; sleep 1; done
+        # hostapd enslaves wlan0 into br0 itself (bridge=br0).
+        grep -q '^bridge=br0' "$HOSTAPD_CONF" 2>/dev/null || echo 'bridge=br0' >> "$HOSTAPD_CONF"
+      fi
+      # (Re)start hostapd against our config.
+      pkill -f 'hostapd .*hostapd.conf' 2>/dev/null; sleep 1
+      hostapd -B "$HOSTAPD_CONF"
+  - path: /etc/systemd/system/pnet-wifi-ap.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=PNetLab Wireless AP bring-up (bridge/routed + hostapd)
+      After=network-online.target
+      Wants=network-online.target
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/local/sbin/pnet-wifi-ap.sh
+      [Install]
+      WantedBy=multi-user.target
+runcmd:
+  - [ systemctl, stop, wifi-autoconfig.service ]
+  - [ systemctl, disable, wifi-autoconfig.service ]
+  - [ systemctl, daemon-reload ]
+  - [ systemctl, enable, --now, pnet-wifi-ap.service ]

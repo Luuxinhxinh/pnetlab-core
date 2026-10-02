@@ -1,0 +1,56 @@
+# vim: syntax=apache tabstop=4 softtabstop=0 noexpandtab laststatus=1 ruler
+
+# php_* directives only exist under mod_php — unguarded they 500 every
+# request under php8.5-fpm (B2). The fpm pool mirrors this exact set in
+# /etc/php/8.5/fpm/pool.d/zz-pnetlab.conf (written by scripts/enable-php-fpm.sh).
+<IfModule mod_php8.5.c>
+# supress php errors
+php_flag display_startup_errors off
+php_flag display_errors off
+php_flag html_errors off
+php_value memory_limit 512M
+
+# enable PHP error logging
+php_flag log_errors on
+php_value error_log /opt/unetlab/data/Logs/php_errors.txt
+
+# PHP settings
+php_value session.gc_maxlifetime 86400
+php_value post_max_size 1024M
+php_value upload_max_filesize 1024M
+</IfModule>
+
+# TODO
+# ErrorDocument 403 /error.php
+
+<IfModule mod_rewrite.c>
+	# http://httpd.apache.org/docs/2.4/rewrite/flags.html
+	RewriteEngine On
+	RewriteBase /
+
+	#RewriteCond %{HTTPS} off
+	#RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301] 
+	
+	# If starts with /api, call API router
+	RewriteCond %{REQUEST_URI} ^/api/
+	RewriteRule ^(.*)$ /api.php [B,L,QSA]
+
+	# If starts with /auth, call Opauth
+	RewriteCond %{REQUEST_URI} ^/auth/
+	RewriteRule ^(.*)$ /auth.php [B,L,QSA]
+	
+	RewriteCond %{REQUEST_URI} ^/legacy/
+	RewriteRule ^(.*)$ /themes/default/ [B,L,QSA]
+
+	# Store retirement (item C6): the Laravel store catch-all
+	# (!-d/!-f -> /store/public/$1) is GONE. Any request that isn't /api/,
+	# /auth/, /legacy/, an existing dir, or an existing file now falls through
+	# this block untouched and hits Apache's own 404 — there is no more
+	# catch-all rewrite target to fall back to.
+
+	# Self-created dashboard (upg/main-dashboard): the bare host now lands on the
+	# new /main/ post-login dashboard instead of the legacy AngularJS store menu.
+	# The store (and its menu) is retired (item C6) — /main/ is the only landing page.
+	RewriteRule ^$ /main/ [R=302,L]
+
+</IfModule>

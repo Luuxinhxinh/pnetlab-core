@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>PNetLab — Sign in</title>
+	<link rel="icon" href="/branding/api.php?action=logo">
+	<!--
+		Engine-native login (replaces the retired Laravel store login at
+		/store/public/auth/login/offline). Reachable at the DIRECT path
+		/login/ — a real directory with a real index.html, so the .htaccess
+		catch-all (RewriteCond !-d / !-f) never rewrites it to /store/public.
+		CSP is enforced (script-src 'self'): all JS is the external login.js;
+		no inline script, no inline handlers.
+	-->
+	<script src="/assets-common/js/pnq-branding.js?v=fa685e58"></script>
+	<script src="/assets-common/js/pnq-theme.js?v=ed2aef02"></script>
+	<link rel="stylesheet" href="/login/login.css?v=d39c01b9">
+</head>
+<body>
+	<main class="login-wrap">
+		<div class="brand">
+			<img class="brand-logo" id="brand-logo" data-brand-logo src="/branding/api.php?action=logo" alt="PNetLab">
+			<span class="brand-mark" id="brand-mark" hidden>PN</span>
+			<span class="brand-text" data-brand-name>PNetLab</span>
+		</div>
+		<!-- Admin-supplied header line (branding/api.php). Hidden until the config
+		     fetch resolves; painted with textContent, never innerHTML. -->
+		<p class="login-header" id="login-header" hidden></p>
+		<p class="version-line" id="version-line">Version: <span id="version-value">&hellip;</span></p>
+		<p class="default-account" id="default-account">Default account: <strong>admin</strong> / <strong>pnet</strong></p>
+
+		<form class="login-card" id="login-form" autocomplete="on">
+			<div class="field">
+				<label for="username">Username</label>
+				<input id="username" name="username" type="text" autocomplete="username"
+					autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus>
+			</div>
+			<div class="field">
+				<label for="password">Password</label>
+				<input id="password" name="password" type="password" autocomplete="current-password" required>
+			</div>
+			<div class="field">
+				<label for="console-pref">Console</label>
+				<select id="console-pref" name="console-pref">
+					<option value="native" selected>Default Console</option>
+					<option value="html5">HTML5 Console</option>
+				</select>
+			</div>
+
+			<div class="alert" id="alert" role="alert" hidden></div>
+
+			<button class="btn" id="submit" type="submit">
+				<span class="btn-label">Sign in</span>
+				<span class="btn-spin" aria-hidden="true"></span>
+			</button>
+		</form>
+		<p class="footnote">Offline appliance access</p>
+	</main>
+
+	<script src="/login/login.js?v=a1ee57a7"></script>
+</body>
+</html>

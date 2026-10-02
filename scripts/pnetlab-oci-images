@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# Ensure OCI images declared by a signed PNetLab release manifest are present
+# under their canonical local tags. This helper is independent of
+# pnetlab.postinst: the network installer and pnetlab-update call it only
+# after the manifest has been authenticated and semantically validated.
+
+set -Eeuo pipefail
+
+readonly PROGRAM="${0##*/}"
+
+die() {
+    printf 'ERROR: %s\n' "$*" >&2
+    exit 1
+}
+
+usage() {
+    cat <<'EOF'
+Usage: pnetlab-oci-images --manifest FILE [--no-docker]
+
+Ensure every OCI image in the already-verified release manifest is pulled by
+immutable registry digest, tagged canonically, and checked against its local
+config/image ID. --no-docker is the explicit successful skip for hosts whose
+installer intentionally omitted Docker.
+EOF
+}
+
+valid_digest() {
+    [[ "$1" =~ ^sha256:[0-9a-f]{64}$ ]]
+}
+
+valid_local_tag() {
+    [[ "$1" =~ ^[a-z0-9][a-z0-9._/-]*:[A-Za-z0-9._-]+$ && "$1" != *@* ]]
+}
+
+valid_registry_ref() {
+    [[ "$1" =~ ^[a-z0-9.-]+/[a-z0-9][a-z0-9._/-]*$ && "$1" != *:* && "$1" != *@* ]]
+}
+
+image_id() {
+    docker image inspect --format '{{.Id}}' "$1" 2>/dev/null
+}
+
+ensure_one() {
+    local local_tag="$1" registry_ref="$2" registry_digest="$3" expected_id="$4"
+    local actual legacy_tag=''
+
+    valid_local_tag "$local_tag" || die "invalid canonical OCI local tag: $local_tag"
+    valid_registry_ref "$registry_ref" || die "invalid OCI registry reference: $registry_ref"
+    valid_digest "$registry_digest" || die "invalid OCI registry digest for $local_tag: $registry_digest"
+    valid_digest "$expected_id" || die "invalid OCI image ID for $local_tag: $expected_id"
+
+    if actual="$(image_id "$local_tag")" && [ "$actual" = "$expected_id" ]; then
+        printf 'OCI ready: %s (%s; already present)\n' "$local_tag" "$actual"
+        return 0
+    fi
+
+    # Older offline riders used this mutable name internally. Preserve the
+    # one-time migration for those hosts, but never run the legacy name.
+    if [ "$local_tag" = 'pnet-wifi-spike:1.0' ]; then
+        legacy_tag='wifi-spike:latest'
+        if actual="$(image_id "$legacy_tag")" && [ "$actual" = "$expected_id" ]; then
+            docker tag "$legacy_tag" "$local_tag" \
+                || die "could not retag legacy $legacy_tag as $local_tag"
+            actual="$(image_id "$local_tag")" \
+                || die "canonical OCI tag disappeared after retag: $local_tag"
+            [ "$actual" = "$expected_id" ] \
+                || die "canonical OCI image ID mismatch after retag for $local_tag: expected $expected_id, found $actual"
+            printf 'OCI ready: %s (%s; migrated legacy tag)\n' "$local_tag" "$actual"
+            return 0
+        fi
+    fi
+
+    printf 'Pulling OCI image by digest: %s@%s\n' "$registry_ref" "$registry_digest"
+    docker pull "$registry_ref@$registry_digest" \
+        || die "OCI digest pull failed for $local_tag: $registry_ref@$registry_digest"
+    actual="$(image_id "$registry_ref@$registry_digest")" \
+        || die "pulled OCI image cannot be inspected: $registry_ref@$registry_digest"
+    [ "$actual" = "$expected_id" ] \
+        || die "pulled OCI image ID mismatch for $local_tag: expected $expected_id, found $actual"
+
+    docker tag "$registry_ref@$registry_digest" "$local_tag" \
+        || die "could not tag pulled OCI image as $local_tag"
+    actual="$(image_id "$local_tag")" \
+        || die "canonical OCI tag cannot be inspected after tagging: $local_tag"
+    [ "$actual" = "$expected_id" ] \
+        || die "canonical OCI image ID mismatch for $local_tag: expected $expected_id, found $actual"
+    printf 'OCI ready: %s (%s; pulled and tagged)\n' "$local_tag" "$actual"
+}
+
+ensure_manifest() {
+    local manifest="$1" no_docker="$2" rows local_tag registry_ref registry_digest image_id_value
+
+    [ -f "$manifest" ] || die "OCI manifest is missing: $manifest"
+    if [ "$no_docker" -eq 1 ]; then
+        printf 'OCI provisioning skipped: --no-docker was selected\n'
+        return 0
+    fi
+    command -v docker >/dev/null 2>&1 || die 'Docker is required to provision manifest OCI images'
+
+    rows="$(python3 - "$manifest" <<'PY'
+import json
+import re
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as source:
+    manifest = json.load(source)
+oci = manifest.get("oci")
+if oci is None:
+    raise SystemExit(0)
+if not isinstance(oci, dict) or not oci:
+    raise SystemExit("manifest OCI member must be null or a non-empty object")
+for local_tag in sorted(oci):
+    image = oci[local_tag]
+    if not isinstance(image, dict) or set(image) != {"ref", "registry_digest", "image_id"}:
+        raise SystemExit(f"invalid OCI object for {local_tag}")
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", image["registry_digest"]):
+        raise SystemExit(f"invalid registry digest for {local_tag}")
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", image["image_id"]):
+        raise SystemExit(f"invalid image ID for {local_tag}")
+    if not isinstance(image["ref"], str):
+        raise SystemExit(f"invalid registry reference for {local_tag}")
+    print("\t".join((local_tag, image["ref"], image["registry_digest"], image["image_id"])))
+PY
+)" || die "manifest OCI extraction failed"
+
+    while IFS=$'\t' read -r local_tag registry_ref registry_digest image_id_value; do
+        [ -n "$local_tag" ] || continue
+        ensure_one "$local_tag" "$registry_ref" "$registry_digest" "$image_id_value"
+    done <<<"$rows"
+}
+
+MANIFEST=''
+NO_DOCKER=0
+while (( $# > 0 )); do
+    case "$1" in
+        --manifest)
+            (( $# >= 2 )) || die '--manifest requires FILE'
+            MANIFEST="$2"
+            shift 2
+            ;;
+        --no-docker)
+            NO_DOCKER=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            die "unknown argument: $1"
+            ;;
+    esac
+done
+
+[ -n "$MANIFEST" ] || { usage >&2; die '--manifest is required'; }
+ensure_manifest "$MANIFEST" "$NO_DOCKER"

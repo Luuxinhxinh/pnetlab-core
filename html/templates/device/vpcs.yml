@@ -1,0 +1,63 @@
+---
+name: VPCS
+
+name: 
+  width : 4
+
+description: 
+  show : 0
+
+icon: 
+  width : 4
+
+ethernet: 
+  type: number
+  value: 2
+  width: 6
+  restart: 1
+
+mtu: 
+  type: number
+  value: 9000
+  width: 6
+  restart: 1
+ram: 
+  type: number
+  unit: MB
+  value: 128
+
+config: 
+  type: list
+  value: 0
+  options:
+    0: None
+    1: Exported
+    
+delay: 
+  value: 0
+  type: number
+  restart: 1
+
+description: 
+  show : 0
+config_script: 
+    show : 0
+
+cpulimit : 
+  show : 0
+size:
+  type: number
+  width: 4
+  unit: (px)
+
+left: 
+  type: number
+  width: 4
+  unit: (px)
+
+top:
+  type: number
+  width: 4
+  unit: (px)
+
+...

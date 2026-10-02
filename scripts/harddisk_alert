@@ -1,0 +1,17 @@
+#!/bin/bash
+# harddisk_alert — relocated engine-side (item C6, store decommission).
+# Recovered verbatim (behavior) from the stock 6.6 pnetlab-store deb's
+# app/Console/Commands/harddisk_alert — the store is retired, but this check
+# is pure bash with no Laravel/store dependency beyond the path it used to
+# live at, so it moves to /opt/unetlab/scripts instead of being dropped.
+while true ; do \
+    harddisk=$(df -k /);
+    if [[ "$harddisk" =~ ([0-9]+)%[[:space:]]*/$ ]];
+    then
+        if [[ ${BASH_REMATCH[1]} -gt 90 ]];
+        then
+            echo -e "\nHard drive current is ${BASH_REMATCH[1]}%. Please add another hard drive and reboot (Do not expand)" >> /dev/tty0
+        fi
+    fi
+    sleep 90
+done

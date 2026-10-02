@@ -1,0 +1,9 @@
+---
+ipv6: 0
+numa: 0
+cpudedicate: 0
+nat: 0
+cloud: 0
+port: 30000
+port_2nd: 40000
+...

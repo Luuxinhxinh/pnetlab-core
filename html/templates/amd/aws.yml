@@ -1,0 +1,35 @@
+# PNetLab template for the AWS Region Simulator docker node.
+# Goes to /opt/unetlab/html/templates/{amd,intel}/aws.yml.
+# Filename stem "aws" must stay a substring of the image name (pnet-aws) —
+# the engine binds template->image via `docker images | grep <stem>`.
+#
+# Interface roles (fixed at node create; the fabric assigns them by index):
+#   eth0  = mgmt (docker0 NAT + published http console)   [engine-managed]
+#   eth1  = Direct Connect link A (dx-a)
+#   eth2  = Direct Connect link B (dx-b)
+#   eth3  = inter-region backbone (multi-region peering + netem RTT)
+#   eth4+ = EC2 "VM ports" — bind other lab nodes into a subnet/ENI in the GUI
+# ethernet: 24 gives 20 VM ports by default (eth4..eth23). The interface count
+# is FIXED at node create and cannot grow afterward, so the default is set high
+# enough for a sizeable multi-instance region without editing the template.
+# Unused ports cost nothing (no veth is created until the port is cabled).
+#
+# docker_options grants the three capabilities the fabric needs and that are
+# NOT in docker's default set: CAP_SYS_ADMIN (create network namespaces and
+# remount /proc/sys rw for the per-subnet proxy-ARP/forwarding sysctls),
+# CAP_NET_ADMIN (veth/netns/nftables/FRR/tc), CAP_NET_RAW (strongSwan + DHCP
+# raw sockets). No --privileged. Mirrors the redteam/splunk docker_options
+# pattern that flows through the engine's GUI-publish `docker create` path.
+---
+type: docker
+name: AWS Region Simulator
+description: AWS Region Simulator (VPC, subnets, route tables, SG/NACL, IGW/NAT, Transit Gateway, Site-to-Site VPN, Direct Connect, multi-region)
+cpulimit: 2
+cpu: 2
+ram: 4096
+ethernet: 24
+console: http
+config_script: config_aaa.py
+icon: Cloud-2D-AWS-Region-S.svg
+docker_options: '--cap-add=NET_ADMIN --cap-add=NET_RAW --cap-add=SYS_ADMIN'
+shutdown: 1

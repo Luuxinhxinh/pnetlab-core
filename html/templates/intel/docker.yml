@@ -1,0 +1,11 @@
+---
+type: docker
+name: Docker
+config_script: config_docker.py
+description: Docker.io
+icon: Dockerserver-1.png
+ethernet: 4
+console: telnet
+ram: 1024
+docker_options: '--privileged'
+...

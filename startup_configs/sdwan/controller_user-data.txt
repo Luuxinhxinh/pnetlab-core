@@ -1,0 +1,61 @@
+#cloud-config
+# Day-0 cloud-init "user-data" for a STANDALONE Cisco Catalyst SD-WAN Controller (vSmart).
+# Delivered as the user-data of a `cidata` seed ISO built by device_catcontrol.php.
+# Boots vSmart past the setup dialog with hostname = node name, admin/admin, a VPN 0 (eth1)
+# transport interface and a DHCP VPN 512 (eth0) management interface. The "Cisco SDWAN Lab
+# Builder" (Phase 2) overrides this with a fully rendered cloud-config (root-CA / org-name /
+# vBond / system-ip / static transport IP).
+#
+# VPN 0 / eth1 MUST be declared (do NOT remove): the appliance defaults the first NIC (eth0)
+# into VPN 0, so binding eth0 in VPN 512 without claiming VPN 0 on eth1 leaves eth0 in both
+# VPNs → confd "values are not unique: eth0 at vpn-instance{0}/interface{eth0}" → init
+# transaction fails → CDB corrupts → boot loop. Needs ≥2 NICs (catcontrol template has 4);
+# eth1 need not be wired. A node that already boot-looped must be WIPED.
+write_files:
+- path: /etc/default/personality
+  content: "vsmart\n"
+- path: /etc/default/inited
+  content: "1\n"
+- path: /etc/confd/init/zcloud.xml
+  content: |
+    <config xmlns="http://tail-f.com/ns/config/1.0">
+      <system xmlns="http://viptela.com/system">
+        <personality>vsmart</personality>
+        <device-model>vsmart</device-model>
+        <organization-name>pnetlab</organization-name>
+        <sp-organization-name>pnetlab</sp-organization-name>
+        <host-name>inserthostname-here</host-name>
+        <site-id>100</site-id>
+        <system-ip>100.0.0.101</system-ip>
+        <domain-id>1</domain-id>
+        <aaa>
+          <user>
+            <name>admin</name>
+            <password>admin</password>
+            <group>netadmin</group>
+          </user>
+        </aaa>
+      </system>
+      <vpn xmlns="http://viptela.com/vpn">
+        <vpn-instance>
+          <vpn-id>0</vpn-id>
+          <interface>
+            <if-name>eth1</if-name>
+            <ip>
+              <dhcp-client>true</dhcp-client>
+            </ip>
+            <shutdown>false</shutdown>
+          </interface>
+        </vpn-instance>
+        <vpn-instance>
+          <vpn-id>512</vpn-id>
+          <interface>
+            <if-name>eth0</if-name>
+            <ip>
+              <dhcp-client>true</dhcp-client>
+            </ip>
+            <shutdown>false</shutdown>
+          </interface>
+        </vpn-instance>
+      </vpn>
+    </config>

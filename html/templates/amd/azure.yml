@@ -1,0 +1,32 @@
+# PNetLab template for the Azure Region Simulator docker node.
+# Goes to /opt/unetlab/html/templates/{amd,intel}/azure.yml.
+# Filename stem "azure" must stay a substring of the image name (pnet-azure)
+# — the engine binds template->image via `docker images | grep <stem>`.
+#
+# console: http -> the engine publishes container port 80 and (since 6.8.43+
+# and the gated http-console embed) reverse-proxies the portal SPA at
+# /console/http/<token>/. console_2nd: telnet gives the PID1 log console.
+#
+# ethernet: 24 is the PORT POOL — only eth0 (mgmt) is fixed; eth1/eth2
+# (ExpressRoute MSEEs), eth3 (VPN gateway public), eth4 (backbone) and eth11
+# (Internet edge uplink) are ROLE DEFAULTS claimed only when the feature is
+# configured; every other eth is a bindable VM port. The count is fixed at
+# node create.
+#
+# docker_options (single-quoted — YAML trap) adds the caps armd needs to build
+# the fabric: NET_ADMIN (netns/veth/routes/nft/tc), NET_RAW (proxy-ARP probes,
+# raw ESP), SYS_ADMIN (netns mount + per-netns /proc remount for FRR).
+---
+type: docker
+name: Azure Region
+description: Azure Region Simulator (VNets/NSGs/UDRs/Peering/VPN/ExpressRoute)
+cpulimit: 4
+cpu: 4
+ram: 4096
+ethernet: 24
+console: http
+console_2nd: telnet
+config_script: config_aaa.py
+icon: Cloud-2D-Azure-Region-S.svg
+docker_options: '--cap-add=NET_ADMIN --cap-add=NET_RAW --cap-add=SYS_ADMIN'
+shutdown: 1

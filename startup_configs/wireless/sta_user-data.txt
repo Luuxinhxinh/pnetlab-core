@@ -1,0 +1,115 @@
+#cloud-config
+# PNetLab Wireless STA day-0 seed (cloud-init NoCloud / cidata).
+# device_wifista.php substitutes inserthostname-here and insert-ssid-here.
+#
+# P1b — wired data path. Self-contained STA bring-up (we disable the image's wifi-autoconfig so it
+# can't double-run wpa_supplicant): associate to the cell AP with wpa_supplicant, then DHCP on wlan0
+# so the station gets an L3 address from the lab *through* the AP (bridge mode) or from the AP itself
+# (routed mode). The radio (wlan0) is created by the baked vwifi-client unit (vsock); WPA2/3/EAP = P3.
+hostname: inserthostname-here
+manage_etc_hosts: True
+ssh_pwauth: True
+disable_root: false
+users:
+  - name: cisco
+    groups: [sudo]
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+    lock_passwd: false
+chpasswd:
+  expire: False
+  list: |
+    cisco:cisco
+    root:cisco
+# Disable the dev image's wifi-autoconfig EARLY so it can't also drive wpa_supplicant on wlan0.
+bootcmd:
+  - [ sh, -c, 'systemctl disable --now wifi-autoconfig.service 2>/dev/null; rm -f /etc/systemd/system/multi-user.target.wants/wifi-autoconfig.service; true' ]
+write_files:
+  - path: /home/cisco/wpa_supplicant.conf
+    permissions: '0644'
+    content: |
+      insert-wpa-conf-here
+  - path: /usr/local/sbin/pnet-wifi-sta.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      # PNetLab Wireless STA bring-up SUPERVISOR (resilient, runs forever).
+      # If wpa_supplicant.conf carries a network{} block (an explicit Wifi_SSID was set),
+      # wpa_supplicant associates to it directly. If it carries only the control header
+      # (blank Wifi_SSID), we scan and auto-join the strongest OPEN SSID; ties on signal
+      # are broken by the LOWEST BSSID so the choice is deterministic in emulation.
+      #
+      # The radio (wlan0) is created by the baked vwifi-client unit over the vsock medium
+      # and can appear LATE (the medium server may not be up, or vsock reconnects after a
+      # node restart). A one-shot bring-up that gave up after a fixed wait would then leave
+      # wlan0 down forever, so this loops: it keeps wlan0 up, wpa_supplicant running,
+      # associated, and addressed, recovering from a late radio or any transient drop.
+      set +e
+      SSID_SET=0
+      grep -Eq '^[[:space:]]*network=\{' /home/cisco/wpa_supplicant.conf && SSID_SET=1
+      pick_open() {
+        # strongest OPEN SSID (no WPA/RSN/WEP/SAE/PSK/EAP), tie -> lowest BSSID
+        wpa_cli -i wlan0 scan_results 2>/dev/null \
+          | awk -F'\t' 'NF>=5 && $5!="" && $4 !~ /WPA|RSN|WEP|SAE|PSK|EAP/ {print $3"\t"$1"\t"$5}' \
+          | sort -k1,1nr -k2,2 | head -1 | cut -f3
+      }
+      while true; do
+        # 1. wait for the radio (it may appear well after boot)
+        ip link show wlan0 >/dev/null 2>&1 || { sleep 3; continue; }
+        ip link set wlan0 up 2>/dev/null
+        # 2. ensure wpa_supplicant is alive on wlan0
+        if ! wpa_cli -i wlan0 ping 2>/dev/null | grep -q PONG; then
+          pkill -f 'wpa_supplicant .*wlan0' 2>/dev/null; sleep 1
+          wpa_supplicant -B -i wlan0 -Dnl80211 -c /home/cisco/wpa_supplicant.conf 2>/dev/null
+          sleep 2
+        fi
+        # 3. auto mode (blank SSID): make sure a network is configured; (re)scan + pick open
+        if [ "$SSID_SET" = "0" ]; then
+          have=$(wpa_cli -i wlan0 list_networks 2>/dev/null | grep -c '^[0-9]')
+          if [ "${have:-0}" = "0" ]; then
+            wpa_cli -i wlan0 scan >/dev/null 2>&1; sleep 3
+            SSID=$(pick_open)
+            if [ -n "$SSID" ]; then
+              NID=$(wpa_cli -i wlan0 add_network | tail -1)
+              wpa_cli -i wlan0 set_network "$NID" ssid "\"$SSID\"" >/dev/null 2>&1
+              wpa_cli -i wlan0 set_network "$NID" key_mgmt NONE >/dev/null 2>&1
+              wpa_cli -i wlan0 enable_network "$NID" >/dev/null 2>&1
+            else
+              sleep 4; continue
+            fi
+          fi
+        fi
+        # 4. require association
+        st=$(wpa_cli -i wlan0 status 2>/dev/null | sed -n 's/^wpa_state=//p')
+        if [ "$st" != "COMPLETED" ]; then wpa_cli -i wlan0 reassociate >/dev/null 2>&1; sleep 5; continue; fi
+        # 5. require a REAL IPv4 lease through the AP bridge / lab DHCP. A 169.254.x
+        # APIPA/link-local does NOT count (it means DHCP got no answer) -> drop it and
+        # keep retrying. Prefer dhclient/udhcpc (no auto link-local); dhcpcd is last
+        # with --noipv4ll so it never re-imposes a 169.254 address.
+        if ! ip -4 addr show wlan0 2>/dev/null | awk '/inet /{print $2}' | grep -vq '^169\.254\.'; then
+          ip -4 addr show wlan0 2>/dev/null | awk '/inet 169\.254\./{print $2}' | while read -r a; do ip addr del "$a" dev wlan0 2>/dev/null; done
+          dhclient -1 wlan0 >/dev/null 2>&1 || udhcpc -n -i wlan0 >/dev/null 2>&1 || dhcpcd -4 --noipv4ll wlan0 >/dev/null 2>&1
+          sleep 3; continue
+        fi
+        # associated + addressed -> idle, then re-verify periodically
+        sleep 20
+      done
+  - path: /etc/systemd/system/pnet-wifi-sta.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=PNetLab Wireless STA bring-up (associate + DHCP)
+      After=network-online.target
+      Wants=network-online.target
+      [Service]
+      Type=simple
+      ExecStart=/usr/local/sbin/pnet-wifi-sta.sh
+      Restart=always
+      RestartSec=5
+      [Install]
+      WantedBy=multi-user.target
+runcmd:
+  - [ systemctl, stop, wifi-autoconfig.service ]
+  - [ systemctl, disable, wifi-autoconfig.service ]
+  - [ systemctl, daemon-reload ]
+  - [ systemctl, enable, --now, pnet-wifi-sta.service ]

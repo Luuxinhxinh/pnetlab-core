@@ -1,0 +1,17 @@
+# PNetLab template for the BGP Injector docker node.
+# Goes to /opt/unetlab/html/templates/{amd,intel}/exabgp.yml.
+# Filename stem "exabgp" must stay a substring of the image name (pnet-exabgp)
+# — the engine binds template->image via `docker images | grep <stem>`.
+---
+type: docker
+name: BGP Injector
+description: BGP Injector (ExaBGP)
+cpulimit: 1
+cpu: 2
+ram: 2048
+ethernet: 2
+console: http
+console_2nd: telnet
+config_script: config_aaa.py
+icon: Router-2D-Gen-Grey-S.svg
+shutdown: 1

@@ -1,0 +1,26 @@
+PASS
+observed mode=dhcp expected=192.168.137.174/24
+pnet0 addresses:
+2: pnet0    inet 192.168.137.176/24 brd 192.168.137.255 scope global dynamic noprefixroute pnet0\       valid_lft 1800sec preferred_lft 1575sec
+pnet0 default route:
+default via 192.168.137.2 proto dhcp src 192.168.137.176 metric 1002 
+nat0 addresses:
+12: nat0    inet 10.0.137.254/24 brd 10.0.137.255 scope global nat0\       valid_lft forever preferred_lft forever
+udp listeners:
+State  Recv-Q Send-Q                    Local Address:Port Peer Address:PortProcess                                   
+UNCONN 0      0                            127.0.0.54:53        0.0.0.0:*    users:(("systemd-resolve",pid=950,fd=18))
+UNCONN 0      0                         127.0.0.53%lo:53        0.0.0.0:*    users:(("systemd-resolve",pid=950,fd=16))
+UNCONN 0      0                          0.0.0.0%nat0:67        0.0.0.0:*    users:(("udhcpd",pid=2420,fd=6))         
+UNCONN 0      0                       192.168.137.176:68        0.0.0.0:*    users:(("dhcpcd",pid=3324,fd=5))         
+UNCONN 0      0                             127.0.0.1:323       0.0.0.0:*    users:(("chronyd",pid=2550,fd=4))        
+UNCONN 0      0                                 [::1]:323          [::]:*    users:(("chronyd",pid=2550,fd=5))        
+UNCONN 0      0      [fe80::2864:97ff:fe5b:363]%pnet0:546          [::]:*    users:(("dhcpcd",pid=2765,fd=5))         
+ip_forward=1
+POSTROUTING:
+-P POSTROUTING ACCEPT
+-A POSTROUTING -s 172.17.0.0/16 ! -o docker0 -j MASQUERADE
+-A POSTROUTING -s 10.0.137.0/24 -o pnet0 -j MASQUERADE
+PNETLAB-FWD:
+-N PNETLAB-FWD
+-A PNETLAB-FWD -s 10.0.137.0/24 -o pnet0 -j ACCEPT
+-A PNETLAB-FWD -d 10.0.137.0/24 -i pnet0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT

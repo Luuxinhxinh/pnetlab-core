@@ -1,0 +1,28 @@
+# PNetLab template for the Security Bench docker node.
+# Goes to /opt/unetlab/html/templates/{amd,intel}/secbench.yml.
+# Filename stem "secbench" must stay a substring of the image name
+# (pnet-secbench) — the engine binds template->image via
+# `docker images | grep <stem>`.
+#
+# docker_options adds the two capabilities the attack helpers need beyond a
+# plain container: CAP_NET_RAW for L2 raw send (scapy sendp/srp) and
+# CAP_NET_ADMIN for promiscuous sniff (recon/sniff, DHCP snooping-style
+# listeners). Neither is in docker's default capability set. This mirrors
+# the pnet-splunk template, the proven pattern for extra docker_options
+# flowing through the GUI-publish `docker create` path.
+---
+type: docker
+name: Security Bench
+description: Security Bench
+cpulimit: 2
+cpu: 2
+ram: 2048
+# eth0 = docker mgmt/console (auto, non-connectable on canvas); eth1 = lab data.
+# 2 NICs so eth1 exists as a selectable data port (attacks run on eth1).
+ethernet: 2
+console: http
+console_2nd: telnet
+config_script: config_aaa.py
+icon: Firewall-2D-Generic-S.svg
+docker_options: --cap-add=NET_ADMIN --cap-add=NET_RAW
+shutdown: 1

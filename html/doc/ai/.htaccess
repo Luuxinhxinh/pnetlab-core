@@ -1,0 +1,13 @@
+# /doc/ai/ — API documentation is served ONLY through the index.php auth
+# gate (engine token-cookie check). Direct static access would hand an
+# anonymous visitor the full route map, so every request is rewritten to
+# the gate; if mod_rewrite is somehow unavailable, fail closed.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /doc/ai/
+    RewriteCond %{REQUEST_URI} !/doc/ai/index\.php$
+    RewriteRule ^(.*)$ index.php?f=$1 [L,QSA]
+</IfModule>
+<IfModule !mod_rewrite.c>
+    Require all denied
+</IfModule>

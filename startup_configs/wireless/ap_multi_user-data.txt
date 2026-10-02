@@ -1,0 +1,146 @@
+#cloud-config
+# PNetLab Wireless AP day-0 seed - VLAN-trunk MULTI-SSID (P5).
+# device_wifiap.php substitutes the node name, a PHP-generated hostapd MULTI-BSS
+# config (one BSS per SSID, each bridged to its own VLAN bridge), the untagged
+# native management VLAN id, and a compact per-WLAN VLAN spec. (Placeholder
+# tokens are intentionally NOT spelled out here - str_replace would inject into
+# this comment too.)
+#
+# Topology: the AP has ONE wired NIC = a TRUNK to a Wireless cell (a
+# vlan_filtering bridge). Each SSID rides its own VLAN: hostapd bridges each BSS
+# to brVID, and this script enslaves the wired.VID sub-interface into brVID. The
+# untagged native VLAN carries AP management. Wired lab nodes attach to the cell
+# on per-VLAN access ports, so a station on SSID-X reaches whatever is on VLAN-X.
+hostname: inserthostname-here
+manage_etc_hosts: True
+ssh_pwauth: True
+disable_root: false
+users:
+  - name: cisco
+    groups: [sudo]
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+    lock_passwd: false
+chpasswd:
+  expire: False
+  list: |
+    cisco:cisco
+    root:cisco
+# Disable the dev image's wifi-autoconfig EARLY so it can't race our bring-up.
+bootcmd:
+  - [ sh, -c, 'systemctl disable --now wifi-autoconfig.service 2>/dev/null; rm -f /etc/systemd/system/multi-user.target.wants/wifi-autoconfig.service; true' ]
+write_files:
+  - path: /home/cisco/hostapd.conf
+    permissions: '0644'
+    content: |
+      insert-hostapd-conf-here
+  - path: /etc/pnet-wifi/wlans.env
+    permissions: '0644'
+    content: |
+      MGMT_VLAN=insert-mgmt-vlan-here
+      WLANS="insert-wlan-specs-here"
+  - path: /usr/local/sbin/pnet-wifi-ap-multi.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      # PNetLab Wireless AP bring-up (VLAN-trunk multi-SSID). Builds per-VLAN
+      # bridges on a single trunk uplink, then starts the multi-BSS hostapd.
+      set +e
+      . /etc/pnet-wifi/wlans.env 2>/dev/null
+      [ -z "$MGMT_VLAN" ] && MGMT_VLAN=1
+      # Wait for the emulated radio (vwifi-client creates wlan0 over vsock).
+      for i in $(seq 1 60); do ip link show wlan0 >/dev/null 2>&1 && break; sleep 1; done
+      ip link set wlan0 up 2>/dev/null
+      # Auto-detect the trunk uplink: first real ethernet that isn't wlan*/lo/
+      # bridge/veth and isn't itself a VLAN sub-interface (no dot in the name).
+      WIRED=""
+      for d in /sys/class/net/*; do
+        n=$(basename "$d")
+        case "$n" in lo|wlan*|br*|veth*|*.*) continue;; esac
+        [ -e "$d/device" ] || continue
+        WIRED="$n"; break
+      done
+      # cloud-init's fallback netplan would DHCP the raw NIC and fight us.
+      rm -f /etc/netplan/50-cloud-init.yaml
+      [ -n "$WIRED" ] && ip link set "$WIRED" up
+      sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1
+      NEED_DNSMASQ=0
+      MGMT_BR=""
+      for spec in $WLANS; do
+        vid="${spec%%:*}"; rest="${spec#*:}"; mode="${rest%%:*}"; cidr="${rest#*:}"
+        [ -z "$vid" ] && continue
+        br="br$vid"
+        ip link add "$br" type bridge 2>/dev/null
+        ip link set "$br" up
+        if [ "$mode" = "routed" ] && [ -n "$cidr" ]; then
+          # Routed SSID: brVID is the client gateway; NAT out the trunk on a tagged
+          # VLAN sub-interface (uplink only, stays OUT of the bridge).
+          if [ -n "$WIRED" ]; then
+            ip link add link "$WIRED" name "$WIRED.$vid" type vlan id "$vid" 2>/dev/null
+            ip link set "$WIRED.$vid" up
+          fi
+          gw="${cidr%/*}"; base="${gw%.*}"
+          ip addr add "$cidr" dev "$br" 2>/dev/null
+          if [ -n "$WIRED" ]; then
+            iptables -t nat -C POSTROUTING -o "$WIRED.$vid" -j MASQUERADE 2>/dev/null \
+              || iptables -t nat -A POSTROUTING -o "$WIRED.$vid" -j MASQUERADE
+          fi
+          mkdir -p /etc/dnsmasq.d
+          printf 'interface=%s\nbind-interfaces\ndhcp-range=%s.50,%s.150,255.255.255.0,12h\ndhcp-option=3,%s\ndhcp-option=6,%s,1.1.1.1\n' \
+            "$br" "$base" "$base" "$gw" "$gw" > "/etc/dnsmasq.d/pnet-$br.conf"
+          NEED_DNSMASQ=1
+        elif [ "$vid" = "$MGMT_VLAN" ] && [ -n "$WIRED" ]; then
+          # Bridge SSID on the NATIVE/management VLAN: it rides the trunk UNTAGGED, so
+          # enslave the RAW uplink (NO .vid sub-interface) into this bridge. This is the
+          # common single-SSID case where the cell/switch port is an untagged access
+          # port (PVID = mgmt VLAN) bridged to the management network — a tagged
+          # sub-interface would NOT reach it (wired clients on the same untagged VLAN
+          # get a lease but the station would not). Also serves AP management.
+          ip link set "$WIRED" master "$br" 2>/dev/null
+          MGMT_BR="$br"
+        elif [ -n "$WIRED" ]; then
+          # Bridge SSID on a tagged VLAN: enslave the wired.VID sub-interface so the
+          # SSID's traffic rides VLAN VID tagged on the trunk to the cell.
+          ip link add link "$WIRED" name "$WIRED.$vid" type vlan id "$vid" 2>/dev/null
+          ip link set "$WIRED.$vid" up
+          ip link set "$WIRED.$vid" master "$br" 2>/dev/null
+        fi
+      done
+      # AP management rides the native/untagged VLAN. If a bridge-mode SSID already
+      # claimed it (raw uplink enslaved above) manage on that bridge; otherwise build a
+      # dedicated br-mgmt holding the raw uplink so the AP itself is still reachable.
+      if [ -z "$MGMT_BR" ] && [ -n "$WIRED" ]; then
+        ip link add br-mgmt type bridge 2>/dev/null
+        ip link set "$WIRED" master br-mgmt 2>/dev/null
+        ip link set br-mgmt up
+        MGMT_BR="br-mgmt"
+      fi
+      [ -n "$MGMT_BR" ] && { dhclient -nw "$MGMT_BR" 2>/dev/null || dhcpcd "$MGMT_BR" 2>/dev/null; }
+      # Routed-mode DHCP: dnsmasq isn't in the dev stand-in image (baked in P5);
+      # best-effort install so routed SSIDs can hand out leases.
+      if [ "$NEED_DNSMASQ" = "1" ]; then
+        command -v dnsmasq >/dev/null 2>&1 || { export DEBIAN_FRONTEND=noninteractive; apt-get install -y --no-install-recommends dnsmasq 2>/dev/null; }
+        pkill dnsmasq 2>/dev/null; sleep 1
+        command -v dnsmasq >/dev/null 2>&1 && dnsmasq 2>/dev/null
+      fi
+      # Start the multi-BSS hostapd (it enslaves each BSS iface into its bridge=).
+      pkill -f 'hostapd ' 2>/dev/null; sleep 1
+      hostapd -B /home/cisco/hostapd.conf
+  - path: /etc/systemd/system/pnet-wifi-ap.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=PNetLab Wireless AP bring-up (VLAN-trunk multi-SSID)
+      After=network-online.target
+      Wants=network-online.target
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/local/sbin/pnet-wifi-ap-multi.sh
+      [Install]
+      WantedBy=multi-user.target
+runcmd:
+  - [ systemctl, stop, wifi-autoconfig.service ]
+  - [ systemctl, disable, wifi-autoconfig.service ]
+  - [ systemctl, daemon-reload ]
+  - [ systemctl, enable, --now, pnet-wifi-ap.service ]

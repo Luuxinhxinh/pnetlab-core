@@ -1,0 +1,394 @@
+/* pnetlab-topology-overlay.css — OSPF SPF tree overlay on the lab canvas.
+ * Link recolour is done by a class on the connector <svg> (CSS `stroke` wins
+ * over jsPlumb's presentation attribute), so Clear just drops the class. */
+
+/* tree links: green, thicker */
+svg.pnq-ov-tree path {
+  stroke: #3fb950 !important;
+  stroke-width: 4px !important;
+  opacity: 1 !important;
+}
+/* ECMP members: green but dashed so equal-cost paths read as alternates */
+svg.pnq-ov-ecmp path {
+  stroke-dasharray: 9 5 !important;
+}
+/* off-tree links (OSPF present): dimmed grey */
+svg.pnq-ov-dim path {
+  stroke: #5a5a5a !important;
+  stroke-width: 1.5px !important;
+  opacity: 0.35 !important;
+}
+/* topology-only (no OSPF detected): neutral blue, just shows discovered links */
+svg.pnq-ov-topo path {
+  stroke: #3b82f6 !important;
+  stroke-width: 3px !important;
+}
+/* BGP best-path: amber forwarding path */
+svg.pnq-ov-path path {
+  stroke: #f0992e !important;
+  stroke-width: 4px !important;
+  opacity: 1 !important;
+}
+/* EIGRP successor: solid purple (the installed path) */
+svg.pnq-ov-succ path {
+  stroke: #a371f7 !important;
+  stroke-width: 4px !important;
+  opacity: 1 !important;
+}
+/* EIGRP feasible successor: dashed purple, thinner (a loop-free backup) */
+svg.pnq-ov-fs path {
+  stroke: #a371f7 !important;
+  stroke-width: 2.5px !important;
+  stroke-dasharray: 7 5 !important;
+  opacity: 0.85 !important;
+}
+/* EIGRP non-feasible: red dashed (a neighbour that FAILS feasibility, RD>=FD —
+ * visible only via all-links; shows WHY a path is excluded by DUAL) */
+svg.pnq-ov-nf path {
+  stroke: #f85149 !important;
+  stroke-width: 2px !important;
+  stroke-dasharray: 4 4 !important;
+  opacity: 0.8 !important;
+}
+
+/* ── STP port roles ──────────────────────────────────────────────────────── */
+/* forwarding tree link (both ends FWD): solid green */
+svg.pnq-ov-stp-fwd path {
+  stroke: #3fb950 !important;
+  stroke-width: 4px !important;
+  opacity: 1 !important;
+}
+/* blocked redundant link (an Altn/Back/BLK end): red dashed */
+svg.pnq-ov-stp-blk path {
+  stroke: #f85149 !important;
+  stroke-width: 2.5px !important;
+  stroke-dasharray: 6 5 !important;
+  opacity: 0.9 !important;
+}
+/* converging (an LIS/LRN end): amber, pulsing through listen/learn */
+svg.pnq-ov-stp-trans path {
+  stroke: #f0b429 !important;
+  stroke-width: 3.5px !important;
+  stroke-dasharray: 5 4 !important;
+  animation: pnq-ov-pulse 1s ease-in-out infinite;
+}
+@keyframes pnq-ov-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* port-role badge: lift off the link line so it never overlaps PNetLab's
+   interface-name labels (which ride on the line at the ends) */
+.pnq-ov-cost-lbl.rl {
+  transform: translateY(-15px);
+  padding: 0 5px;
+  font-weight: 700;
+}
+/* clickable "?" badge on a blocked link -> why-blocked popup */
+.pnq-ov-cost-lbl.pnq-ov-why {
+  cursor: pointer;
+  color: #f85149;
+  border-color: #f85149;
+  font-weight: 800;
+  padding: 0 7px;
+}
+.pnq-ov-cost-lbl.pnq-ov-why:hover { background: #f85149; color: #0d1117; }
+/* why-blocked explanation paragraph (wraps, unlike the monospace rows) */
+.pnq-ov-why-explain {
+  margin-top: 8px; color: #c9d1d9; font-size: 12px; line-height: 1.45;
+  white-space: normal;
+}
+
+/* per-port role badge colours (label mod classes) */
+.pnq-ov-cost-lbl.rl-root  { color: #3fb950; border-color: #3fb950; }
+.pnq-ov-cost-lbl.rl-desg  { color: #3b82f6; border-color: #3b82f6; }
+.pnq-ov-cost-lbl.rl-altn  { color: #f0992e; border-color: #f0992e; }
+.pnq-ov-cost-lbl.rl-back  { color: #9aa7b2; border-color: #9aa7b2; }
+.pnq-ov-cost-lbl.rl-trans { color: #f0b429; border-color: #f0b429; }
+.pnq-ov-cost-lbl.rl-dim   { color: #8b949e; border-color: #5a5a5a; }
+
+/* root-bridge halo (gold) */
+.pnq-ov-stproot {
+  box-shadow: 0 0 0 3px #ffd33d, 0 0 20px 3px rgba(255, 211, 61, 0.75) !important;
+  border-radius: 8px !important;
+}
+
+/* cost label riding the tree link */
+.pnq-ov-cost-ovl .pnq-ov-cost-lbl,
+.pnq-ov-cost-lbl {
+  background: #0d1117;
+  color: #3fb950;
+  border: 1px solid #3fb950;
+  border-radius: 9px;
+  padding: 0 6px;
+  font: 600 11px/16px ui-monospace, "SF Mono", Menlo, monospace;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+/* EIGRP metric label: purple to match the successor link */
+.pnq-ov-cost-lbl.eg { color: #a371f7; border-color: #a371f7; }
+/* EIGRP non-feasible label: red "✗ RD≥FD" — the feasibility violation */
+.pnq-ov-cost-lbl.nf { color: #f85149; border-color: #f85149; }
+
+/* root node halo */
+.pnq-ov-root {
+  box-shadow: 0 0 0 3px #3fb950, 0 0 18px 2px rgba(63, 185, 80, 0.7) !important;
+  border-radius: 8px !important;
+}
+/* BGP prefix-origin node halo (amber) */
+.pnq-ov-origin {
+  box-shadow: 0 0 0 3px #f0992e, 0 0 18px 2px rgba(240, 153, 46, 0.7) !important;
+  border-radius: 8px !important;
+}
+/* EIGRP prefix-origin node halo (purple, overrides the amber above) */
+.pnq-ov-origin.pnq-ov-origin-eg {
+  box-shadow: 0 0 0 3px #a371f7, 0 0 18px 2px rgba(163, 113, 247, 0.7) !important;
+}
+/* Off-canvas exit badge: a dashed amber ring on a node whose successor/FS leaves
+ * the canvas (DMVPN tunnel / Null0 / off-canvas peer) — the path doesn't vanish */
+.pnq-ov-offcanvas {
+  box-shadow: 0 0 0 2px #f0992e, 0 0 14px 1px rgba(240, 153, 46, 0.55) !important;
+  outline: 2px dashed rgba(240, 153, 46, 0.9) !important;
+  outline-offset: 2px !important;
+  border-radius: 8px !important;
+}
+/* Tunnel-peer badge: the resolved owner of a tunnel next-hop (purple, to match
+ * the EIGRP virtual link drawn to it) */
+.pnq-ov-tunpeer {
+  box-shadow: 0 0 0 2px #a371f7, 0 0 14px 1px rgba(163, 113, 247, 0.55) !important;
+  outline: 2px dashed rgba(163, 113, 247, 0.9) !important;
+  outline-offset: 2px !important;
+  border-radius: 8px !important;
+}
+/* Virtual (tunnel) link layer: a fixed, click-through SVG over the viewport; the
+ * dashed purple line is drawn between the two nodes' on-screen centres. */
+.pnq-ov-vlines {
+  position: fixed; left: 0; top: 0; width: 100vw; height: 100vh;
+  pointer-events: none; z-index: 100040;
+}
+.pnq-ov-vline {
+  fill: none;
+  stroke: #a371f7;
+  stroke-width: 2.5px;
+  stroke-dasharray: 6 6;
+  opacity: 0.85;
+}
+
+/* legend panel (dark glass, top-right — clear of the top menu and the bottom
+ * canvas zoom controls; caps height + scrolls so a long warning list never
+ * grows down into the zoom bar). */
+.pnq-ov-legend {
+  position: fixed;
+  right: 18px;
+  top: 72px;
+  z-index: 100050;
+  min-width: 210px;
+  max-width: 320px;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  color: var(--pnq-panel-fg);
+  background: var(--pnq-panel-surface);
+  border: 1px solid var(--pnq-panel-border);
+  border-radius: var(--pnq-radius-panel);
+  box-shadow: var(--pnq-elevation-panel);
+  font: var(--pnq-type-body-weight) var(--pnq-type-body-size)/var(--pnq-type-body-leading) var(--pnq-font-sans);
+}
+.pnq-ov-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -12px -14px 12px;
+  padding: var(--pnq-panel-header-padding);
+  background: var(--pnq-surface-header);
+  border-bottom: 1px solid var(--pnq-panel-border);
+  cursor: move;                 /* drag the panel by its header */
+  -webkit-user-select: none;
+  user-select: none;
+}
+.pnq-ov-title {
+  color: var(--pnq-text-strong);
+  font-size: var(--pnq-type-title-size);
+  font-weight: var(--pnq-type-title-weight);
+  line-height: var(--pnq-type-title-leading);
+}
+/* result-panel navigation row (Rerun / back to VLANs / back to Painter) */
+.pnq-ov-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+/* nav buttons look like the swap chips but use a DISTINCT class — the delegated
+   .pnq-ov-swap handler re-runs the overlay (runOspf fallback) for any swap click. */
+.pnq-ov-navbtn {
+  cursor: pointer; color: var(--pnq-text-strong);
+  background: var(--pnq-surface-hover); border: 1px solid var(--pnq-panel-border);
+  border-radius: var(--pnq-radius-control); padding: 6px 10px;
+  font: 600 var(--pnq-type-body-size)/1.25 var(--pnq-font-sans);
+}
+.pnq-ov-navbtn:hover { background: var(--pnq-panel-border); border-color: var(--pnq-accent); }
+.pnq-ov-clear {
+  cursor: pointer;
+  color: var(--pnq-text-strong);
+  background: var(--pnq-surface-hover);
+  border: 1px solid var(--pnq-panel-border);
+  border-radius: var(--pnq-radius-control);
+  padding: 6px 10px;
+  font: 600 var(--pnq-type-body-size)/1.25 var(--pnq-font-sans);
+}
+.pnq-ov-clear:hover { background: var(--pnq-panel-border); border-color: var(--pnq-accent); }
+/* why-blocked popup close button — same chrome, but closes only that popup */
+.pnq-ov-whyclose {
+  cursor: pointer; color: var(--pnq-text-strong);
+  background: var(--pnq-surface-hover);
+  border: 1px solid var(--pnq-panel-border);
+  border-radius: var(--pnq-radius-control); padding: 6px 10px;
+  font: 600 var(--pnq-type-body-size)/1.25 var(--pnq-font-sans);
+}
+.pnq-ov-whyclose:hover { background: var(--pnq-panel-border); border-color: var(--pnq-accent); }
+/* the why-blocked popup sits top-LEFT so it never overlaps the top-right legend */
+#pnq-ov-whybox { left: 18px; top: 96px; right: auto; }
+.pnq-ov-row { margin: 3px 0; }
+.pnq-ov-swap {
+  margin-left: 8px; cursor: pointer; color: var(--pnq-text-strong);
+  background: var(--pnq-surface-hover); border: 1px solid var(--pnq-panel-border);
+  border-radius: var(--pnq-radius-control); padding: 6px 10px;
+  font: 600 var(--pnq-type-body-size)/1.25 var(--pnq-font-sans);
+}
+.pnq-ov-swap:hover { background: var(--pnq-panel-border); border-color: var(--pnq-accent); }
+.pnq-ov-warn { color: #f0b429; font-size: 12px; }
+.pnq-ov-keys { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.pnq-ov-key { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+.pnq-ov-sw { width: 18px; height: 0; border-top-width: 3px; border-top-style: solid; display: inline-block; }
+.pnq-ov-sw.sw-tree { border-top-color: #3fb950; }
+.pnq-ov-sw.sw-path { border-top-color: #f0992e; }
+.pnq-ov-sw.sw-ecmp { border-top-color: #3fb950; border-top-style: dashed; }
+.pnq-ov-sw.sw-dim { border-top-color: #5a5a5a; }
+.pnq-ov-sw.sw-succ { border-top-color: #a371f7; }
+.pnq-ov-sw.sw-fs { border-top-color: #a371f7; border-top-style: dashed; }
+.pnq-ov-sw.sw-nf { border-top-color: #f85149; border-top-style: dashed; }
+.pnq-ov-sw.sw-stp-fwd { border-top-color: #3fb950; }
+.pnq-ov-sw.sw-stp-blk { border-top-color: #f85149; border-top-style: dashed; }
+.pnq-ov-sw.sw-stp-trans { border-top-color: #f0b429; border-top-style: dashed; }
+
+/* STP "watch convergence" toggle (reuses the swap-button chrome) */
+.pnq-ov-watch-on { background: rgba(240, 180, 41, 0.25) !important; border-color: #f0b429 !important; }
+
+/* off-canvas exits list in the legend */
+.pnq-ov-offc-head { margin-top: 8px; font-weight: 600; color: #f0b429; }
+.pnq-ov-offc {
+  font: 11px/1.45 ui-monospace, "SF Mono", Menlo, monospace;
+  color: #d7c08a; margin: 2px 0 0 6px;
+}
+
+/* BGP prefix picker (reuses the legend glass) */
+.pnq-ov-plist { margin-top: 8px; max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.pnq-ov-prow {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  width: 100%; text-align: left; cursor: pointer;
+  color: #e6edf3; background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px;
+  padding: 6px 10px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.pnq-ov-prow:hover { background: rgba(240, 153, 46, 0.18); border-color: #f0992e; }
+.pnq-ov-pfx { font: 600 13px/1.4 ui-monospace, "SF Mono", Menlo, monospace; }
+.pnq-ov-pmeta { color: #9aa7b2; font-size: 11px; white-space: nowrap; }
+
+/* Protocol Painter panel (left-pane launcher; reuses the legend glass) */
+.pnq-pp-hint { color: #9aa7b2; font-size: 12px; margin-bottom: 6px; }
+.pnq-pp-field { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
+.pnq-pp-field label { width: 58px; color: #9aa7b2; font-size: 12px; flex: none; }
+.pnq-pp-field select {
+  flex: 1; min-width: 0; cursor: pointer;
+  color: var(--pnq-panel-fg); background: var(--pnq-surface-input);
+  border: 1px solid var(--pnq-panel-border); border-radius: var(--pnq-radius-control);
+  padding: 8px 10px; font: var(--pnq-type-body-weight) var(--pnq-type-body-size)/var(--pnq-type-body-leading) var(--pnq-font-sans);
+}
+.pnq-pp-field select:focus { outline: none; border-color: var(--pnq-accent); box-shadow: 0 0 0 3px var(--pnq-accent-ring); }
+/* the native popup list is OS-drawn (a translucent control bg doesn't reach it):
+   give the options a SOLID dark bg + light text so every row is readable */
+.pnq-pp-field select option {
+  background: var(--pnq-surface-input);
+  color: var(--pnq-panel-fg);
+}
+.pnq-pp-paint {
+  margin-top: 10px; width: 100%; cursor: pointer;
+  min-height: 36px; padding: 8px 16px;
+  color: var(--pnq-accent-foreground); background: var(--pnq-accent);
+  border: 1px solid var(--pnq-accent); border-radius: var(--pnq-radius-control);
+  font: 600 var(--pnq-type-body-size)/1.25 var(--pnq-font-sans);
+}
+.pnq-pp-paint:hover:not(:disabled) { background: var(--pnq-accent-hover); border-color: var(--pnq-accent-hover); }
+.pnq-pp-paint:focus-visible { outline: 2px solid var(--pnq-accent); outline-offset: 2px; }
+.pnq-pp-paint:disabled {
+  background: var(--pnq-surface-hover);
+  border-color: var(--pnq-panel-border);
+  color: var(--pnq-panel-fg-muted);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+/* ── Rack View panel (pnetlab-rack-view.js) ──────────────────────────────────
+   Wider than the protocol panels (it holds a faceplate SVG); the canvas scrolls
+   both ways so a big multi-rack lab never bursts the panel. */
+.pnq-rack-map { margin: 4px 0 8px; }
+.pnq-rack-map > summary {
+  cursor: pointer; color: #9aa7b2; font-size: 12px; list-style: none; padding: 2px 0;
+}
+.pnq-rack-map > summary::-webkit-details-marker { display: none; }
+.pnq-rack-ta {
+  width: 100%; box-sizing: border-box; margin-top: 6px; min-height: 64px; resize: vertical;
+  background: var(--pnq-surface-input); color: var(--pnq-panel-fg); border: 1px solid var(--pnq-panel-border);
+  border-radius: var(--pnq-radius-control); padding: 8px 10px; font: var(--pnq-type-body-size)/var(--pnq-type-body-leading) ui-monospace, Menlo, Consolas, monospace;
+}
+.pnq-rack-ta:focus { outline: none; border-color: var(--pnq-accent); box-shadow: 0 0 0 3px var(--pnq-accent-ring); }
+.pnq-rack-canvas {
+  max-width: 100%; max-height: calc(100vh - 320px); overflow: auto;
+  background: #0f1115; border-radius: 8px; padding: 6px;
+}
+.pnq-rack-canvas svg { display: block; }
+.pnq-rack-msg { font-size: 12px; margin-top: 8px; }
+.pnq-rack-warnings { color: #d8a657; }
+.pnq-rack-warning-count { font-weight: 600; }
+.pnq-rack-warning-list {
+  max-height: 120px;
+  overflow-y: auto;
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.pnq-rack-warning-list li { margin: 2px 0; }
+/* hover highlighting: a port (or cable) glows itself + its Z-side end. Cables
+   only catch the pointer on their stroke, so they never shadow the ports. */
+.pnq-rack-canvas rect.rv-port { cursor: pointer; }
+.pnq-rack-canvas rect.rv-hl { stroke: #fde68a; stroke-width: 2.2px; }
+.pnq-rack-canvas path.rv-cable { pointer-events: stroke; cursor: pointer; }
+.pnq-rack-canvas path.rvc-hl { stroke-width: 4px; }
+/* drag-to-rack editor */
+.pnq-rack-canvas g.rv-unit { cursor: grab; }
+.pnq-rack-canvas g.rv-unit.rv-net { cursor: default; }
+.pnq-rack-canvas g.rv-dragging { opacity: 0.8; cursor: grabbing; }
+.pnq-rack-bar { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; flex-wrap: wrap; }
+/* Rack View is a resizable flex column: header/toolbar/json stay fixed height and
+   the rack body fills the rest and scrolls (so shrinking the panel scrolls the
+   wide rack SVG instead of clipping it). */
+.pnq-ov-legend > .pnq-rack-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.pnq-rack-in {
+  width: 116px; background: var(--pnq-surface-input); color: var(--pnq-panel-fg);
+  border: 1px solid var(--pnq-panel-border); border-radius: var(--pnq-radius-control); padding: 8px 10px;
+  font: var(--pnq-type-body-size)/var(--pnq-type-body-leading) var(--pnq-font-sans);
+}
+.pnq-rack-in:focus { outline: none; border-color: var(--pnq-accent); box-shadow: 0 0 0 3px var(--pnq-accent-ring); }
+.pnq-rack-add {
+  cursor: pointer; background: var(--pnq-surface-hover); color: var(--pnq-text-strong);
+  border: 1px solid var(--pnq-panel-border); border-radius: var(--pnq-radius-control); padding: 8px 10px;
+  font: 600 var(--pnq-type-body-size)/1.25 var(--pnq-font-sans);
+}
+.pnq-rack-add:hover { background: var(--pnq-panel-border); border-color: var(--pnq-accent); }
+.pnq-rack-hint { color: #9aa7b2; font-size: 11px; margin-left: 4px; }
+/* live operational state from the taps (matches the canvas): up = green,
+   down/node-off = red, down link dimmed. Free + patch-panel ports keep their
+   static fill. */
+.pnq-rack-canvas rect.rv-up { fill: #46c46a; }
+.pnq-rack-canvas rect.rv-down { fill: #e0564f; }
+.pnq-rack-canvas path.rv-cabledown { opacity: 0.32; }
+/* live-traffic glow: ports + their link pulse light-green while frames flow */
+@keyframes rvPulse { 0%, 100% { fill: #9be35f; } 50% { fill: #e4f9c8; } }
+@keyframes rvPulseStroke { 0%, 100% { stroke: #9be35f; } 50% { stroke: #e4f9c8; } }
+.pnq-rack-canvas rect.rv-traffic { fill: #9be35f; animation: rvPulse 1.1s ease-in-out infinite; }
+.pnq-rack-canvas path.rv-traffic { stroke: #9be35f; animation: rvPulseStroke 1.1s ease-in-out infinite; }

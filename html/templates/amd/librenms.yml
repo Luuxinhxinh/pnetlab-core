@@ -1,0 +1,27 @@
+---
+# PNetLab "LibreNMS" node — a full SNMP NMS (LibreNMS + in-container MariaDB +
+# Redis + dispatcher + snmptrapd + syslog-ng) in ONE self-contained container.
+# Image: pnet-librenms (offline-install via the Dashboard Docker Devices page;
+# Docker Hub rspnet/pnet-librenms). APPROVED DEVIATION from the Go-GUI node
+# pattern: LibreNMS itself is the web UI — console: http maps to container :80
+# (login admin / pnet). Leave dock_args EMPTY so device_docker takes the
+# GUI-docker path (publishes the console port + busybox-managed lab iface).
+# Lab devices are polled over eth1 (SNMP), and send traps (udp/162) + syslog
+# (udp+tcp/514) to the node's eth1 address; services bind 0.0.0.0.
+# Binds to any image whose repo name contains "librenms" (matches pnet-librenms).
+# config_script keeps the run LED working and pushes the Startup-config blob in
+# (optional JSON: {"admin_password": "..."}).
+type: docker
+config_script: config_aaa.py
+name: LibreNMS
+description: LibreNMS
+cpulimit: 1
+icon: Server-2D-Linux-S.svg
+ethernet: 2
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 4096
+mtu: 1500
+docker_shell: echo "LibreNMS — web UI on the http console (container :80), login admin/pnet."; echo "SNMP polls lab devices over eth1; traps udp/162 + syslog udp,tcp/514 also on eth1."; echo "CLI examples:"; echo "  lnms device:add --v2c -c public <lab-ip>"; echo "  lnms user:list"; exec /bin/bash
+...

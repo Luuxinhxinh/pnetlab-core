@@ -1,0 +1,26 @@
+#!/bin/sh
+# PNetLab MOTD header.  Keep this fast and offline: pam_motd runs it at login.
+#
+# The full ASCII wordmark already ran at /etc/issue seconds before this login
+# shell exists -- repeating it here reads as two banners stacked on one
+# screen. This header stays to one compact branded line instead.
+set -u
+
+if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ] && [ -n "${TERM:-}" ]; then
+    BOLD=$(printf '\033[1m')
+    CYAN=$(printf '\033[36m')
+    DIM=$(printf '\033[90m')
+    RESET=$(printf '\033[0m')
+else
+    BOLD=
+    CYAN=
+    DIM=
+    RESET=
+fi
+
+VERSION=$(dpkg-query -W -f='${Version}' pnetlab 2>/dev/null || true)
+[ -n "$VERSION" ] || VERSION=unknown
+printf '\n'
+printf '%s%s PNetLab v8.2%s%s - engine %s - network labs, wire-rate fun%s\n' \
+    "$BOLD" "$CYAN" "$RESET" "$CYAN" "$VERSION" "$RESET"
+printf '%s%s%s\n' "$DIM" ' Console personality: enabled; update guidance: local and explicit.' "$RESET"

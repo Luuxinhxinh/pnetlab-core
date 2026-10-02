@@ -1,0 +1,42 @@
+I'd tell you a UDP joke, but you might not get it.
+Here's a TCP joke. Did you get it? Did you get it? Did you get it?
+It's not DNS. There's no way it's DNS. It was DNS.
+Never underestimate the bandwidth of a station wagon full of backup tapes. - Tanenbaum
+There's no place like ::1.
+Problem exists between chair and keyboard: see OSI layer 8.
+BGP: trust everyone. What could go wrong?
+Spanning tree is why we can't have nice loops.
+Always be pinging.
+An ICMP packet walks into a bar. "Ow." "Destination unreachable?" "No, just fragmented."
+A network engineer's diet: table salt and route summaries.
+NAT: because we were sure 4 billion addresses would be enough.
+My other lab is a /8.
+Why did the packet cross the network? It had a default route.
+A VLAN walks into a bar. The bartender says, "We don't serve your type here."
+I tried to explain subnetting, but the conversation was outside my range.
+My router and I are in a committed relationship. It keeps dropping me.
+The firewall's favorite music? Stateful harmonies.
+An ARP request walks into a switch. Nobody answers, but everyone learns something.
+I named my dog BGP. It keeps announcing routes to the neighbors.
+The trouble with UDP is that it never calls back to explain itself.
+Why did the sysadmin bring a ladder? The issue was at layer 8.
+A /31 walks into a point-to-point link. It says, "Room for two."
+I put my problems in a VRF. Now they are isolated, but still routed.
+The OSPF neighbors got married. It was a very stable adjacency.
+RIP is the protocol that announces its own retirement every few minutes.
+A firewall and a packet walk into a bar. The packet gets dropped at the door.
+The switch said it had a great memory. It was just caching MACs.
+I asked the cloud for a static route. It gave me an SLA.
+Vendor A calls it a feature; Vendor B calls it a license tier.
+Some vendors sell zero-touch provisioning. The touch is just hidden in the support ticket.
+The CLI prompt is where optimism goes to wait for a timeout.
+A vendor-neutral network is like a unicorn: excellent in diagrams.
+I don't always troubleshoot DNS, but when I do, it's always DNS.
+MTU problems are the network's way of asking whether you really needed that packet.
+The packet's journey was successful, but its return trip had an asymmetric personality.
+A route reflector doesn't forward traffic, but it still gets invited to every meeting.
+BFD is just a network engineer checking whether the link is still breathing.
+The cleanest config is the one you can explain before the change window ends.
+My lab has perfect availability: every outage is scheduled.
+A loopback never argues. It is always right about where it is.
+The access list said "permit any" and suddenly everyone had a networking career.

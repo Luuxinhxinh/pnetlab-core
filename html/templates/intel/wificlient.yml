@@ -1,0 +1,35 @@
+---
+# PNetLab Wireless Client (GUI) — a graphical end-user laptop on the emulated
+# 802.11 plane. Handler: device_wificlient.php (extends device_qemu; injects the
+# per-node vsock device for the vwifi medium, like the AP/STA). Image dir auto-
+# discovered as addons/qemu/wificlient-<version>/virtioa.qcow2 (P5 own image:
+# Debian 12 + XFCE + NetworkManager/nm-applet + Firefox-ESR + xfce4-terminal).
+# NetworkManager owns wlan0 — the user picks SSIDs from the desktop (incl. 802.1X
+# / EAP-TLS for cert-based RADIUS/ISE testing), browses, and runs ping from the
+# terminal. Rendered through the VNC console.
+type: qemu
+name: Wireless Client (GUI)
+description: Wireless client (GUI)
+cpulimit: 1
+icon: Desktop_linux.png
+cpu: 1
+ram: 3072
+ethernet: 1
+console: vnc
+qemu_arch: x86_64
+qemu_nic: virtio-net-pci
+qemu_options: -machine type=pc,accel=kvm -vga virtio -usbdevice tablet -enable-kvm
+Wifi_SSID:
+  type: text
+  value: ''
+  width: 6
+EAP_Identity:
+  type: text
+  value: pnetuser
+  width: 6
+Initial_startup_config:
+  type: checkbox
+  value: 1
+  width: 6
+  restart: 1
+...

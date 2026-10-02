@@ -1,0 +1,29 @@
+# PNetLab "Flow Collector" node — goflow2 (NetFlow v5/v9 udp/2055, IPFIX
+# udp/4739, sFlow udp/6343) + a self-contained Go web GUI on :80 with live
+# flow tables, top talkers and per-exporter stats. Image: pnet-flowlab
+# (offline-install via the Dashboard Docker Devices page).
+# console: http → device_docker's GUI-docker path publishes container port 80
+# as the node console (native http routing since engine 6.8.43). Leave
+# dock_args EMPTY so device_docker takes that path (adds --net=bridge -p
+# <host>:80 + the busybox-managed lab interface). Per-interface networking
+# (DHCP / static IP) is set in the normal node edit; the listeners bind
+# 0.0.0.0 so exporters reach them over the lab interface (eth1). Template
+# stem "flowlab" is a substring of the image name (engine binds template →
+# image via docker images | grep). config_script keeps the run LED working
+# and pushes the Startup-config blob (/firstboot.cfg) in.
+type: docker
+config_script: config_aaa.py
+name: Flow Collector
+description: Flow Collector (NetFlow/sFlow)
+cpulimit: 1
+icon: Firewall-2D-Stealthwatch-FC-S.svg
+ethernet: 2
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 2048
+mtu: 1500
+# Single-quoted: the unquoted form dies in yaml_parse_file on the ": " inside
+# "Listeners: NetFlow ..." (mapping-values scan error) and the whole template
+# silently vanishes from the Add-Node picker.
+docker_shell: 'echo "Flow Collector — configure via the http console GUI (admin/pnet)."; echo "Listeners: NetFlow v5/v9 udp/2055 · IPFIX udp/4739 · sFlow udp/6343 (all interfaces)."; echo "--- /firstboot.cfg ---"; cat /firstboot.cfg 2>/dev/null; exec /bin/bash'

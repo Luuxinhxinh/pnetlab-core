@@ -1,0 +1,1 @@
+guacdb-1.6.0-schema.sql

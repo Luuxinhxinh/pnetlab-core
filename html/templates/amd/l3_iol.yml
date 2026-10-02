@@ -1,0 +1,14 @@
+---
+type: iol
+config_script: embedded
+description: Cisco IOL Router 
+name: R
+cpulimit: 1
+icon: Router Blue.png
+nvram: 1024
+ram: 256
+ethernet: 2
+serial: 0
+keepalive: 1
+...
+

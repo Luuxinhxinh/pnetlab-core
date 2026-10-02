@@ -1,0 +1,171 @@
+#!/bin/sh
+# pnetlab-banner — shared console banner renderer.
+#
+# The wordmark below is deliberately stored in direct-tty form.  `issue` pipes
+# that same output through sed to double backslashes for agetty; do not create a
+# second hand-edited copy for /etc/issue.
+set -eu
+
+FORTUNE_FILE=${PNETLAB_FORTUNE_FILE:-/opt/unetlab/scripts/motd-fortunes.txt}
+VERSION_FALLBACK=${PNETLAB_BANNER_VERSION_FALLBACK:-6.8.64resolute1}
+
+version() {
+    value=$(dpkg-query -W -f='${Version}' pnetlab 2>/dev/null || true)
+    if [ -n "$value" ]; then
+        printf '%s\n' "$value"
+    else
+        printf '%s\n' "$VERSION_FALLBACK"
+    fi
+}
+
+emit_wordmark() {
+    case "${1:-default}" in
+        alternate)
+            cat <<'WORDMARK'
+    .----------------.
+   /  P N E T L A B  \
+  |  [* ] [ *] [ ]    |
+  |   console online  |
+   \________________/
+WORDMARK
+            ;;
+        *)
+            cat <<'WORDMARK'
+ ____  _   _ _____ _____ _          _
+|  _ \| \ | | ____|_   _| |    __ _| |__
+| |_) |  \| |  _|   | | | |   / _` | '_ \
+|  __/| |\  | |___  | | | |__| (_| | |_) |
+|_|   |_| \_|_____| |_| |_____\__,_|_.__/
+WORDMARK
+            ;;
+    esac
+}
+
+use_color() {
+    [ "${PNETLAB_BANNER_NO_COLOR:-0}" != 1 ] || return 1
+    [ "${PNETLAB_BANNER_FORCE_COLOR:-0}" = 1 ] && return 0
+    [ -t 1 ] || return 1
+    [ "${TERM:-dumb}" != dumb ] && [ -n "${TERM:-}" ]
+}
+
+emit_colored_wordmark() {
+    if use_color; then
+        printf '\033[36m'
+        emit_wordmark "${1:-default}"
+        printf '\033[0m\n'
+    else
+        emit_wordmark "${1:-default}"
+        printf '\n'
+    fi
+}
+
+emit_issue_wordmark() {
+    if use_color; then
+        printf '\033[36m'
+        emit_wordmark "${1:-default}" | sed 's/\\/\\\\/g'
+        printf '\033[0m\n'
+    else
+        emit_wordmark "${1:-default}" | sed 's/\\/\\\\/g'
+        printf '\n'
+    fi
+}
+
+management_ip() {
+    ip -4 -o addr show dev pnet0 scope global 2>/dev/null \
+        | awk '{ split($4, address, "/"); print address[1]; exit }'
+}
+
+rare_skin() {
+    roll=${PNETLAB_BANNER_ROLL:-}
+    if [ -z "$roll" ]; then
+        roll=$(od -An -N2 -tu2 /dev/urandom 2>/dev/null | tr -d ' ' || true)
+    fi
+    [ -n "$roll" ] || roll=$(date +%s)
+    case "$roll" in
+        *[!0-9]*) return 1 ;;
+    esac
+    [ $((roll % 128)) -eq 0 ]
+}
+
+issue_banner() {
+    warn_novirt=$1
+    skin=default
+    if rare_skin; then
+        skin=alternate
+    fi
+
+    # Raw control bytes are intentional: agetty passes them through and this
+    # clears the pre-DHCP draw before the later \\4{pnet0} redraw.
+    printf '\033[2J\033[H'
+    PNETLAB_BANNER_FORCE_COLOR=1 emit_issue_wordmark "$skin"
+    printf '\n  v8.2 (engine %s)  -  network labs, wire-rate fun\n\n' "$(version)"
+    # Keep the default-password wording unconditionally; this is an operator
+    # contract for fresh installs and intentionally does not inspect shadow.
+    printf '%s\n' '  Web UI:  https://\4{pnet0}/        (default root password: pnet)'
+    printf '%s\n' '  Change the management IP:  log in and run   pnetlab-netcfg'
+    printf '%s\n' '  Updates:  log in and run   pnetlab-update --check'
+
+    if [ "$warn_novirt" -eq 1 ] && ! grep -Eq '(^|[[:space:]])(vmx|svm)([[:space:]]|$)' /proc/cpuinfo 2>/dev/null; then
+        printf '\nWARNING: neither Intel VT-x or AMD-V found\n\n'
+    fi
+}
+
+print_banner() {
+    install_mode=$1
+    printf '\033[2J\033[H'
+    emit_colored_wordmark
+    printf '\n  v8.2 (engine %s)  -  network labs, wire-rate fun\n\n' "$(version)"
+    if [ "$install_mode" -eq 1 ]; then
+        printf '%s\n' '  Installing PNetLab - the box reboots automatically when done.'
+    else
+        ip_address=$(management_ip || true)
+        [ -n "$ip_address" ] || ip_address='not configured'
+        printf '  Web UI:  https://%s/\n' "$ip_address"
+        printf '%s\n' '  Change the management IP:  log in and run   pnetlab-netcfg'
+        printf '%s\n' '  Updates:  log in and run   pnetlab-update --check'
+    fi
+}
+
+fortune() {
+    [ -r "$FORTUNE_FILE" ] && cat "$FORTUNE_FILE"
+}
+
+command=${1:-}
+shift 2>/dev/null || true
+case "$command" in
+    issue)
+        warn_novirt=0
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                --warn-novirt) warn_novirt=1 ;;
+                *) printf 'usage: %s issue [--warn-novirt]\n' "$0" >&2; exit 2 ;;
+            esac
+            shift
+        done
+        issue_banner "$warn_novirt"
+        ;;
+    print)
+        install_mode=0
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                --install) install_mode=1 ;;
+                *) printf 'usage: %s print [--install]\n' "$0" >&2; exit 2 ;;
+            esac
+            shift
+        done
+        print_banner "$install_mode"
+        ;;
+    fortune)
+        [ "$#" -eq 0 ] || { printf 'usage: %s fortune\n' "$0" >&2; exit 2; }
+        fortune
+        ;;
+    wordmark)
+        # Internal consumer for 00-pnetlab-header; intentionally undocumented.
+        [ "$#" -eq 0 ] || { printf 'usage: %s wordmark\n' "$0" >&2; exit 2; }
+        emit_colored_wordmark
+        ;;
+    *)
+        printf 'usage: %s {issue|print|fortune}\n' "$0" >&2
+        exit 2
+        ;;
+esac

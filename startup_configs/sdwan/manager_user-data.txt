@@ -1,0 +1,81 @@
+#cloud-config
+# Day-0 cloud-init "user-data" for a STANDALONE Cisco Catalyst SD-WAN Manager (vManage)
+# node added by hand in the GUI. Delivered to the VM as the user-data file of a `cidata`
+# seed ISO built by device_catmanager.php (mirrors the NX-OS 9000v day-0 prestage).
+#
+# This base config gets the appliance to a usable login WITHOUT the orchestrator:
+#   - personality/inited so it skips the interactive first-boot setup dialog
+#   - hostname = node name (the `inserthostname-here` token is substituted by the handler)
+#   - admin/admin local login
+#   - VPN 0 (eth1) transport + VPN 512 (eth0) management via DHCP so the node is reachable
+#   - the /opt/data ext4 data volume (vManage stores its DB there → second virtio disk)
+#
+# WHY VPN 0 / eth1 is declared even for a standalone node (do NOT remove it):
+#   The appliance puts the first NIC (eth0) into VPN 0 by default. If the day-0 binds
+#   eth0 into VPN 512 WITHOUT also claiming VPN 0 with a different interface, eth0 ends
+#   up in BOTH VPN 0 and VPN 512 → confd rejects the init transaction with
+#   "values are not unique: eth0 at /viptela-vpn:vpn/vpn-instance{0}/interface{eth0}/if",
+#   the bad commit corrupts the CDB ("Persistent file format error …"), and vManage
+#   boot-loops. Declaring eth1 in VPN 0 frees eth0 for management (mirrors the working
+#   "Cisco SDWAN Lab Builder" render). The node needs ≥2 NICs (the catmanager template
+#   has 4); eth1 need not be wired — it only has to own VPN 0. A node that already
+#   boot-looped must be WIPED (the corrupt CDB persists in the linked-clone overlay
+#   across stop/start).
+#
+# The "Cisco SDWAN Lab Builder" (Phase 2) does NOT use this file: it writes a fully
+# rendered cloud-config (root-CA, org-name, vBond, system-ip, static external IP) as the
+# node's startup-config, which the handler wraps into cidata in place of this base.
+fs_setup:
+- device: "/dev/vdb"
+  partition: "none"
+  filesystem: "ext4"
+mounts:
+- [ vdb, /opt/data ]
+write_files:
+- path: /etc/default/personality
+  content: "vmanage\n"
+- path: /etc/default/inited
+  content: "1\n"
+- path: /etc/confd/init/zcloud.xml
+  content: |
+    <config xmlns="http://tail-f.com/ns/config/1.0">
+      <system xmlns="http://viptela.com/system">
+        <personality>vmanage</personality>
+        <device-model>vmanage</device-model>
+        <organization-name>pnetlab</organization-name>
+        <sp-organization-name>pnetlab</sp-organization-name>
+        <host-name>inserthostname-here</host-name>
+        <site-id>100</site-id>
+        <system-ip>100.0.0.1</system-ip>
+        <domain-id>1</domain-id>
+        <aaa>
+          <user>
+            <name>admin</name>
+            <password>admin</password>
+            <group>netadmin</group>
+          </user>
+        </aaa>
+      </system>
+      <vpn xmlns="http://viptela.com/vpn">
+        <vpn-instance>
+          <vpn-id>0</vpn-id>
+          <interface>
+            <if-name>eth1</if-name>
+            <ip>
+              <dhcp-client>true</dhcp-client>
+            </ip>
+            <shutdown>false</shutdown>
+          </interface>
+        </vpn-instance>
+        <vpn-instance>
+          <vpn-id>512</vpn-id>
+          <interface>
+            <if-name>eth0</if-name>
+            <ip>
+              <dhcp-client>true</dhcp-client>
+            </ip>
+            <shutdown>false</shutdown>
+          </interface>
+        </vpn-instance>
+      </vpn>
+    </config>

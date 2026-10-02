@@ -1,0 +1,25 @@
+# PNetLab "Net Services" node — dnsmasq DNS/DHCP/TFTP + chrony NTP + ZTP file
+# serving + an HTTP/HTTPS test endpoint (GUI-configurable color/heading page for
+# LB/NAT/policy labs), all in one Debian container. Image: pnet-services
+# (offline-install via the Dashboard Docker Devices page). Handler: device_docker —
+# console:http maps to container port 80 (the admin web GUI, admin/pnet); a second
+# telnet console shows the supervisor log. Leave dock_args EMPTY so device_docker
+# takes the GUI-docker path (publishes the console port + busybox-managed lab
+# interface). Per-interface networking (DHCP / static IP) is set in the normal node
+# edit; services bind 0.0.0.0 so lab devices reach DNS 53, DHCP 67 (off by default),
+# TFTP 69, NTP 123, HTTP 80 / HTTPS 443 (+/ztp/) on the lab interface (eth1).
+# Binds to any image whose repo name contains "services" (matches pnet-services).
+# config_script keeps the run LED working and pushes the Startup-config blob in.
+type: docker
+config_script: config_aaa.py
+name: Net Services
+description: Net Services (DNS/DHCP/NTP/ZTP)
+cpulimit: 1
+icon: Server-2D-DNS-S.svg
+ethernet: 2
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 2048
+mtu: 1500
+docker_shell: echo "Net Services — configure via the http console GUI (admin/pnet)."; echo "--- /etc/dnsmasq.conf ---"; cat /etc/dnsmasq.conf 2>/dev/null; echo "--- /etc/chrony/chrony.conf ---"; cat /etc/chrony/chrony.conf 2>/dev/null; echo "--- leases ---"; cat /var/lib/misc/dnsmasq.leases 2>/dev/null; exec /bin/bash

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<!-- Anti-flash: dark-neutral first paint matching the dashboard's default page
+     background (--pnq-bg light theme #f4f6f5) so closing a lab (dark canvas →
+     dashboard) doesn't flash browser-white before the CSS loads. CSP-safe static
+     attribute (no inline script to read the localStorage theme). -->
+<html lang="en" style="background:#f4f6f5">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>PNetLab</title>
+	<link rel="icon" href="/branding/api.php?action=logo">
+	<!-- vendored, served from 'self' (CSP: script-src/style-src 'self') -->
+	<link rel="stylesheet" href="/assets-common/icons/css/font-awesome.min.css">
+	<script src="/assets-common/js/pnq-branding.js?v=fa685e58"></script>
+	<script src="/assets-common/js/pnq-theme.js?v=ed2aef02"></script>
+	<link rel="stylesheet" href="/main/css/dashboard.css?v=2d97946b">
+</head>
+<body>
+	<!-- boot overlay: visible until dashboard.js resolves /api/auth -->
+	<div id="boot" class="boot"><div class="boot-spin"></div></div>
+
+	<div id="app" class="app is-loading">
+		<header class="topbar">
+			<div class="topbar-brand">
+				<img class="topbar-logo" data-brand-logo src="/branding/api.php?action=logo" alt="PNetLab">
+				<span class="topbar-brand-text" data-brand-name>PNetLab</span>
+			</div>
+			<div class="topbar-right">
+				<span class="topbar-user">
+					<i class="fa fa-user-circle-o" aria-hidden="true"></i>
+					<span data-bind="username">&hellip;</span>
+				</span>
+				<button type="button" class="topbar-logout" data-action="passwd" title="Change password" aria-label="Change password">
+					<i class="fa fa-key" aria-hidden="true"></i>
+				</button>
+				<button type="button" class="topbar-logout" data-action="logout" title="Log out" aria-label="Log out">
+					<i class="fa fa-sign-out" aria-hidden="true"></i>
+				</button>
+			</div>
+		</header>
+
+		<nav class="sidebar" aria-label="Main navigation">
+			<div class="nav-group" data-nav-group="workspace">
+				<div class="nav-group-label">Workspace</div>
+				<a class="nav-item" data-route="labs" href="#/labs"><i class="fa fa-sitemap" aria-hidden="true"></i><span>Labs</span></a>
+				<a class="nav-item" data-route="running" href="#/running"><i class="fa fa-play-circle" aria-hidden="true"></i><span>Running Labs</span></a>
+			</div>
+			<div class="nav-group" data-nav-group="resources">
+				<div class="nav-group-label">Resources</div>
+				<a class="nav-item" data-route="history" data-admin="1" href="#/history"><i class="fa fa-line-chart" aria-hidden="true"></i><span>History</span></a>
+				<a class="nav-item" data-route="images" data-admin="1" href="#/images"><i class="fa fa-hdd-o" aria-hidden="true"></i><span>Images</span></a>
+				<a class="nav-item" data-route="devices" data-admin="1" href="#/devices"><i class="fa fa-cube" aria-hidden="true"></i><span>Docker Devices</span></a>
+				<a class="nav-item" data-route="network" data-admin="1" href="#/network"><i class="fa fa-sitemap" aria-hidden="true"></i><span>Network</span></a>
+				<a class="nav-item" data-route="clusters" data-admin="1" href="#/clusters"><i class="fa fa-server" aria-hidden="true"></i><span>Clusters</span></a>
+			</div>
+			<div class="nav-group" data-nav-group="platform">
+				<div class="nav-group-label">Platform</div>
+				<a class="nav-item" data-route="system" href="#/system"><i class="fa fa-tachometer" aria-hidden="true"></i><span>System</span></a>
+				<a class="nav-item" data-route="users" data-admin="1" href="#/users"><i class="fa fa-users" aria-hidden="true"></i><span>Users &amp; Roles</span></a>
+				<a class="nav-item" data-route="mail" data-admin="1" href="#/mail"><i class="fa fa-envelope" aria-hidden="true"></i><span>Mail</span></a>
+				<a class="nav-item" data-route="logs" data-admin="1" href="#/logs"><i class="fa fa-history" aria-hidden="true"></i><span>Logs</span></a>
+			</div>
+			<div class="nav-group" data-nav-group="tools">
+				<div class="nav-group-label">Tools</div>
+				<a class="nav-item" data-route="ai" data-admin="1" href="#/ai"><i class="fa fa-magic" aria-hidden="true"></i><span>AI / MCP</span></a>
+				<a class="nav-item" data-route="data" data-admin="1" href="#/data"><i class="fa fa-exchange" aria-hidden="true"></i><span>Import Data</span></a>
+			</div>
+			<!-- No sidebar entry for #/custom by design: Customization is an
+			     unadvertised view reached by typing the URL. The route is still
+			     registered (custom.js) and still admin-gated by the router and,
+			     authoritatively, by branding/api.php's 403 on every write — so
+			     omitting the link is presentation, not access control. -->
+			<div class="sidebar-spacer"></div>
+			<a class="sidebar-version" data-route="version" href="#/version" title="Version details">
+				<i class="fa fa-info-circle" aria-hidden="true"></i>
+				<span class="sv-text"><strong data-brand-name>PNetLab</strong><span data-bind="version">&hellip;</span></span>
+			</a>
+		</nav>
+
+		<main class="content" id="view" aria-live="polite"></main>
+	</div>
+
+	<script src="/main/js/dashboard.js?v=516532b9"></script>
+	<script src="/main/js/labs.js?v=62d15083"></script>
+	<script src="/main/js/running.js?v=ac6b503a"></script>
+	<script src="/main/js/system.js?v=f538dd13"></script>
+	<script src="/main/js/history.js?v=683a4ac0"></script>
+	<script src="/main/js/data.js?v=3c23e94d"></script>
+	<script src="/main/js/clusters.js?v=16bd7445"></script>
+	<script src="/main/js/network.js?v=5c84b4b4"></script>
+	<script src="/main/js/images.js?v=d36618b7"></script>
+	<script src="/main/js/devices.js?v=9113528f"></script>
+	<script src="/main/js/users.js?v=917ff545"></script>
+	<script src="/main/js/mail-settings.js?v=e440bb14"></script>
+	<script src="/main/js/logs.js?v=2f5aecbb"></script>
+	<script src="/main/js/ai.js?v=df3a5e36"></script>
+	<script src="/main/js/version.js?v=30ef6f43"></script>
+	<script src="/main/js/custom.js?v=58bc9b88"></script>
+	<!-- MAIN-ISLANDS:START — generated by work/islands (sync-islands.mjs); do not hand-edit -->
+  <script type="module" src="/themes/default/islands/js/labs-workspace.BYFK7WY4.js"></script>
+  <!-- MAIN-ISLANDS:END -->
+</body>
+</html>

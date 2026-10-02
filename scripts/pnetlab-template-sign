@@ -1,0 +1,79 @@
+#!/bin/bash
+# pnetlab-template-sign — ROOT-ONLY escape valve to trust an admin-added docker
+# template that uses the legacy free-form dock_args/docker_options string.
+#
+# The broker's docker_create verb refuses a free-form template whose file hash
+# is not in /opt/unetlab/scripts/docker-template-manifest.sha256 (a root-owned
+# path outside the fixpermissions-swept html tree). Shipped
+# templates are covered by that manifest at build time; a template an admin adds
+# by hand (e.g. a custom network-OS node) is NOT — so its nodes fail closed with
+# a "convert to typed docker: schema or sign it" message until an admin signs it.
+#
+# This is deliberately a root CLI, not a broker/GUI verb: signing a template is
+# equivalent to authorising its (root-executed) dock_args, so it must require the
+# same trust as editing files under /opt/unetlab. Wiring an admin-authenticated
+# GUI action into the broker is DEFERRED (it needs a real session-token check;
+# see the docker-rebroker Stage 2 notes). Run this as root on the box.
+#
+# Usage:
+#   pnetlab-template-sign <platform>/<template>.yml     # relative to templates/
+#   pnetlab-template-sign /full/path/to/templates/<platform>/<template>.yml
+#   pnetlab-template-sign --list                        # show manifest entries
+set -euo pipefail
+
+# Template files still live under html/templates (that is what we hash), but the
+# MANIFEST output lives in the root-owned scripts dir the broker trusts.
+TPL_ROOT="/opt/unetlab/html/templates"
+MANIFEST="/opt/unetlab/scripts/docker-template-manifest.sha256"
+
+if [ "$(id -u)" != "0" ]; then
+    echo "pnetlab-template-sign: must run as root" >&2
+    exit 1
+fi
+
+if [ "${1:-}" = "--list" ]; then
+    [ -f "$MANIFEST" ] && grep -vE '^\s*#' "$MANIFEST" || echo "(manifest empty/absent)"
+    exit 0
+fi
+
+arg="${1:-}"
+if [ -z "$arg" ]; then
+    echo "usage: pnetlab-template-sign <platform>/<template>.yml | --list" >&2
+    exit 2
+fi
+
+# Resolve to an absolute path under the templates root (no traversal escape).
+case "$arg" in
+    /*) path="$arg" ;;
+    *)  path="$TPL_ROOT/$arg" ;;
+esac
+real="$(realpath -e "$path" 2>/dev/null || true)"
+if [ -z "$real" ]; then
+    echo "pnetlab-template-sign: template not found: $arg" >&2
+    exit 1
+fi
+case "$real/" in
+    "$TPL_ROOT"/*) : ;;
+    *) echo "pnetlab-template-sign: refusing path outside $TPL_ROOT: $real" >&2; exit 1 ;;
+esac
+if [ -L "$path" ]; then
+    echo "pnetlab-template-sign: refusing symlinked template path" >&2
+    exit 1
+fi
+
+h="$(sha256sum "$real" | awk '{print $1}')"
+rel="templates/${real#"$TPL_ROOT"/}"
+
+if [ -f "$MANIFEST" ] && grep -qi "^$h" "$MANIFEST"; then
+    echo "already signed: $h  $rel"
+    exit 0
+fi
+
+# Ensure the manifest exists and is root:root 0644, then append.
+if [ ! -f "$MANIFEST" ]; then
+    printf '# PNetLab shipped free-form docker template manifest (docker-rebroker).\n' > "$MANIFEST"
+fi
+printf '%s  %s\n' "$h" "$rel" >> "$MANIFEST"
+chown root:root "$MANIFEST"
+chmod 0644 "$MANIFEST"
+echo "signed: $h  $rel"

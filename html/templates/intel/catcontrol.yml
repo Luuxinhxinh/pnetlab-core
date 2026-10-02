@@ -1,0 +1,22 @@
+---
+# Cisco Catalyst SD-WAN Controller (vSmart) — day-0 prestaged via device_catcontrol.php
+# (cloud-init cidata seed). Version-agnostic: addons/qemu/catcontrol-<version>/ auto-discovered.
+# Single IDE OS disk (catcontrol-<ver>/hda.qcow2), no data volume.
+type: qemu
+name: vSmart
+description: Cisco Catalyst SD-WAN Controller
+cpulimit: 1
+icon: Server.png
+cpu: 2
+ram: 4096
+ethernet: 4
+console: telnet
+qemu_arch: x86_64
+qemu_nic: virtio-net-pci
+qemu_options: -machine type=pc,accel=kvm -serial mon:stdio -nographic -enable-kvm
+Initial_startup_config:
+  type: checkbox
+  value: 1
+  width: 6
+  restart: 1
+...

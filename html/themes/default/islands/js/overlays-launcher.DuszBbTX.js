@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["js/chunk.Dseit_7D.js","js/chunk.B58dRciU.js","js/chunk.BcJsaWgR.js"])))=>i.map(i=>d[i]);
+import{_ as c}from"./chunk.C-W_yBpp.js";const i=[{selector:".action-bgppath",load:()=>c(()=>import("./chunk.Dseit_7D.js"),__vite__mapDeps([0,1,2]))}],a=new Map;function s(t,o){document.addEventListener("click",e=>{const r=e.target&&e.target.closest&&e.target.closest(t);r&&(e.preventDefault(),a.has(t)||a.set(t,o()),a.get(t).then(n=>n.openFromTrigger(r)).catch(()=>{}))},!0)}for(const{selector:t,load:o}of i)s(t,o);

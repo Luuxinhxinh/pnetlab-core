@@ -1,0 +1,28 @@
+---
+# Cisco Catalyst SD-WAN Manager (vManage) — day-0 prestaged via device_catmanager.php
+# (cloud-init cidata seed). Version-agnostic: any addons/qemu/catmanager-<version>/ image
+# dir is auto-discovered, so newer vManage builds drop in with no change here.
+#
+# TBD on the fat test box (vManage = 32 GB / 10 vCPU):
+#   - icon is cosmetic (Server.png from the base icon set).
+#   - the catmanager-<ver>/ image dir must contain virtioa.qcow2 (OS) AND a virtiob.qcow2
+#     data disk (vManage stores its DB on /opt/data → /dev/vdb); create the data disk with
+#     `qemu-img create -f qcow2 virtiob.qcow2 50G` when staging the image.
+type: qemu
+name: vManage
+description: Cisco Catalyst SD-WAN Manager
+cpulimit: 1
+icon: Server.png
+cpu: 10
+ram: 32768
+ethernet: 4
+console: telnet
+qemu_arch: x86_64
+qemu_nic: virtio-net-pci
+qemu_options: -machine type=pc,accel=kvm -serial mon:stdio -nographic -enable-kvm
+Initial_startup_config:
+  type: checkbox
+  value: 1
+  width: 6
+  restart: 1
+...

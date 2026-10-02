@@ -1,0 +1,163 @@
+---
+image:
+  wipe: 1
+  width: 8
+
+name: 
+  width : 6
+
+description: 
+  show : 0
+
+icon: 
+  width : 6
+
+ethernet: 
+  type: number
+  value: 2
+  width: 6
+  restart: 1
+
+mtu: 
+  type: number
+  value: 9000
+  width: 6
+  restart: 1
+
+cpu: 
+  type: number
+  value: 1
+  unit: (Core)
+  wipe: 1
+  width: 6
+
+ram: 
+  type: number
+  value: 1024
+  unit: (MB)
+  wipe: 1
+  width: 6
+
+
+eth0_dhcp: 
+  type: checkbox
+  value: 0
+  restart: 1
+  width: 6
+  show : 0
+
+eth0_ip:
+  type: text
+  value: ''
+  unit: (x.x.x.x/y)
+  restart: 1
+  width: 6
+  show : 0
+
+
+ETBA: 
+  type: number
+  value: 1
+  wipe: 1
+  width: 6
+
+default_route:
+  type: text
+  value: ''
+  unit: (x.x.x.x)
+  restart: 1
+  width: 6
+  show : 0
+
+
+EOS_PLATFORM : 
+  type: text
+  value: 'ceoslab'
+  wipe: 1
+  width: 6
+ 
+DNS:
+  type: text
+  value: ''
+  unit: (x.x.x.x)
+  restart: 1
+  width: 6
+  show : 0
+
+
+
+console: 
+  type: list
+  value: telnet
+  options:
+    telnet: TELNET
+    ssh: SSH
+    bash: bash
+  wipe: 1
+  width: 6
+
+
+console_2nd: 
+  type: list
+  value: bash
+  options:
+    '': 'Empty'
+    telnet: TELNET
+    ssh: SSH
+    bash: bash
+  wipe: 1
+  width: 6
+
+docker_options: 
+  type: text
+  value: '--privileged'
+  wipe: 1
+
+config: 
+  width : 12
+  type: list
+  value: 0
+  options:
+    0: None
+    1: Exported
+delay:
+  type: number
+  value: 0
+  width: 3
+
+size:
+  type: number
+  width: 3
+  unit: (px)
+
+left: 
+  type: number
+  width: 3
+  unit: (px)
+
+top:
+  type: number
+  width: 3
+  unit: (px)
+
+backspace: 
+  type: list
+  width: 6
+  value: 127
+  options:
+    127: DEFAULT
+    8: Control-H
+
+terminaltype: 
+  type: list
+  width: 6
+  value: 'linux'
+  options:
+    ainsi : ainsi
+    linux : linux
+    vt100 : vt100
+    vt220 : vt220
+    xtrem : xtrem
+    xterm-256color : xterm-256color
+
+...

@@ -1,0 +1,46 @@
+#!/bin/sh
+# Update guidance must remain local-only.  In particular, never run
+# pnetlab-update --check here: login must not contend for apt/network locks.
+set -u
+
+if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ] && [ -n "${TERM:-}" ]; then
+    BOLD=$(printf '\033[1m')
+    CYAN=$(printf '\033[36m')
+    DIM=$(printf '\033[90m')
+    GREEN=$(printf '\033[32m')
+    YELLOW=$(printf '\033[33m')
+    RESET=$(printf '\033[0m')
+else
+    BOLD=
+    CYAN=
+    DIM=
+    GREEN=
+    YELLOW=
+    RESET=
+fi
+
+CONFIG=${PNETLAB_UPDATER_CONFIG:-/etc/pnetlab/updater.conf}
+UPDATE_LOG=${PNETLAB_UPDATE_LOG:-/var/log/pnetlab/update.log}
+if [ -f "$CONFIG" ] && grep -Fqx 'ENROLLED=1' "$CONFIG" 2>/dev/null; then
+    ENROLLMENT="${GREEN}enrolled${RESET}"
+else
+    ENROLLMENT="${YELLOW}not enrolled${RESET}"
+fi
+
+LAST_EPOCH=$(stat -c '%Y' "$UPDATE_LOG" 2>/dev/null || true)
+case "$LAST_EPOCH" in
+    ''|*[!0-9]*) LAST_RUN='no updater log yet' ;;
+    *) LAST_RUN=$(date -d "@$LAST_EPOCH" '+%Y-%m-%d %H:%M' 2>/dev/null || printf 'unknown') ;;
+esac
+
+printf '\n%s%s Software updates%s\n' "$BOLD" "$CYAN" "$RESET"
+printf '   State: %s%s; last updater log activity: %s%s\n' "$ENROLLMENT" "$RESET" "$LAST_RUN" "$RESET"
+printf '\n'
+printf '   %sOnline (signed, PNetLab packages only - never touches Ubuntu):%s\n' "$DIM" "$RESET"
+printf '     sudo pnetlab-update enroll     %sfirst-time: pin key + enable source%s\n' "$DIM" "$RESET"
+printf '     sudo pnetlab-update --check    %slist newer installed pnetlab* packages%s\n' "$DIM" "$RESET"
+printf '     sudo pnetlab-update            %ssnapshot DB + debs, then apply%s\n' "$DIM" "$RESET"
+printf '     sudo pnetlab-update rollback   %srestore the newest complete snapshot%s\n' "$DIM" "$RESET"
+printf '   %sOffline: extract a newer release bundle and run its patch script:%s\n' "$DIM" "$RESET"
+printf '     cd pnetlab-27H1-*/ && sudo bash patch-27H1-*.sh\n'
+printf '   %sLogs: /var/log/pnetlab/update.log | Snapshots: /var/backups/pnetlab/%s\n' "$DIM" "$RESET"

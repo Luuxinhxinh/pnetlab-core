@@ -1,0 +1,148 @@
+/* pnetlab-bgp-waterfall.css — BGP best-path waterfall modal.
+   Paired with themes/default/js/pnetlab-bgp-waterfall.js. Entry point is the
+   editor's link context menu (.action-bgppath). Dark-glass chrome matches the
+   Protocol Inspector. */
+
+.bw-toast {
+  position: fixed; left: 50%; bottom: 28px;
+  transform: translateX(-50%) translateY(12px);
+  z-index: 10060; max-width: 70vw; padding: 10px 16px;
+  background: rgba(28, 32, 38, 0.97); color: #e8eef4; font-size: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none;
+}
+.bw-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── modal shell ──────────────────────────────────────────────────────────── */
+.bw-modal {
+  position: fixed; z-index: 10040; width: 640px; max-width: 96vw;
+  height: 540px; max-height: 88vh; min-width: 380px; min-height: 260px;
+  display: flex; flex-direction: column;
+  background: #161a20; color: #eef4fa;
+  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px); font-size: 13px; overflow: hidden;
+}
+.bw-bar {
+  display: flex; align-items: center; gap: 8px; padding: 9px 11px;
+  background: rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12); cursor: move;
+}
+.bw-title { font-weight: 700; font-size: 13.5px; white-space: nowrap; }
+.bw-title i { color: #8fd0a6; margin-right: 5px; }
+.bw-status { color: #aebfce; font-size: 12px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.bw-sp { flex: 1; }
+.bw-btn {
+  background: rgba(255, 255, 255, 0.09); color: #eef4fa;
+  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 7px;
+  padding: 4px 9px; cursor: pointer; font-size: 12px; line-height: 1.2;
+}
+.bw-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.bw-btn:disabled { opacity: 0.4; cursor: default; }
+.bw-btn.on { background: #1d6e56; border-color: #2a9c79; }
+
+/* segmented node picker (which endpoint to query) */
+.bw-nodes { display: flex; gap: 6px; }
+.bw-nodes .bw-node {
+  background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255,255,255,0.16);
+  color: #cfe0ef; border-radius: 7px; padding: 3px 10px; cursor: pointer;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.bw-nodes .bw-node.on { background: #185fa5; border-color: #378add; color: #fff; }
+
+/* ── body ─────────────────────────────────────────────────────────────────── */
+.bw-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 14px;
+  scrollbar-gutter: stable; }
+.bw-empty { padding: 28px 18px; color: #aebfce; text-align: center;
+  line-height: 1.6; font-size: 13px; }
+.bw-crumbs { font-size: 12px; color: #9fb6cc; margin-bottom: 10px; }
+.bw-crumbs a { color: #7cbcf0; cursor: pointer; }
+
+/* ── stage 1: prefix picker (div/grid, NOT a <table>) ─────────────────────────
+   Rendered as divs with custom classes so PNetLab's global table CSS cannot
+   leak a light row background or dim/uppercase text in. Every colour explicit. */
+.bw-list { display: flex; flex-direction: column; }
+.bw-lhead, .bw-prefix-row {
+  display: grid; grid-template-columns: 1.7fr 0.6fr 1.5fr auto;
+  gap: 10px; align-items: center; padding: 9px 11px;
+}
+.bw-lhead {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  color: #9bb3c9; border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+}
+.bw-prefix-row {
+  cursor: pointer; color: #eaf2fb;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.bw-prefix-row:hover { background: rgba(120, 170, 225, 0.16); }
+.bw-c-prefix { color: #bcd9f5; font-size: 13px; }
+.bw-c-paths { color: #d7e3ef; }
+.bw-c-nh { color: #aebfce; }
+.bw-mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.bw-c-flags { display: flex; gap: 4px; justify-content: flex-end; }
+.bw-flag { font-size: 11px; padding: 1px 7px; border-radius: 8px;
+  white-space: nowrap; }
+.bw-flag.rib { background: #5a1a1a; color: #f6c2c2; }
+.bw-flag.ecmp { background: #114a3b; color: #8fe6c8; }
+
+/* ── stage 2: path chips ──────────────────────────────────────────────────── */
+.bw-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr));
+  gap: 8px; margin-bottom: 14px; }
+.bw-chip { border: 1px solid rgba(255,255,255,0.14); border-radius: 10px;
+  padding: 8px 10px; background: rgba(255,255,255,0.04); }
+.bw-chip.win { border-color: #2a9c79; background: rgba(29,110,86,0.18); }
+.bw-chip.out { opacity: 0.55; }
+.bw-chip-h { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.bw-chip-id { font-weight: 700; font-size: 13px; }
+.bw-chip .nh { font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px; color: #9fb6cc; }
+.bw-src { margin-left: auto; font-size: 11px; padding: 1px 7px; border-radius: 8px; }
+.bw-src.ebgp { background: #0c447c; color: #bcd9f5; }
+.bw-src.ibgp { background: #3a3a36; color: #cfcdc2; }
+.bw-chip-b { font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px; color: #aebfce; line-height: 1.5; }
+
+/* ── stage 2: the decision ladder ─────────────────────────────────────────── */
+.bw-rung { display: flex; align-items: center; gap: 10px; padding: 7px 10px;
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; margin-bottom: 5px; }
+.bw-rung.skip { opacity: 0.5; }
+.bw-rung.decided { border: 2px solid #378add; background: rgba(24,95,165,0.18); }
+.bw-rung-n { flex: none; width: 20px; height: 20px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; background: #5f5e5a; color: #fff; }
+.bw-rung.decided .bw-rung-n { background: #185fa5; }
+.bw-rung-name { flex: none; width: 170px; }
+.bw-rung-name b { font-weight: 600; font-size: 12.5px; }
+.bw-rung-name .sub { display: block; font-size: 10.5px; color: #8ba3ba; }
+.bw-rung-badges { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.bw-pill { font-size: 11px; padding: 1px 7px; border-radius: 8px; }
+.bw-pill.in { background: #0c447c; color: #cfe6fb; }
+.bw-pill.win { background: #1d6e56; color: #ccf3e3; }
+.bw-pill.out { background: #2c2c2a; color: #b4b2a9; text-decoration: line-through; }
+.bw-rung-verdict { margin-left: auto; font-size: 11px; color: #9fb6cc;
+  white-space: nowrap; }
+
+.bw-winner { display: flex; align-items: center; gap: 10px; padding: 11px 13px;
+  border-radius: 10px; background: rgba(29,110,86,0.18);
+  border: 1px solid rgba(255,255,255,0.12); margin: 14px 0 4px; }
+.bw-winner i { font-size: 19px; color: #6fd3aa; }
+.bw-winner .h { font-size: 13.5px; font-weight: 600; color: #aef0d3; }
+.bw-winner .s { font-size: 12px; color: #9fd9c2; }
+
+.bw-raw { margin-top: 12px; }
+.bw-raw pre { white-space: pre; overflow: auto; max-height: 200px;
+  background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px; padding: 8px 10px; margin: 0;
+  font-size: 11px; color: #cdddec; }
+
+/* ── resize grip ──────────────────────────────────────────────────────────── */
+.bw-resize {
+  position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px;
+  cursor: nwse-resize; z-index: 2;
+  background:
+    linear-gradient(135deg, transparent 0 45%,
+      rgba(180, 200, 220, 0.6) 45% 55%, transparent 55% 70%,
+      rgba(180, 200, 220, 0.6) 70% 80%, transparent 80%);
+}

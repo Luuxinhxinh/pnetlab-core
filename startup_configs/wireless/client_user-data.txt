@@ -1,0 +1,137 @@
+#cloud-config
+# PNetLab Wireless Client (GUI) — EAP-TLS day-0 seed (cloud-init NoCloud / cidata).
+#
+# This is the Startup-config the GUI Wireless Client boots with. Paste your three PEM
+# blobs between the markers below (CA cert, client cert, client private key), keep the
+# 6-space indentation, then Save the Startup-config and (re)start the node. The handler
+# device_wificlient.php fills in the SSID and EAP identity from the node's params.
+#
+# NetworkManager owns wlan0 on this image, so we only drop the certs into /etc/pnet-eap/
+# plus ONE keyfile connection (autoconnect) — NM loads it and EAP-TLS-associates to the
+# WPA-EAP cell. Nothing here blocks boot: bad/blank certs only fail EAP, the desktop still
+# comes up and you can fix it in nm-applet. For a plain desktop with no staged connection,
+# clear this Startup-config (or untick the node's Startup-config option).
+write_files:
+  - path: /etc/pnet-eap/ca.pem
+    permissions: '0644'
+    content: |
+      <<PASTE CA CERTIFICATE (PEM) HERE>>
+  - path: /etc/pnet-eap/client.pem
+    permissions: '0644'
+    content: |
+      <<PASTE CLIENT CERTIFICATE (PEM) HERE>>
+  - path: /etc/pnet-eap/client.key
+    permissions: '0600'
+    content: |
+      <<PASTE CLIENT PRIVATE KEY (PEM) HERE>>
+  # --8<-- wifi-keyfile (the handler drops this whole block when no Wifi_SSID is set;
+  #        the pnet-wifi-autojoin helper below then joins the strongest OPEN SSID).
+  - path: /etc/NetworkManager/system-connections/insert-ssid-here.nmconnection
+    permissions: '0600'
+    content: |
+      [connection]
+      id=insert-ssid-here
+      type=wifi
+      autoconnect=true
+      [wifi]
+      mode=infrastructure
+      ssid=insert-ssid-here
+      [wifi-security]
+      key-mgmt=wpa-eap
+      [802-1x]
+      eap=tls
+      identity=insert-eap-identity-here
+      ca-cert=/etc/pnet-eap/ca.pem
+      client-cert=/etc/pnet-eap/client.pem
+      private-key=/etc/pnet-eap/client.key
+      # If your private key is encrypted, uncomment and set its password:
+      # private-key-password=insert-key-password-here
+      [ipv4]
+      method=auto
+      [ipv6]
+      method=ignore
+  # --8<-- end wifi-keyfile
+  # Lab convenience: auto-join the strongest OPEN SSID as an INFRASTRUCTURE client when
+  # no infrastructure Wi-Fi profile exists yet, so an open lab "just connects" as a
+  # station. We build the profile EXPLICITLY (mode=infrastructure) instead of using
+  # `nmcli device wifi connect`, which can latch onto a stray Ad-Hoc beacon for the same
+  # SSID and come up mode=adhoc + ipv4=shared -> a 10.42.0.1 hotspot that hijacks wlan0.
+  # Any ad-hoc/AP/shared wifi profile is torn down first; once an infrastructure profile
+  # exists the helper stands down and lets NetworkManager own association/DHCP.
+  - path: /usr/local/sbin/pnet-wifi-autojoin.sh
+    permissions: '0755'
+    content: |
+      #!/bin/sh
+      sleep 8
+      has_infra() {
+        for u in $(nmcli -t -f UUID,TYPE c show 2>/dev/null | awk -F: '$2=="802-11-wireless"{print $1}'); do
+          [ "$(nmcli -g 802-11-wireless.mode c show "$u" 2>/dev/null)" = "infrastructure" ] && return 0
+        done
+        return 1
+      }
+      while true; do
+        # Tear down ad-hoc / AP / shared wifi profiles (hotspots that self-assign
+        # 10.42.0.1 and hijack wlan0).
+        for u in $(nmcli -t -f UUID,TYPE c show 2>/dev/null | awk -F: '$2=="802-11-wireless"{print $1}'); do
+          m=$(nmcli -g 802-11-wireless.mode c show "$u" 2>/dev/null)
+          m4=$(nmcli -g ipv4.method c show "$u" 2>/dev/null)
+          if [ "$m" = "adhoc" ] || [ "$m" = "ap" ] || [ "$m4" = "shared" ]; then nmcli c delete "$u" 2>/dev/null; fi
+        done
+        # An infrastructure profile already exists -> NM owns it; stand down.
+        if has_infra; then sleep 15; continue; fi
+        nmcli device wifi rescan 2>/dev/null
+        sleep 2
+        # Strongest OPEN (empty SECURITY) INFRASTRUCTURE AP, tie -> lowest BSSID. Skip
+        # Ad-Hoc beacons (MODE). nmcli -t escapes ':' as '\:' in BSSID/SSID -> swap to a
+        # sentinel (the sed needs the doubled backslash), split, then restore.
+        SSID=$(nmcli -t -f BSSID,SIGNAL,SECURITY,MODE,SSID device wifi list 2>/dev/null \
+          | sed 's/\\\\:/%%/g' \
+          | awk -F: 'NF>=5 && $3=="" && $4 !~ /[Aa]d-?[Hh]oc/ && $5!="" {b=$1; s=$5; gsub(/%%/,":",b); gsub(/%%/,":",s); print $2"\t"b"\t"s}' \
+          | sort -k1,1nr -k2,2 | head -1 | cut -f3)
+        if [ -n "$SSID" ]; then
+          nmcli connection add type wifi ifname wlan0 con-name "pnet-$SSID" ssid "$SSID" \
+            802-11-wireless.mode infrastructure ipv4.method auto connection.autoconnect yes 2>/dev/null
+          nmcli connection up "pnet-$SSID" >/dev/null 2>&1 &
+        fi
+        sleep 10
+      done
+  - path: /etc/systemd/system/pnet-wifi-autojoin.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=PNetLab auto-join strongest open Wi-Fi (lab convenience)
+      After=NetworkManager.service
+      Wants=NetworkManager.service
+      [Service]
+      Type=simple
+      ExecStart=/usr/local/sbin/pnet-wifi-autojoin.sh
+      Restart=always
+      RestartSec=5
+      [Install]
+      WantedBy=multi-user.target
+  # Lab convenience: rescan Wi-Fi every 5s so a newly-added cell SSID surfaces in
+  # nm-applet's "Available networks" within a few seconds (NM rate-limits scans, so
+  # 5s requests just keep the list as fresh as NM permits — harmless in emulation).
+  - path: /etc/systemd/system/pnet-wifi-rescan.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=PNetLab periodic Wi-Fi rescan (lab convenience)
+      After=NetworkManager.service
+      Wants=NetworkManager.service
+      [Service]
+      Type=simple
+      ExecStart=/bin/sh -c 'while true; do nmcli -t dev wifi rescan 2>/dev/null || true; sleep 5; done'
+      Restart=always
+      RestartSec=5
+      [Install]
+      WantedBy=multi-user.target
+runcmd:
+  # Tighten perms (cloud-init writes 0600 already, but be defensive) and ask NM to load the
+  # new keyfile connection. NM auto-associates via autoconnect; the explicit `up` just speeds
+  # the first attempt. All best-effort — never fail the boot on these.
+  - [ sh, -c, 'chmod 0600 /etc/pnet-eap/client.key 2>/dev/null; chmod 0600 /etc/NetworkManager/system-connections/*.nmconnection 2>/dev/null; nmcli connection reload 2>/dev/null; nmcli connection up id "insert-ssid-here" 2>/dev/null; true' ]
+  # Start the 5-second Wi-Fi rescan helper (above) so new SSIDs appear promptly.
+  - [ systemctl, enable, --now, pnet-wifi-rescan.service ]
+  # Start the auto-join helper so an open lab SSID is joined as a station automatically.
+  - [ systemctl, enable, --now, pnet-wifi-autojoin.service ]

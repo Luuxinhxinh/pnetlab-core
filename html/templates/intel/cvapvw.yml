@@ -1,0 +1,75 @@
+---
+# Cisco Virtual Access Point over the vwifi medium (cVAP-vwifi). Same genuine Cisco
+# AP COS userland as cvap.yml (capwapd/click/hostapd.stock, CAPWAP-joins a Catalyst
+# 9800-CL WLC over wired0) but relays 802.11 over the vwifi vsock medium instead of
+# cvap's airduct virtio-serial transport — so it associates with the full vwifi
+# client ecosystem (wifista/wificlient) rather than only cwificlient. Handler:
+# device_cvapvw.php. Image dir auto-discovered as addons/qemu/cvapvw-<version>/ and
+# the disk MUST be named sataa.qcow2 so device_qemu puts it on the AHCI/SATA bus
+# that OVMF-sata.fd + the image's EFI/grub expect.
+#
+# Boot shape mirrors cvap.yml: EFI firmware (OVMF-sata.fd), SATA disk, e1000 NICs.
+# Day-0 apvirtual.env is delivered via a cidata ISO by the handler; the vwifi vsock
+# device is injected in customFlag().
+type: qemu
+name: cVAP-vwifi
+description: Cisco Virtual Access Point over vwifi (CAPWAP → Catalyst 9800)
+cpulimit: 1
+icon: Access Point Green.png
+cpu: 2
+ram: 2048
+ethernet: 2
+console: telnet
+qemu_arch: x86_64
+qemu_nic: e1000
+# NOTE: deliberately NO "-serial mon:stdio" here (cvap.yml has it; this template must not).
+# device_qemu.php already emits "-serial chardev:serial0" for the telnet console. A second
+# -serial makes the guest kernel console land on qemu stdio (wrapper.txt) instead of
+# console.sock, leaving the PNetLab telnet console silent and unresponsive after GRUB.
+qemu_options: -machine type=pc,accel=kvm -nographic -enable-kvm -bios /opt/qemu/share/qemu/OVMF-sata.fd
+AP_Model:
+  type: list
+  value: '9178'
+  options:
+    '9178': CW9178I — Wi-Fi 7 tri-band
+    '9176': CW9176I — Wi-Fi 7
+    '9166': C9166 — Wi-Fi 6E tri-band
+    '9164': C9164 — Wi-Fi 6E
+    '9162': C9162 — Wi-Fi 6E
+    '9136': C9136 — Wi-Fi 6E tri-band
+    '9130': C9130 — Wi-Fi 6
+    '9124': C9124 — Wi-Fi 6 outdoor
+    '9120': C9120 — Wi-Fi 6
+    '9117': C9117 — Wi-Fi 6
+    '9115': C9115 — Wi-Fi 6
+    '9105': C9105 — Wi-Fi 6
+    '3800': AIR-AP3800 — Wave 2
+    '2800': AIR-AP2800 — Wave 2
+    '1815': AIR-AP1815 — Wave 2
+    '1800': AIR-AP1800 — Wave 2
+  width: 6
+WLC_IP:
+  type: text
+  value: 10.10.100.254
+  width: 6
+CAPWAP_VER:
+  type: text
+  value: 17.18.3.18
+  width: 6
+AP_WIFI7_MLO:
+  type: list
+  value: '0'
+  options:
+    '0': disabled
+    '1': enabled (9178/9176 only)
+  width: 6
+RADIO_FREQ:
+  type: text
+  value: ''
+  width: 6
+Initial_startup_config:
+  type: checkbox
+  value: 1
+  width: 6
+  restart: 1
+...

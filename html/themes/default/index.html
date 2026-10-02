@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<!-- Anti-flash: paint a dark background on the very first frame (before any CSS
+     link loads) so opening a lab never flashes browser-white before the dark
+     #loading-lab overlay / flow canvas appear. #0d274d matches the loading
+     overlay and is theme-agnostic (the overlay is dark in both themes). The lab
+     was the amputation's anti-flash boot shim that this restores, CSP-safely
+     (static attribute, no inline script). -->
+<html style="background:#0d274d" data-brand-title="%s | Topology">
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="description" content="PNetLab" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+	<!-- data-brand-title: pnq-branding.js rewrites the title with the custom
+	     product name once its config fetch resolves (%s = the name). -->
+	<title>PNetLab | Topology</title>
+
+	<link rel="shortcut icon" href="/branding/api.php?action=logo">
+	<link href="/themes/default/bootstrap/css/bootstrap.min.css?v=e20ea1c4" rel="stylesheet" />
+	<link href="/themes/default/bootstrap/css/bootstrap-select.min.css?v=b913ccaf" rel="stylesheet" />
+	<link href="/themes/default/bootstrap/css/tinytools.toggleswitch.min.css?v=32eb5fa9" rel="stylesheet" />
+	<link href="/themes/default/bootstrap/css/jquery-ui.min.css?v=254ae24d" rel="stylesheet" />
+	<link rel="stylesheet" href="/themes/default/css/font-awesome.min.css">
+	<link href="/themes/default/css/fonts.css" rel="stylesheet" />
+	<link href="/themes/default/css/style.css?v=eea70eaa" rel="stylesheet" />
+	<link href="/themes/default/css/ebs.css?v=f6a74d69" rel="stylesheet" />
+	<link href="/themes/default/css/unetlab.css?v=57f3e59f" rel="stylesheet" />
+
+	<!-- canvas-flow amputation (b2 Wave 3): the boot shim (pnetlab-canvas-boot.js)
+	     + anti-flash + ?canvas=classic toggle are retired — the Svelte Flow island
+	     is the ONLY canvas and mounts unconditionally. lab.js + jsPlumb are no longer
+	     loaded. The App.topology stub below stands in for lab.js's model object for
+	     the ~14 survivor files that still call App.topology.* (must load BEFORE
+	     actions.js / the functions/** decomp). -->
+	<script src="/themes/default/bootstrap/js/jquery-3.7.1.min.js" defer></script>
+	<script src="/themes/default/bootstrap/js/tinytools.toggleswitch.min.js" defer></script>
+	<script src="/themes/default/bootstrap/js/jquery-ui-1.13.3.min.js" defer></script>
+	<script src="/themes/default/bootstrap/js/jquery-cookie-1.4.1.js" defer></script>
+	<script src="/themes/default/bootstrap/js/jquery.validate-1.14.0.min.js" defer></script>
+	<script src="/themes/default/bootstrap/js/jquery.hotkey.js" defer></script>
+	<script src="/themes/default/bootstrap/js/bootstrap.min.js" defer></script>
+	<script src="/themes/default/bootstrap/js/bootstrap-select.min.js" defer></script>
+	<script src="/themes/default/bootstrap/js/circle-progress-1.1.3.js" defer></script>
+	<!-- jsPlumb removed (canvas-flow amputation): the Svelte Flow island is the only
+	     canvas; nothing draws jsPlumb connections anymore. -->
+	<script src="/themes/default/bootstrap/js/imageMapResizer.min.js" defer></script>
+	<script src="/themes/default/js/ejs.js" defer></script>
+	<script src="/themes/default/js/b64encoder.js" defer></script>
+	<script src="/themes/default/js/messages_en.js" defer></script>
+	<script src="/themes/default/js/validate.js" defer></script>
+	<script src="/themes/default/js/browsers.js" defer></script>
+
+	<!-- Phase C store decommission (C5): window.server + default.js globals are
+	     now served engine-side. server-init emits window.server (auth via token
+	     cookie); pnq-default.js carries only the load-bearing globals (lang/get/
+	     isset/output_secure/addClass/rmClass/makeId + the .modal scroll-lock
+	     handler). constant.js dropped (store-only DB constants, 0 engine
+	     consumers). moment.js + swal2 relocated to /assets-common/. -->
+	<script src="/server-init/" type="text/javascript"></script>
+	<!-- Auth expiry guard: the static topology shell can outlive its token;
+	     redirect all 401/412 API responses back to login instead of leaving a
+	     canvas feature (for example Network Watcher) stuck waiting. -->
+	<script src="/assets-common/js/pnq-default.js?v=dec6b432" type="text/javascript"></script>
+	<!-- Custom branding: swaps the splash/left-pane logo and the tab title from
+	     /branding/api.php. Must load before functions/status/render.js paints the
+	     left pane; that render reads PnqBranding.logoUrl() when it is present. -->
+	<script src="/assets-common/js/pnq-branding.js?v=fa685e58"></script>
+	<script src="/assets-common/js/pnq-theme.js?v=ed2aef02" type="text/javascript"></script>
+	<script src="/assets-common/js/pnq-branding-boot.js?v=c8c70a8d"></script>
+	<script src="/assets-common/js/moment.js"></script>
+	<script src="/assets-common/js/swal2.all.min.js"></script>
+
+
+	<!-- Ace editor: loaded statically (deferred). A 6.7.35 attempt to lazy-load
+	     it (pnetlab-lazy-ace.js, fetch only on the ACE toggle) regressed the
+	     Startup-config editor/export — the config pane and `Export config` read
+	     through Ace (ext-textarea auto-conversion / ace.edit on render), which
+	     assume window.ace exists when the modal renders. Reverted in 6.7.36:
+	     `defer` keeps it off the render-blocking path without removing it. -->
+	<script src="/themes/default/js/src/ace.js" defer></script>
+	<script src="/themes/default/js/src/ext-language_tools.js" defer></script>
+
+	<!-- client state store (single source of truth) — must load BEFORE the
+	     topology stub below: the stub's installWindowNodes() calls
+	     window.PNQStore.subscribe(...) synchronously at install time (via the
+	     top-level installStub() call in that file), guarded by
+	     `if (window.PNQStore && ...)`. With the store loading later, that guard
+	     always failed silently and window.nodes never wired up to live PNQStore
+	     changes — it only ever reflected whatever existed at initial page load.
+	     A "re-assert on DOMContentLoaded" fallback in the stub was meant to catch
+	     this, but is itself blocked by the stub's own idempotency guard, so it
+	     never actually re-ran the subscribe. Net effect: any node added mid-
+	     session (Add Node dialog) never appeared in window.nodes, so the
+	     quickbar's Start All / Stop All / Wipe All / Console All buttons (which
+	     iterate Object.keys(window.nodes)) silently skipped it — while the
+	     per-node hover-action-bar buttons kept working, since those read
+	     PNQStore directly. Loading the store first fixes this at the source. -->
+	<script src="/themes/default/js/pnetlab-store.js?v=2f5ca983" defer></script>
+	<!-- canvas-flow amputation (b2 Wave 3, B2): persistent App.topology stub. Must
+	     run BEFORE actions.js + the functions/** decomp, which call App.topology.*
+	     unconditionally (lab.js — which used to install it — is no longer loaded). -->
+	<script src="/themes/default/js/pnetlab-app-topology-stub.js?v=7381d5ac" defer></script>
+	<!-- ?v= added 2026-07-21: this was the ONLY one of 21 local asset tags with no
+	     cache-bust token, so debs/hash-cachebust.py (which rewrites existing
+	     `?v=` tokens) never managed it and browsers kept a cached copy across
+	     every release. The token value is a placeholder — the release stage
+	     replaces it with the content hash. -->
+	<script src='/themes/default/js/ebs/functions.js?v=eeb62d0f' defer></script>
+	<script src='/themes/default/js/ebs/actions.js?v=9b737892' defer></script>
+	<script src='/themes/default/js/actions.js?v=19edd8ec' defer></script>
+	<!-- Phase 3: functions.js decomposed into per-domain files under js/functions/
+	     (monolith retired). Loaded as classic <script defer> (NOT type=module) so
+	     the legacy code keeps its original sloppy-mode semantics — implicit globals
+	     (e.g. linksourcedata, shape_border_width) that the golden actions.js + the
+	     add-ons read would ReferenceError under a strict ES module. Same-origin
+	     classic scripts are CSP-clean (script-src 'self'); document order preserved.
+	     core/globals first (window.contextMenuOpen), pnq/prefs last (load-time
+	     delegated-listener block). -->
+	<script src='/themes/default/js/functions/core/globals.js?v=5b56e5ff' defer></script>
+	<script src='/themes/default/js/functions/core/dom.js?v=0ee73d49' defer></script>
+	<script src='/themes/default/js/functions/util/color.js?v=1fb3247b' defer></script>
+	<script src='/themes/default/js/functions/util/misc.js?v=2feb11ee' defer></script>
+	<script src='/themes/default/js/functions/api/labs.js?v=d3d83f56' defer></script>
+	<script src='/themes/default/js/functions/api/users.js?v=49050721' defer></script>
+	<script src='/themes/default/js/functions/system/ctrl.js?v=9a82968b' defer></script>
+	<script src='/themes/default/js/functions/media/text-pictures.js?v=210b8b97' defer></script>
+	<script src='/themes/default/js/functions/canvas/zoom.js?v=8e9d48db' defer></script>
+	<script src='/themes/default/js/functions/conn/modal.js?v=57840906' defer></script>
+	<script src='/themes/default/js/functions/lab/manage.js?v=c6886ebe' defer></script>
+	<script src='/themes/default/js/functions/networks/edit.js?v=18ca6687' defer></script>
+	<script src='/themes/default/js/functions/nodes/lifecycle.js?v=446b7201' defer></script>
+	<script src='/themes/default/js/functions/nodes/mutate.js?v=d168c4dd' defer></script>
+	<script src='/themes/default/js/functions/nodes/interfaces.js?v=b65a7ce1' defer></script>
+	<script src='/themes/default/js/functions/forms/print.js?v=81b67496' defer></script>
+	<script src='/themes/default/js/functions/status/render.js?v=2fdc53f3' defer></script>
+	<script src='/themes/default/js/functions/pnq/prefs.js?v=0a140ced' defer></script>
+
+	<script src="/themes/default/js/javascript.js" defer></script>
+
+  <link rel="stylesheet" href="/assets-common/css/pnetlab-enhance-v2.css?v=e0a2ea6a">
+  <link rel="stylesheet" href="/themes/default/css/pnetlab-network-watcher.css?v=1cae5f8e">
+  <link rel="stylesheet" href="/themes/default/css/pnetlab-protocol-inspector.css?v=8cc3cfe6">
+  <link rel="stylesheet" href="/themes/default/css/pnetlab-bgp-waterfall.css?v=75005cb8">
+  <link rel="stylesheet" href="/themes/default/css/pnetlab-topology-overlay.css?v=ba7caec4">
+  <link rel="stylesheet" href="/themes/default/css/pnetlab-notif-history.css?v=774a8e17">
+</head>
+
+<body>
+	<!-- PNetLab Quick Action Bar -->
+	<div id="pnetlab-quickbar">
+		<div id="pnq-buttons">
+		<button type="button" class="pnq-btn action-nodesstart" aria-label="Start All"><i class="glyphicon glyphicon-play" aria-hidden="true"></i><span class="pnq-label">Start All</span></button>
+		<button type="button" class="pnq-btn action-nodesstop" aria-label="Stop All"><i class="glyphicon glyphicon-stop" aria-hidden="true"></i><span class="pnq-label">Stop All</span></button>
+		<button type="button" class="pnq-btn action-nodeswipe" title="Wipe All — erase every node's saved state (factory reset)" aria-label="Wipe All — erase every node's saved state (factory reset)"><i class="glyphicon glyphicon-erase" aria-hidden="true"></i><span class="pnq-label">Wipe All</span></button>
+		<button type="button" class="pnq-btn action-openconsole-all" title="Open the web console with every node as a tab (combined)" aria-label="Console All — open the web console with every node as a tab"><i class="glyphicon glyphicon-console" aria-hidden="true"></i><span class="pnq-label">Console All</span></button>
+		<button type="button" class="pnq-btn action-nodesexport" aria-label="Export CFGs"><i class="glyphicon glyphicon-save" aria-hidden="true"></i><span class="pnq-label">Export CFGs</span></button>
+		<button type="button" class="pnq-btn action-labclose" aria-label="Close Lab"><i class="glyphicon glyphicon-off" aria-hidden="true"></i><span class="pnq-label">Close Lab</span></button>
+		<button type="button" class="pnq-btn action-nodeplace" aria-label="Add Node"><i class="fa fa-cube" aria-hidden="true"></i><span class="pnq-label">Add Node</span></button>
+	</div>
+	</div>
+
+	
+	
+	<div class="container-fluid" id="body">
+		
+	</div>
+
+	<div id="loading-lab" class="loading-lab" style="background: #161c19; position: absolute; top: 0;right: 0; bottom: 0; left: 0; z-index: 9999;">
+		<div class="container">
+			<img data-brand-logo src="/branding/api.php?action=logo" style="width:150px; margin-bottom:15px;"/><br/>
+			<div class="progress">
+				<div class="progress-bar progress-bar-striped active" style="width:1%" role="progressbar" aria-valuenow="1" aria-valuemin="0" aria-valuemax="100"></div>
+			</div>
+		</div>
+	</div>
+
+	
+
+  <!-- defer: these PNetLab add-on scripts only define functions / register
+       delegated listeners (they ran BEFORE deferred jQuery previously, so they
+       were already top-level-safe). Deferring them unblocks the parser/first
+       paint and runs them in order AFTER jQuery + the engine core. -->
+  <script src="/themes/default/js/pnetlab-swatch.js?v=d00d8a43" defer></script>
+  <script src="/themes/default/js/pnetlab-props-panel.js?v=d13da4eb" defer></script>
+  <script src="/themes/default/js/pnetlab-node-form.js?v=82b8a0e7" defer></script>
+  <script src="/themes/default/js/pnetlab-template-defaults.js?v=4b6e6090" defer></script>
+  <script src="/themes/default/js/pnetlab-image-store.js" defer></script>
+  <!-- Track 2 (deco-native): pnetlab-shape.js / pnetlab-text.js / pnetlab-line.js
+       / pnetlab-deco-legacy-dom.js are DELETED — the canvas-flow island owns
+       decoration editing natively (editors + direct REST in the island bundle).
+       pnetlab-shape-draw.js stays: Polygon/Freeform draw tools (island bridges
+       its .pnq-draw-* delegates from the native pane menu). -->
+  <script src="/themes/default/js/pnetlab-shape-draw.js?v=7bf4f65c" defer></script>
+  <!-- pnetlab-sidebar-tools.js RESTORED post-amputation (user decision, 3b):
+       Quickbar/sysmon/sticky/fix-perms/PKI/Shell entries are jsPlumb-free; the
+       dead .jtk-overlay CSS lane was stripped (island owns iflabels). -->
+  <script src="/themes/default/js/pnetlab-sidebar-tools.js?v=59958d39" defer></script>
+  <!-- lab-ui-polish: functional regrouping of the #lab-sidebar entries (pure
+       DOM reorder + group dividers; every entry keeps its id/class/handlers).
+       Group order lives in GROUPS inside this file. -->
+  <script src="/themes/default/js/pnetlab-sidebar-groups.js?v=88d94e43" defer></script>
+  <script src="/themes/default/js/pnetlab-sdwan-builder.js?v=b53b08a1" defer></script>
+  <script src="/themes/default/js/pnetlab-node-duplicate.js?v=d502db2d" defer></script>
+  <script src="/themes/default/js/pnetlab-node-rename.js" defer></script>
+  <script src="/themes/default/js/pnetlab-bulk-node-edit.js?v=65df1528" defer></script>
+  <!-- canvas-flow amputation (b2 Wave 3): the classic-canvas-only tools are
+       unloaded (files kept on disk until 3b cleanup):
+         node-click-select (jsPlumb .node_frame selection),
+         canvas-grid (classic snap-to-grid — dropped per user decision),
+         canvas-nav (classic pan/zoom/grid + jsPlumb link-hit),
+         center-topology (island OWNS pnqCenterTopology via fitView).
+       align-distribute stays loaded (harmless; the island uses its own layout). -->
+  <script src="/themes/default/js/pnetlab-align-distribute.js?v=70365abc" defer></script>
+  <script src="/themes/default/js/pnetlab-pan-button.js?v=98492494" defer></script>
+  <script src="/themes/default/js/pnetlab-fullscreen-btn.js?v=fee1a18b" defer></script>
+  <script src="/themes/default/js/pnetlab-link-hide.js?v=8e2ccce6" defer></script>
+  <script src="/themes/default/js/pnetlab-sysmon.js?v=f0bf6576" defer></script>
+  <script src="/themes/default/js/pnetlab-sketch.js?v=422ff7c3" defer></script>
+  <script src="/themes/default/js/pnetlab-webconsole.js?v=19345913" defer></script>
+  <script src="/themes/default/js/pnetlab-capture-console.js?v=933f5b80" defer></script>
+  <!-- pnetlab-system-status.js retired: replaced by the System Status island
+       (Tier B, see the ISLANDS region below). The vanilla file registered its
+       own capture-phase .action-systemstatus listener; left loaded it would win
+       the capture race (classic defer runs before the island module) and shadow
+       the island. File stays on disk (unreferenced) until a later cleanup. -->
+  <script src="/themes/default/js/pnetlab-cluster-sync.js" defer></script>
+  <script src="/themes/default/js/pnetlab-node-stats.js" defer></script>
+  <script src="/themes/default/js/pnetlab-node-save.js" defer></script>
+  <script src="/themes/default/js/pnetlab-node-runon.js?v=47c14edc" defer></script>
+  <script src="/themes/default/js/pnetlab-egress-glow.js?v=e8bb6558" defer></script>
+  <script src="/themes/default/js/pnetlab-sat-badge.js?v=e1a781d9" defer></script>
+  <!-- notification count pill + Message History popover (wraps addMessage) -->
+  <script src="/themes/default/js/pnetlab-notif-history.js?v=98008b74" defer></script>
+  <!-- Phase 3: the five heavy overlays (network-watcher, protocol-inspector,
+       bgp-waterfall, topology-overlay, rack-view) are no longer eager. This
+       always-loaded launcher keeps their trigger surfaces alive and import()s
+       each module on first invocation. protocol-painter + wifi-painter stay
+       eager (topology-overlay handoff dep / always-on auto-start). -->
+  <script src="/themes/default/js/pnetlab-lazy-overlays.js?v=d4ac6345" defer></script>
+  <script src="/themes/default/js/pnetlab-protocol-painter.js?v=51cbe475" defer></script>
+  <script src="/themes/default/js/pnetlab-wifi-painter.js?v=ee6c7455" defer></script>
+  <script src="/themes/default/js/pnetlab-roce-lab.js?v=ed2a909b" defer></script>
+  <script src="/themes/default/js/pnetlab-ai-builder.js?v=ca3e2f18" defer></script>
+  <!-- pnetlab-iso-nodes.js + pnetlab-iso-nodes.css DELETED (Track 1 CSS
+       containment): both were 100% gated on the retired #lab-viewport and the
+       canvas-flow island (PnqNode.svelte) now owns iso-mode rendering with its
+       own scoped .pnq-iso-* styles. -->
+  <script src="/themes/default/js/pnetlab-netem-advanced.js?v=dca6ce2e" defer></script>
+  <!-- pnetlab-store.js now loads much earlier (see the topology-stub block near
+       the top) — the topology stub's window.PNQStore.subscribe() call needs the
+       store to already exist. Still must load BEFORE the labstate client below,
+       which registers a store subscriber at parse time — satisfied either way. -->
+  <!-- lab-state push client: live topology node status over wss /labstate/
+       (feeds the store; additive — the nodestatus poll stays as the fallback) -->
+  <script src="/themes/default/js/pnetlab-labstate-client.js?v=e039da54" defer></script>
+  <!-- Tier B compiled "islands" (Svelte 5 → static, content-hashed ES modules,
+       built in work/islands/, published by sync-islands.mjs). Loaded as
+       type=module (same-origin → script-src 'self', CSP-clean). Module scripts
+       run AFTER the classic defer scripts above, so window.PNQStore exists. -->
+  <!-- ISLANDS:START — generated by work/islands (sync-islands.mjs); do not hand-edit -->
+  <script type="module" src="/themes/default/islands/js/canvas-flow.DYC_UUlw.js"></script>
+  <script type="module" src="/themes/default/islands/js/lab-tasks.DD0oywJw.js"></script>
+  <script type="module" src="/themes/default/islands/js/overlays-launcher.DuszBbTX.js"></script>
+  <script type="module" src="/themes/default/islands/js/system-status.B6G3Rf6r.js"></script>
+  <!-- ISLANDS:END -->
+  <script src="/themes/default/js/pnetlab-csp-bindings.js" defer></script>
+  <!-- defer: must execute AFTER the deferred ejs.js wraps in -->
+  <script src="/themes/default/js/pnetlab-ejs-precompiled.js" defer></script>
+</body>
+
+</html>

@@ -1,0 +1,7 @@
+format=1
+release=6.8.83resolute1
+packages=pnetlab-docker=6.8.83resolute1,pnetlab-qemu=6.8.83resolute1,pnetlab-satellite=6.8.83resolute1,pnetlab-vpcs=6.8.83resolute1
+optional_packages=pnetlab-bridge-dkms=6.8.83resolute1
+assets=qemu-compat-libs.tgz,qemu-zoo-2.4.0-net.tgz,qemu-zoo-2.12.0-net.tgz,qemu-zoo-4.1.0-net.tgz,qemu-zoo-5.2.0-net.tgz
+inventory_sha256=d701b083b39590d79ac2bbd68602669a93c3dea6dc5ca68439f0fb9ded356372
+asset_inventory_sha256=3ad334e2ea03789430ab6809c5349d2cfa330c04c9619e73b5299be12d19740d

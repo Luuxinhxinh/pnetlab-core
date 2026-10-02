@@ -1,0 +1,69 @@
+#cloud-config
+# Day-0 cloud-init "user-data" for a STANDALONE Cisco Catalyst SD-WAN Validator (vBond).
+# Delivered as the user-data of a `cidata` seed ISO built by device_catvalid.php.
+# vBond is a vEdge running in orchestrator mode (<vbond><local/></vbond>). This base config
+# boots it past the setup dialog with hostname = node name, admin/admin, VPN 0 transport on
+# eth1 (DHCP) and VPN 512 management on eth0 (DHCP). The "Cisco SDWAN Lab Builder" (Phase 2)
+# overrides this with a fully rendered cloud-config (root-CA / org-name / system-ip / static
+# transport IP).
+#
+# WHY VPN 0 / eth1 is declared (do NOT remove it): the appliance puts the first NIC (eth0)
+# into VPN 0 by default. Binding eth0 into VPN 512 WITHOUT claiming VPN 0 on another interface
+# leaves eth0 in BOTH VPN 0 and VPN 512 -> confd rejects the init transaction with "values are
+# not unique: eth0 at /viptela-vpn:vpn/vpn-instance{0}/interface{eth0}", the bad commit corrupts
+# the CDB, and vBond boot-loops. Declaring eth1 in VPN 0 frees eth0 for management. This image is
+# device-model vedge-cloud -> eth0/eth1 naming (NOT ge0/0; that's vedge hardware). The node needs
+# >=2 NICs (the catvalid template has 4); eth1 need not be wired. A node that already boot-looped
+# must be WIPED (the corrupt CDB persists in the linked-clone overlay across stop/start). Mirrors
+# the 6.7.34 manager/controller fix.
+write_files:
+- path: /etc/default/personality
+  content: "vedge\n"
+- path: /etc/default/inited
+  content: "1\n"
+- path: /etc/confd/init/zcloud.xml
+  content: |
+    <config xmlns="http://tail-f.com/ns/config/1.0">
+      <system xmlns="http://viptela.com/system">
+        <personality>vedge</personality>
+        <device-model>vedge-cloud</device-model>
+        <organization-name>pnetlab</organization-name>
+        <sp-organization-name>pnetlab</sp-organization-name>
+        <host-name>inserthostname-here</host-name>
+        <site-id>100</site-id>
+        <system-ip>100.0.0.201</system-ip>
+        <domain-id>1</domain-id>
+        <vbond>
+          <local></local>
+        </vbond>
+        <aaa>
+          <user>
+            <name>admin</name>
+            <password>admin</password>
+            <group>netadmin</group>
+          </user>
+        </aaa>
+      </system>
+      <vpn xmlns="http://viptela.com/vpn">
+        <vpn-instance>
+          <vpn-id>0</vpn-id>
+          <interface>
+            <if-name>eth1</if-name>
+            <ip>
+              <dhcp-client>true</dhcp-client>
+            </ip>
+            <shutdown>false</shutdown>
+          </interface>
+        </vpn-instance>
+        <vpn-instance>
+          <vpn-id>512</vpn-id>
+          <interface>
+            <if-name>eth0</if-name>
+            <ip>
+              <dhcp-client>true</dhcp-client>
+            </ip>
+            <shutdown>false</shutdown>
+          </interface>
+        </vpn-instance>
+      </vpn>
+    </config>

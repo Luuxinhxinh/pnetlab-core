@@ -1,0 +1,22 @@
+---
+# PNetLab lightweight Web Browser node — a small graphical browser on the VNC
+# console for reaching lab device web UIs (router HTTPS GUIs, ISE/vManage/DNAC,
+# the Splunk node :8000, etc.) without a heavy desktop VM. Image: pnet-browser
+# (Debian-13 + TigerVNC + Openbox + Firefox-ESR; offline-install via the Dashboard
+# Docker Devices page). Handler: device_docker (no device_browser.php) — console:vnc
+# maps to container port 5900. Per-interface networking (DHCP / static IP / DNS /
+# default route) is set in the normal node edit, applied by the platform (injected
+# busybox + nsenter), so the image needs no networking support. Binds to any docker
+# image whose repo name contains "browser" (matches pnet-browser).
+type: docker
+config_script: config_aaa.py
+name: Web Browser
+description: Web Browser (Firefox)
+cpulimit: 1
+icon: Desktop_linux.png
+ethernet: 2
+console: vnc
+cpu: 2
+ram: 2048
+mtu: 1500
+...

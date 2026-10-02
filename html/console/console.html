@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PNetLab Web Console</title>
+
+<!-- xterm.js stylesheet (VENDORED locally — offline appliance, no CDN). -->
+<link rel="stylesheet" href="vendor/xterm.css">
+
+<!-- Console clients are VENDORED, no CDN (offline appliance). xterm.js +
+     addon-fit + guacamole-common.js ship as classic scripts so they appear as
+     globals (window.Terminal / window.FitAddon / window.Guacamole) before the
+     module below. noVNC is an ES module, imported and exposed as window.RFB
+     inside the module script (see below). -->
+<script src="vendor/xterm.js"></script>
+<script src="vendor/addon-fit.js"></script>
+<script src="vendor/guacamole/guacamole-common.min.js"></script>
+
+<!-- Mirrors the lab page's light/dark choice onto this document (see file
+     comment) before the stylesheet below is parsed, so there is no flash. -->
+<script src="console-theme.js?v=20bd1b7f"></script>
+
+<style>
+  html, body { margin: 0; height: 100%; background: #1e1e1e; color: #ddd;
+               font: 14px/1.4 system-ui, sans-serif; }
+  #app { display: flex; height: 100%; position: relative; }
+  /* The list lives in an absolutely-positioned inner panel so the COLLAPSED rail
+     stays a fixed 18px slot in flow (console never jumps) while a hover-peek lets
+     the panel overlay the console at full width. */
+  #nodes { flex: 0 0 200px; position: relative; transition: flex-basis .12s ease; }
+  #nodes-inner { position: absolute; top: 0; bottom: 0; left: 0; width: 200px;
+                 display: flex; flex-direction: column; padding: 8px; box-sizing: border-box;
+                 overflow-y: auto; background: rgba(28,40,33,.35);
+                 border-right: 1px solid rgba(255,255,255,.10); transition: width .12s ease; }
+  #nodes-head { display: flex; align-items: center; gap: 6px; }
+  #nodes-head h3 { flex: 1 1 auto; margin: 4px 0 8px; font-size: 12px; text-transform: uppercase; color: #888; }
+  .nodes-head-actions { display: flex; flex: 0 0 auto; gap: 4px; }
+  #nodes-head button { flex: 0 0 auto; width: 22px; height: 22px; line-height: 20px; text-align: center;
+                       background: rgba(255,255,255,.06); color: #cfe; border: 1px solid rgba(255,255,255,.12);
+                       border-radius: 4px; cursor: pointer; padding: 0; font-size: 13px; }
+  #nodes-head button:hover:not(:disabled) { background: rgba(255,255,255,.14); }
+  #nodes-head button:focus-visible { outline: 2px solid #8fd8b5; outline-offset: 1px; }
+  #nodes-refresh svg { display: block; width: 13px; height: 13px; margin: auto; }
+  #nodes-refresh.is-loading { cursor: wait; opacity: .65; }
+  #nodes-refresh.is-loading svg { animation: pnq-console-refresh-spin .7s linear infinite; }
+  @keyframes pnq-console-refresh-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { #nodes-refresh.is-loading svg { animation: none; } }
+  /* Collapsed: 18px rail; hide the list + heading text, keep the toggle as the rail. */
+  #nodes.collapsed { flex-basis: 18px; }
+  #nodes.collapsed #nodes-inner { width: 18px; padding: 6px 0; overflow: hidden; align-items: center; }
+  #nodes.collapsed #nodes-head { flex-direction: column; }
+  #nodes.collapsed .nodes-head-actions { flex-direction: column; }
+  #nodes.collapsed #nodes-refresh { display: none; }
+  #nodes.collapsed #nodes-head h3, #nodes.collapsed #node-list { display: none; }
+  /* Hover-peek removed: the collapsed rail no longer expands on hover (it popped
+     open when dragging a text selection toward the left edge, interfering with
+     copy/scroll). Use the «/» toggle to show/hide the list. */
+  #node-list .node-row { display: flex; gap: 4px; margin: 2px 0; }
+  #node-list button { display: block; width: 100%; text-align: left; padding: 6px 8px; font-weight: 700;
+                  background: rgba(255,255,255,.05); color: #ddd; border: 1px solid rgba(255,255,255,.10); border-radius: 4px; cursor: pointer; }
+  #node-list .node-open { flex: 1 1 auto; min-width: 0; }
+  #node-list .node-detach { flex: 0 0 auto; width: 30px; text-align: center; padding: 6px 0; }
+  #node-list button:hover { background: rgba(255,255,255,.12); }
+  #node-list .badge { float: right; font-size: 10px; color: #888; font-weight: 400; }
+
+  /* tab shell */
+  #console { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .ctabs { display: flex; flex-direction: column; height: 100%; }
+  /* Many tabs WRAP onto further rows (all stay visible) instead of scrolling.
+     Glassy translucent bar (matches the app topbar) rather than flat green/grey. */
+  .ctabs-bar { display: flex; flex-wrap: wrap; gap: 2px; row-gap: 2px; padding: 4px 4px 0; flex: 0 0 auto;
+               background: rgba(28,40,33,.55); -webkit-backdrop-filter: blur(10px) saturate(160%);
+               backdrop-filter: blur(10px) saturate(160%); border-bottom: 1px solid rgba(255,255,255,.10); }
+  .ctab { background: rgba(255,255,255,.04); color: #bbb; border: 1px solid rgba(255,255,255,.10); border-bottom: none;
+          border-radius: 6px 6px 0 0; padding: 6px 10px; cursor: pointer; white-space: nowrap; font-weight: 700; }
+  .ctab.active { background: rgba(255,255,255,.10); color: #fff; }
+  .ctab-close { margin-left: 8px; opacity: .6; }
+  .ctab-close:hover { opacity: 1; color: #f66; }
+  /* Drag-to-reorder states */
+  .ctab-dragging { opacity: 0.35; }
+  .ctab-drag-over { box-shadow: inset 0 0 0 2px rgba(120,200,160,.85); }
+  .ctabs-panes { position: relative; flex: 1 1 auto; min-height: 0; }
+  .ctab-pane { position: absolute; inset: 0; overflow: hidden; outline: none; background: #000; }
+  /* See-through mode (Item 4, telnet/serial): only the TERMINAL area goes
+     transparent so the floating window's dark-glass tint (pnetlab-webconsole.js
+     .pnq-wc-ghost) shows the canvas behind while keeping text readable. The node
+     sidebar is explicitly kept OPAQUE so it never bleeds. */
+  html.pnq-seethru, html.pnq-seethru body, html.pnq-seethru #app, html.pnq-seethru #console,
+  html.pnq-seethru .ctabs-panes, html.pnq-seethru .ctab-pane,
+  html.pnq-seethru .xterm, html.pnq-seethru .xterm-viewport, html.pnq-seethru .xterm-screen,
+  html.pnq-seethru .xterm .xterm-rows { background: transparent !important; }
+  html.pnq-seethru #nodes-inner { background: #1b2722 !important; }
+  /* Keep the tab strip opaque in see-through too, so tab names stay high-contrast
+     and consistent with normal mode (only the terminal body is see-through). */
+  html.pnq-seethru .ctabs-bar { background: #1b2722 !important; }
+  /* The native I-beam mouse pointer washes out over the see-through glass; supply a
+     high-contrast custom I-beam (white fill + black outline) visible on any bg. */
+  html.pnq-seethru .xterm,
+  html.pnq-seethru .xterm .xterm-screen,
+  html.pnq-seethru .xterm-viewport,
+  html.pnq-seethru textarea.xterm-helper-textarea {
+    cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='12'%20height='24'%3E%3Cpath%20d='M3%202%20H9%20M3%2022%20H9%20M6%202%20V22'%20stroke='black'%20stroke-width='3'%20fill='none'/%3E%3Cpath%20d='M3.5%202.5%20H8.5%20M3.5%2021.5%20H8.5%20M6%202.5%20V21.5'%20stroke='white'%20stroke-width='1.2'%20fill='none'/%3E%3C/svg%3E") 6 12, text !important;
+  }
+
+  /* RDP pane chrome: a refit/keyboard/CAD toolbar + the guac display screen +
+     an on-screen keyboard, all overlaid inside the pane. */
+  .rdp-screen { position: absolute; inset: 0; overflow: hidden; background: #000; }
+  .rdp-toolbar { position: absolute; top: 6px; right: 6px; z-index: 5; display: flex; gap: 4px;
+                 flex-wrap: wrap; max-width: 72%; justify-content: flex-end; }
+  .rdp-tbtn { height: 24px; min-width: 24px; padding: 0 7px; font: 12px/22px system-ui, sans-serif;
+              color: #cfe; background: rgba(28,40,33,.78); -webkit-backdrop-filter: blur(8px);
+              backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.18); border-radius: 4px;
+              cursor: pointer; }
+  .rdp-tbtn:hover { background: rgba(255,255,255,.16); }
+  .rdp-tbtn.active { background: rgba(120,200,160,.40); color: #fff; }
+  /* Indeterminate loading bar shown across the top of an RDP pane while it connects. */
+  .rdp-loading { position: absolute; top: 0; left: 0; right: 0; height: 3px; z-index: 7; pointer-events: none;
+                 background: linear-gradient(90deg, rgba(120,200,160,0), rgba(120,200,160,.95), rgba(120,200,160,0));
+                 background-size: 40% 100%; background-repeat: no-repeat;
+                 animation: pnq-rdp-load 1.1s linear infinite; }
+  @keyframes pnq-rdp-load { from { background-position: -45% 0; } to { background-position: 145% 0; } }
+  /* Font-family picker in the telnet/serial toolbar (Item 1). */
+  .rdp-tsel { height: 24px; padding: 0 4px; font: 12px/22px system-ui, sans-serif; color: #cfe;
+              background: rgba(28,40,33,.78); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+              border: 1px solid rgba(255,255,255,.18); border-radius: 4px; cursor: pointer; max-width: 130px; }
+  /* Telnet/serial typography ribbon: a dedicated FULL-WIDTH bar at the TOP of
+     the pane (under the tab strip) so the controls never float over the
+     terminal text. The bar wraps on narrow windows; console-tabs.js mirrors its
+     measured height into the terminal container's top offset (ResizeObserver)
+     and refits xterm, so the terminal always starts below it. */
+  .term-ribbon { position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+                 display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+                 padding: 4px 6px; box-sizing: border-box;
+                 background: rgba(28,40,33,.55); -webkit-backdrop-filter: blur(10px) saturate(160%);
+                 backdrop-filter: blur(10px) saturate(160%);
+                 border-bottom: 1px solid rgba(255,255,255,.10); }
+  /* Keep the ribbon opaque in see-through mode, same as the tab strip. */
+  html.pnq-seethru .term-ribbon { background: #1b2722 !important; }
+  /* Italic toggle: DOM-renderer xterm rows (no canvas/webgl addon loaded). */
+  .ctab-pane.pnq-italic .xterm .xterm-rows { font-style: italic; }
+  .vkbd { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; padding: 5px;
+          display: flex; flex-direction: column; gap: 3px; background: rgba(18,22,20,.94);
+          -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+          border-top: 1px solid rgba(255,255,255,.14); }
+  .vk-row { display: flex; gap: 3px; justify-content: center; }
+  .vk-key { flex: 0 0 auto; min-width: 30px; height: 30px; padding: 0 6px;
+            font: 12px/28px system-ui, sans-serif; color: #ddd; background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.12); border-radius: 4px; cursor: pointer; }
+  .vk-key:hover { background: rgba(255,255,255,.14); }
+  .vk-key:active { background: rgba(255,255,255,.22); }
+  .vk-key.sm { min-width: 26px; padding: 0 4px; font-size: 11px; }
+  .vk-key.wide { min-width: 52px; }
+  .vk-key.space { flex: 1 1 auto; max-width: 360px; }
+  .vk-key.mod.active { background: rgba(120,200,160,.45); color: #fff; border-color: rgba(120,200,160,.7); }
+  /* node-list status indicator */
+  .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+                background: #555; margin-right: 5px; flex-shrink: 0; vertical-align: middle; }
+  .status-dot.active { background: #4c4; }
+  /* tab unread-activity indicator */
+  .ctab.pnq-tab-unread { color: #4af; }
+  /* Capture-embed: when this console runs inside the Captures aggregator
+     (captures.html), that shell provides the tab strip — hide our own single-tab
+     bar so the capture fills the pane and there's no duplicate tab row. */
+  html.pnq-capture-embed .ctabs-bar { display: none !important; }
+
+  /* ============================================================
+     LIGHT MODE — mirrors the lab page's white frosted-glass chrome
+     (#pnetlab-quickbar; see pnetlab-enhance-v2.css light :root tokens:
+     --pnq-panel-surface #fff, --pnq-panel-border #d0d7de, --pnq-panel-fg
+     #24292f, --pnq-chrome-sidebar-* ). Toggled by console-theme.js reading
+     the same localStorage theme the canvas-flow island writes. Only the
+     window CHROME (sidebar, tab strip, toolbars, keyboard) goes light —
+     the terminal/RDP screen itself stays black, matching how real terminal
+     apps keep a dark console surface independent of app-chrome theme.
+     ============================================================ */
+  html.pnq-light, html.pnq-light body { background: #f4f6f5; color: #24292f; }
+
+  html.pnq-light #nodes-inner {
+    background: rgba(255, 255, 255, .72);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+    backdrop-filter: blur(14px) saturate(180%);
+    border-right: 1px solid rgba(208, 215, 222, .85);
+  }
+  html.pnq-light #nodes-head h3 { color: #57606a; }
+  html.pnq-light #nodes-head button {
+    background: rgba(36, 41, 47, .06); color: #24292f; border-color: rgba(208, 215, 222, .9);
+  }
+  html.pnq-light #nodes-head button:hover:not(:disabled) { background: #e8eef2; }
+  html.pnq-light #nodes-head button:focus-visible { outline-color: #3c708a; }
+  html.pnq-light #node-list button {
+    background: rgba(255, 255, 255, .65); color: #24292f; border-color: rgba(208, 215, 222, .9);
+  }
+  html.pnq-light #node-list button:hover { background: #e8eef2; }
+  html.pnq-light #node-list .badge { color: #57606a; }
+  html.pnq-light .status-dot { background: #b3b8bd; }
+  html.pnq-light .status-dot.active { background: #2da44e; }
+
+  html.pnq-light .ctabs-bar {
+    background: rgba(255, 255, 255, .55);
+    border-bottom: 1px solid rgba(208, 215, 222, .85);
+  }
+  html.pnq-light .ctab { background: rgba(36, 41, 47, .05); color: #57606a; border-color: rgba(208, 215, 222, .85); }
+  html.pnq-light .ctab.active { background: #ffffff; color: #1f2328; }
+  html.pnq-light .ctab-close:hover { color: #d1242f; }
+  html.pnq-light .ctab.pnq-tab-unread { color: #0a63c9; }
+
+  html.pnq-light .term-ribbon {
+    background: rgba(255, 255, 255, .55);
+    border-bottom: 1px solid rgba(208, 215, 222, .85);
+  }
+  html.pnq-light .rdp-tbtn, html.pnq-light .rdp-tsel {
+    color: #24292f; background: rgba(255, 255, 255, .78); border-color: rgba(208, 215, 222, .9);
+  }
+  html.pnq-light .rdp-tbtn:hover { background: #e8eef2; }
+  html.pnq-light .rdp-tbtn.active { background: rgba(60, 112, 138, .28); color: #14323f; }
+
+  html.pnq-light .vkbd { background: rgba(255, 255, 255, .92); border-top-color: rgba(208, 215, 222, .9); }
+  html.pnq-light .vk-key { color: #24292f; background: rgba(36, 41, 47, .06); border-color: rgba(208, 215, 222, .9); }
+  html.pnq-light .vk-key:hover { background: #e8eef2; }
+  html.pnq-light .vk-key:active { background: #dbe7ed; }
+  html.pnq-light .vk-key.mod.active { background: rgba(60, 112, 138, .30); color: #14323f; border-color: rgba(60, 112, 138, .5); }
+
+  /* See-through combo: the see-through rules above force the sidebar/tab-strip/
+     ribbon to a hardcoded dark opaque fill (#1b2722 !important) regardless of
+     theme, so they need their own light-mode override here (same selector
+     weight — two classes beats the single-class dark rule either way). */
+  html.pnq-seethru.pnq-light #nodes-inner { background: rgba(255, 255, 255, .88) !important; }
+  html.pnq-seethru.pnq-light .ctabs-bar { background: rgba(255, 255, 255, .88) !important; }
+  html.pnq-seethru.pnq-light .term-ribbon { background: rgba(255, 255, 255, .88) !important; }
+
+  /* Command Button Bar (console-tabs.js, .pnq-cmdbar*) — built with inline
+     styles as its dark-mode base, so the light override needs !important to
+     win over them. */
+  html.pnq-light .pnq-cmdbar { background: rgba(255, 255, 255, .88) !important; border-top-color: rgba(208, 215, 222, .9) !important; }
+  html.pnq-light .pnq-cmdbar-btn { background: rgba(36, 41, 47, .06) !important; border-color: rgba(208, 215, 222, .9) !important; color: #24292f !important; }
+  html.pnq-light .pnq-cmdbar-add { background: rgba(36, 41, 47, .06) !important; border-color: rgba(208, 215, 222, .9) !important; color: #3c708a !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="nodes">
+    <div id="nodes-inner">
+      <div id="nodes-head">
+        <h3>Lab nodes</h3>
+        <div class="nodes-head-actions">
+          <button id="nodes-refresh" type="button" title="Refresh node list" aria-label="Refresh node list">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 6v5h-5M4 18v-5h5" />
+              <path d="M6.1 9a7 7 0 0 1 11.6-2.6L20 11M4 13l2.3 4.6A7 7 0 0 0 17.9 15" />
+            </svg>
+          </button>
+          <button id="nodes-toggle" type="button" title="Collapse sidebar" aria-label="Collapse sidebar">&#xAB;</button>
+        </div>
+      </div>
+      <div id="node-list" aria-live="polite">Loading…</div>
+    </div>
+  </div>
+  <div id="console"></div>
+</div>
+
+<script type="module" src="console-init.js?v=5c131ccd"></script>
+</body>
+</html>

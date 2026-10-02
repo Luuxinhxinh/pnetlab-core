@@ -1,0 +1,201 @@
+---
+image:
+  width: 8
+  wipe: 1
+
+name: 
+  width : 6
+
+description: 
+  show : 0
+
+icon: 
+  width : 6
+
+ethernet: 
+  type: number
+  value: 2
+  width: 3
+  restart: 1
+
+mtu: 
+  type: number
+  value: 9000
+  width: 3
+  restart: 1
+
+firstmac: 
+  value: ''
+  restart: 1
+  width: 3
+
+first_nic: 
+  value: ''
+  type: list
+  options:
+    '': 'Auto'
+    e1000 : e1000
+    virtio-net-pci : virtio-net-pci
+    vmxnet3 : vmxnet3
+  width: 3
+  restart: 1
+
+
+uuid: 
+  value: ''
+  restart: 1
+  width: 12
+
+cpulimit: 
+  type: checkbox
+  value: 1
+  width: 2
+  restart: 1
+  
+cpu: 
+  type: number
+  value: 1
+  width: 4
+  restart: 1
+
+ram: 
+  type: number
+  value: 512
+  unit: (MB)
+  width: 6
+  restart: 1
+
+console: 
+  type: list
+  options:
+    telnet: TELNET
+    vnc: VNC
+    spice : SPICE
+  value: vnc
+  restart: 1
+  width: 6
+
+console_2nd: 
+  type: list
+  options:
+    '': 'Empty'
+    telnet: TELNET
+    vnc: VNC
+    spice : SPICE
+  value: ''
+  restart: 1
+  width: 6
+  
+qemu_arch: 
+  value: x86_64
+  type: list
+  options:
+    "": "Empty" 
+    i386: i386
+    x86_64: x86_64
+  width: 4
+  restart: 1
+
+qemu_nic: 
+  value: virtio-net-pci
+  type: list
+  options:
+    e1000 : e1000
+    virtio-net-pci : virtio-net-pci
+    vmxnet3 : vmxnet3
+  width: 4
+  restart: 1
+
+qemu_version:
+  width: 4
+  restart: 1
+
+qemu_options: 
+  value: -machine type=pc,accel=kvm -enable-kvm -serial mon:stdio -nographic -nodefconfig -nodefaults -rtc base=utc
+  restart: 1
+
+timos_line : 
+  value : 'slot=A chassis=sr-1s card=cpm-1s slot=1 card=xcm-1s mda/1=s18-100gb-qsfp28'
+  restart: 1
+management_address :
+  value : ''
+  restart: 1
+timos_license :
+  value : 'cf3:lic'
+  restart: 1
+
+config_script: 
+  show: 0
+  value: ''
+  width: 6
+  restart: 1
+
+script_timeout: 
+  type: number
+  value: 1200
+  width: 3
+  show : 0
+  restart: 1
+
+delay: 
+  value: 0
+  type: number
+  restart: 1
+  width: 3
+
+size:
+  type: number
+  width: 3
+  unit: (px)
+
+left: 
+  type: number
+  width: 3
+  unit: (px)
+
+top:
+  type: number
+  width: 3
+  unit: (px)
+
+config: 
+  type: list
+  value: 0
+  options:
+    0: None
+    1: Exported
+  wipe: 1
+
+shutdown: 
+  show: 0
+eth_name: 
+  show: 0
+eth_format: 
+  show: 0
+prep :
+  show: 0
+cstart :
+  show : 0
+nokia_type: 
+  show: 0
+backspace: 
+  type: list
+  width: 6
+  value: 127
+  options:
+    127: DEFAULT
+    8: Control-H
+
+terminaltype: 
+  type: list
+  width: 6
+  value: 'linux'
+  options:
+    ainsi : ainsi
+    linux : linux
+    vt100 : vt100
+    vt220 : vt220
+    xtrem : xtrem
+    xterm-256color : xterm-256color
+
+...

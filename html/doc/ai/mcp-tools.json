@@ -1,0 +1,629 @@
+{
+  "generated_by": "scripts/gen-apidocs.py",
+  "source": "/opt/unetlab/scripts/mcp/pnetlab-mcp.py",
+  "endpoint": "/mcp/ (streamable HTTP; Authorization: Bearer <token minted in the dashboard MCP view>)",
+  "count": 35,
+  "tools": [
+    {
+      "name": "list_templates",
+      "description": "List the PNetLab node templates installed on this server. Each entry has slug, description, type, config_capable, and image_available. config_capable marks the config_script family (vIOS / vIOSL2 / IOL / XRd / NX-OSv9k / Catalyst-SDWAN / CSR) that supports day-0 config import/export; image_available is true only when a node of that template can actually be placed (an image is installed, or it is vpcs). Build with templates that are image_available. IOL templates also report roles (switch and/or router) when an L2 and/or L3 image is installed.",
+      "params": []
+    },
+    {
+      "name": "list_node_images",
+      "description": "List the installed images for a template. Each entry is {name, default, and (for IOL) role}. For IOL an L2 image has role 'switch' and an L3 image has role 'router' \u2014 use this to pick a specific image, or just pass role='switch'/'router' to add_node.",
+      "params": [
+        {
+          "name": "template",
+          "type": "str"
+        }
+      ]
+    },
+    {
+      "name": "get_lab",
+      "description": "Read a lab's full topology: id, name, the description/body documentation, all nodes and all networks. lab_path is relative to the labs root (e.g. \"/Folder/My Lab.unl\"); leave empty to use the lab this client currently has open.",
+      "params": [
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "list_nodes",
+      "description": "List the nodes in a lab (id, name, template, type, status, interfaces). lab_path is relative to the labs root; empty = the open lab.",
+      "params": [
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "get_running_config",
+      "description": "Get the saved startup-configuration for the lab's nodes (all nodes, or a single node_id). lab_path is relative to the labs root; empty = the open lab. (Live device-scrape of a running node is added at the agent level in a later phase.)",
+      "params": [
+        {
+          "name": "node_id",
+          "type": "int",
+          "default": 0
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "create_lab",
+      "description": "Create a new empty lab and bind this client to it. name is the lab title (no path/extension); path is an optional folder under the labs root (defaults to your own workspace). Returns the new lab_path and a `bound` flag: if bound is false, your client has no session id, so pass that lab_path explicitly to every later build tool. (Mutating.)",
+      "params": [
+        {
+          "name": "name",
+          "type": "str"
+        },
+        {
+          "name": "path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "open_lab",
+      "description": "Open an existing lab (relative to the labs root, e.g. \"/Folder/My Lab.unl\") and bind this client to it, so later build tools default to it. Returns the lab's current topology plus a `bound` flag: if bound is false, your client has no session id, so pass lab_path explicitly to every later build tool.",
+      "params": [
+        {
+          "name": "lab_path",
+          "type": "str"
+        }
+      ]
+    },
+    {
+      "name": "save_lab",
+      "description": "Persist the open lab to disk. Each build tool already saves, so this is normally a no-op for explicit completeness. (Mutating.)",
+      "params": [
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "set_lab_documentation",
+      "description": "Set the lab's documentation: a short objectives summary (the lab description) and an ordered list of task strings (the lab body). (Mutating.)",
+      "params": [
+        {
+          "name": "objectives",
+          "type": "str",
+          "default": ""
+        },
+        {
+          "name": "tasks",
+          "type": "list",
+          "default": null
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "add_text",
+      "description": "Place a TEXT ANNOTATION directly on the topology canvas (a draggable text box on the lab layout), e.g. a title, legend, or the lab details/notes. left/top position it; font_size/color style it; name labels it. This is DIFFERENT from set_lab_documentation, which only fills the Lab-details info panel \u2014 use add_text when the user wants text shown ON the canvas. Returns the new text object id. (Mutating.)",
+      "params": [
+        {
+          "name": "text",
+          "type": "str"
+        },
+        {
+          "name": "left",
+          "type": "int",
+          "default": 60
+        },
+        {
+          "name": "top",
+          "type": "int",
+          "default": 60
+        },
+        {
+          "name": "font_size",
+          "type": "int",
+          "default": 14
+        },
+        {
+          "name": "color",
+          "type": "str",
+          "default": ""
+        },
+        {
+          "name": "name",
+          "type": "str",
+          "default": ""
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "add_node",
+      "description": "Add a node to the open lab. template is a slug from list_templates; name is the node hostname (auto-uniquified); left/top place it on the canvas. ram/cpu/ethernet override the template defaults when > 0. For IOL, role='switch' picks an L2 image (Ethernet switch) and role='router' picks an L3 image (router); or pass an explicit image name from list_node_images. Returns the new node id (and the chosen image/role). (Mutating.)",
+      "params": [
+        {
+          "name": "template",
+          "type": "str"
+        },
+        {
+          "name": "name",
+          "type": "str",
+          "default": ""
+        },
+        {
+          "name": "left",
+          "type": "int",
+          "default": 0
+        },
+        {
+          "name": "top",
+          "type": "int",
+          "default": 0
+        },
+        {
+          "name": "ram",
+          "type": "int",
+          "default": 0
+        },
+        {
+          "name": "cpu",
+          "type": "int",
+          "default": 0
+        },
+        {
+          "name": "ethernet",
+          "type": "int",
+          "default": 0
+        },
+        {
+          "name": "role",
+          "type": "str",
+          "default": ""
+        },
+        {
+          "name": "image",
+          "type": "str",
+          "default": ""
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "edit_node",
+      "description": "Edit an existing node's parameters (e.g. {\"name\":\"R1\",\"ram\":1024}). params keys mirror the node edit form. (Mutating.)",
+      "params": [
+        {
+          "name": "id",
+          "type": "int"
+        },
+        {
+          "name": "params",
+          "type": "dict"
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "set_node_position",
+      "description": "Move a node to canvas coordinates (left, top). (Mutating.)",
+      "params": [
+        {
+          "name": "id",
+          "type": "int"
+        },
+        {
+          "name": "left",
+          "type": "int"
+        },
+        {
+          "name": "top",
+          "type": "int"
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "delete_node",
+      "description": "Delete a node from the open lab. Destructive \u2014 pass confirm=true to proceed. (Mutating, destructive.)",
+      "params": [
+        {
+          "name": "id",
+          "type": "int"
+        },
+        {
+          "name": "confirm",
+          "type": "bool",
+          "default": false
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "add_network",
+      "description": "Add a network to the open lab. type is bridge (isolated L2), cloud (pnet0 management bridge), nat, or an explicit pnetN/natN/dot1q/wireless. Returns the new network id. (Mutating.)",
+      "params": [
+        {
+          "name": "type",
+          "type": "str",
+          "default": "bridge"
+        },
+        {
+          "name": "name",
+          "type": "str",
+          "default": "Net"
+        },
+        {
+          "name": "left",
+          "type": "int",
+          "default": 0
+        },
+        {
+          "name": "top",
+          "type": "int",
+          "default": 0
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "connect_nodes",
+      "description": "Create a DIRECT point-to-point link between two nodes (drawn as a line, no cloud icon). Omit a_if/b_if (or pass -1) to auto-use each node's first free interface; pass explicit 0-based indexes to choose a specific port. Do NOT use add_network just to join two devices. (Mutating.)",
+      "params": [
+        {
+          "name": "a_id",
+          "type": "int"
+        },
+        {
+          "name": "b_id",
+          "type": "int"
+        },
+        {
+          "name": "a_if",
+          "type": "int",
+          "default": -1
+        },
+        {
+          "name": "b_if",
+          "type": "int",
+          "default": -1
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "connect_node_to_network",
+      "description": "Connect a node's interface (iface, 0-based) to an existing network (net_id from add_network / get_lab). (Mutating.)",
+      "params": [
+        {
+          "name": "node_id",
+          "type": "int"
+        },
+        {
+          "name": "iface",
+          "type": "int"
+        },
+        {
+          "name": "net_id",
+          "type": "int"
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "disconnect",
+      "description": "Unlink a node's interface (iface, 0-based) from whatever network it is attached to. (Mutating.)",
+      "params": [
+        {
+          "name": "node_id",
+          "type": "int"
+        },
+        {
+          "name": "iface",
+          "type": "int"
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "set_startup_config",
+      "description": "Set a node's day-0 startup-configuration and flag it for delivery at next boot. Only works on config_capable templates (see list_templates); refuses others. (Mutating.)",
+      "params": [
+        {
+          "name": "node_id",
+          "type": "int"
+        },
+        {
+          "name": "config_text",
+          "type": "str"
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "provide_config",
+      "description": "Offer a node's day-0 config to the USER as a downloadable .txt to paste into the node's console themselves \u2014 the PREFERRED way to configure IOS-family nodes (vIOS, IOL, ...). It does NOT import/modify the node, so the device boots clean instead of waiting out autoinstall like set_startup_config does. The lab-view AI panel shows a Download button per node; the user starts the node, skips the setup dialog / autoinstall, and pastes the file. Call this for each config_capable node instead of set_startup_config.",
+      "params": [
+        {
+          "name": "node_name",
+          "type": "str"
+        },
+        {
+          "name": "config_text",
+          "type": "str"
+        }
+      ]
+    },
+    {
+      "name": "host_capacity",
+      "description": "Host resources for sizing a build: cpu_count, ram_total_mb, ram_free_mb, plus this user's per-user caps (max_cpu, max_ram_mb; 0 = unlimited). The engine refuses a node start that would exceed the caps, so plan a lab that fits.",
+      "params": []
+    },
+    {
+      "name": "list_networks_types",
+      "description": "List the network types add_network accepts (bridge, cloud, nat, dot1q, wireless) with a one-line description of each.",
+      "params": []
+    },
+    {
+      "name": "list_links",
+      "description": "List every link in the lab, derived from node interfaces and the networks they attach to: each entry has the network id/name/type, whether it is a point-to-point link, and its endpoints. lab_path empty = open lab.",
+      "params": [
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "list_configurable_nodes",
+      "description": "List the lab's nodes that accept a day-0 startup-config (the config_capable templates) \u2014 the ones set_startup_config / export_running_ config can target. lab_path empty = open lab.",
+      "params": [
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "get_node_interfaces",
+      "description": "List one node's interfaces (0-based index, name, type, the network it is connected to, and whether it is connected) \u2014 use it to pick free interfaces before wiring links. lab_path empty = open lab.",
+      "params": [
+        {
+          "name": "id",
+          "type": "int"
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "start_node",
+      "description": "Start a node in the open lab. Consumes CPU/RAM \u2014 pass confirm=true. The engine refuses the start if it would exceed your per-user CPU/RAM cap (see host_capacity). (Mutating; running session required.)",
+      "params": [
+        {
+          "name": "id",
+          "type": "int"
+        },
+        {
+          "name": "confirm",
+          "type": "bool",
+          "default": false
+        }
+      ]
+    },
+    {
+      "name": "stop_node",
+      "description": "Stop a running node in the open lab. (Mutating; running session required.)",
+      "params": [
+        {
+          "name": "id",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "wipe_node",
+      "description": "Wipe a node's NVRAM/working dir back to its day-0 state. Destructive \u2014 pass confirm=true. (Mutating; running session required.)",
+      "params": [
+        {
+          "name": "id",
+          "type": "int"
+        },
+        {
+          "name": "confirm",
+          "type": "bool",
+          "default": false
+        }
+      ]
+    },
+    {
+      "name": "export_running_config",
+      "description": "Scrape the LIVE running-configuration off a started, config_capable node (config_<x>.py -a get) and return it as text. This is the export half of the import/export pair (set_startup_config is import). (Running session required.)",
+      "params": [
+        {
+          "name": "node_id",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "apply_config_console",
+      "description": "Apply a node's day-0 config the RELIABLE way: drive the running node's serial console like a human \u2014 abort autoinstall / the setup dialog, log in, paste the config in config mode, and (save=true) 'write memory' then export the running-config back into the lab. Use this AFTER set_startup_config + start_node instead of waiting out the slow unattended startup-config import (IOS otherwise sits on autoinstall for minutes; IOL on the setup dialog). Pastes the node's stored config unless config_text is given. Works for telnet-console IOS-family nodes (vIOS, IOL, ...). (Running session required; the node must be started.)",
+      "params": [
+        {
+          "name": "node_id",
+          "type": "int"
+        },
+        {
+          "name": "save",
+          "type": "bool",
+          "default": true
+        },
+        {
+          "name": "config_text",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "set_link_impairment",
+      "description": "Apply WAN impairment (netem) to a running node's interface (iface, 0-based). delay/jitter in ms, loss in %, rate in Kbit. Any knob you omit (leave -1) is cleared \u2014 this replaces the interface's whole impairment, so pass all the knobs you want active. advanced is an optional dict of the extra netem knobs: dist (uniform|normal|pareto|paretonormal), loss_mode (random|gemodel), delay_corr, loss_corr, duplicate, dup_corr, corrupt, reorder, reorder_corr, gap, limit. (Mutating; running session required.)",
+      "params": [
+        {
+          "name": "node_id",
+          "type": "int"
+        },
+        {
+          "name": "iface",
+          "type": "int"
+        },
+        {
+          "name": "delay",
+          "type": "int",
+          "default": -1
+        },
+        {
+          "name": "jitter",
+          "type": "int",
+          "default": -1
+        },
+        {
+          "name": "loss",
+          "type": "int",
+          "default": -1
+        },
+        {
+          "name": "rate",
+          "type": "int",
+          "default": -1
+        },
+        {
+          "name": "advanced",
+          "type": "dict",
+          "default": null
+        }
+      ]
+    },
+    {
+      "name": "link_up",
+      "description": "Bring a running node's interface (iface, 0-based) administratively UP (un-suspend the link). (Mutating; running session required.)",
+      "params": [
+        {
+          "name": "node_id",
+          "type": "int"
+        },
+        {
+          "name": "iface",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "link_down",
+      "description": "Bring a running node's interface (iface, 0-based) administratively DOWN (suspend the link) to simulate a cable pull / failure. (Mutating; running session required.)",
+      "params": [
+        {
+          "name": "node_id",
+          "type": "int"
+        },
+        {
+          "name": "iface",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "build_topology",
+      "description": "Build a WHOLE topology (many nodes, networks, links, and the lab docs) in ONE call \u2014 one engine bootstrap, one lab lock, one HTTP round-trip \u2014 instead of dozens of add_node/connect_* calls. This is the efficient way to realise an LLM-designed lab; use the individual add_node/connect_* tools only for incremental edits afterwards. Open or create the lab first (open_lab / create_lab), or pass lab_path. The ops run IN ORDER (all nodes, then networks, then links, then docs) under one lock, and STOP AT THE FIRST FAILURE: you get the results built so far, the index of the item that failed, and its error message \u2014 so you can fix and re-send just the remainder. nodes: list of node objects. Each: {\"template\": \"<slug from list_templates>\", # REQUIRED, image_available \"name\": \"R1\", # optional hostname \"left\": 300, \"top\": 200, # optional canvas x/y \"ram\": 1024, \"cpu\": 2, \"ethernet\": 4, # optional overrides (>0) \"role\": \"switch\"|\"router\", # optional, IOL only \"image\": \"<image name>\"} # optional explicit image A node is referenced elsewhere by its 0-based INDEX in this list, or by its \"name\" (if that name is unique across the list). A link's node reference may ALSO name a node that ALREADY EXISTS in this lab (added by an earlier build_topology/add_node call) \u2014 give its engine id (an integer) or its exact name (a string). This is how you build a lab bigger than one 200-op batch: open_lab the lab, then send further build_topology calls with links pointing at nodes already on the canvas. A same-call index/name always wins over an existing-node match of the same value. networks: optional list of network objects. Each: {\"type\": \"bridge\"|\"cloud\"|\"nat\"|\"dot1q\"|\"wireless\", # default \"bridge\" \"name\": \"LAN1\", \"left\": 600, \"top\": 200} Referenced by its 0-based INDEX in this list, or by unique \"name\". NOTE: for a plain point-to-point link between two devices you do NOT need a network \u2014 use a node-to-node link (below); it draws a direct line. links: optional list. Two shapes: - node-to-node (a direct p2p line): {\"a\": <node ref>, \"b\": <node ref>, # index or name \"a_if\": 0, \"b_if\": 1} # optional; omit to auto-pick - node-to-network (attach a node port to a shared segment): {\"node\": <node ref>, \"iface\": 0, \"network\": <network ref>} <network ref> = the integer index into networks, its unique \"name\", or an already-existing engine network id. <node ref> = the integer index into nodes[], its unique \"name\" in this call, OR (for a node built in an earlier call) that node's existing engine id (int) or exact name (string). documentation: optional {\"objectives\": \"<summary>\", \"tasks\": [\"step 1\", ...]}. Returns a summary that maps every handle to the engine id the batch created: {\"lab_path\": \"...\", \"ok\": true, \"nodes\": [{\"index\":0,\"name\":\"R1\",\"id\":1}, ...], \"networks\": [{\"index\":0,\"name\":\"LAN1\",\"id\":1}, ...], \"links_created\": 3, \"failed_at\": null, \"error\": null} On a failure you get \"ok\": false, the already-created nodes/networks, and failed_at = {\"stage\":\"node\"|\"network\"|\"link\"|\"documentation\",\"index\":N, \"detail\":<the offending item>} plus \"error\" = the engine message.",
+      "params": [
+        {
+          "name": "nodes",
+          "type": "list"
+        },
+        {
+          "name": "networks",
+          "type": "list",
+          "default": null
+        },
+        {
+          "name": "links",
+          "type": "list",
+          "default": null
+        },
+        {
+          "name": "documentation",
+          "type": "dict",
+          "default": null
+        },
+        {
+          "name": "lab_path",
+          "type": "str",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "usage_status",
+      "description": "Report this user's AI token usage today and the per-user daily cap (0 = unlimited), so a large build can be sized against what is left.",
+      "params": []
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+# PNetLab "NetDevOps IDE" node — code-server (browser VS Code) + Python network
+# automation stack (netmiko/nornir/napalm/scrapli) + a private Gitea git server,
+# all fronted by nginx on port 80. Image: pnet-netdevops (offline-install via the
+# Dashboard Docker Devices page). console: http → the engine publishes container
+# port 80; opening the node's console lands on the code-server login (password
+# "pnet"). Gitea lives at /git/ on the same port (admin / pnet). Leave dock_args
+# EMPTY so device_docker takes the GUI-docker path (console port publish + the
+# busybox-managed lab interface). eth1 is the lab data path — set its IP in the
+# normal node edit; scripts in /root/workspace reach lab devices over it.
+# Template stem "netdevops" is a substring of the image name (engine binding).
+# config_script pushes the Startup-config blob ({"password": "..."} overrides the
+# code-server login) and keeps the run LED working.
+type: docker
+config_script: config_aaa.py
+name: NetDevOps IDE
+description: NetDevOps IDE
+cpulimit: 1
+icon: Server-2D-Generic-S.svg
+ethernet: 2
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 4096
+mtu: 1500
+docker_shell: echo "NetDevOps IDE — code-server on http://<node>/ (password pnet), Gitea on http://<node>/git/ (admin/pnet)."; echo "Workspace = /root/workspace; venv = /opt/netauto (python/pip already point at it)."; echo "Supervisor logs:"; tail -n 20 /var/log/netdevops/*.log 2>/dev/null; exec /bin/bash

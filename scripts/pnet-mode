@@ -1,0 +1,68 @@
+#!/bin/sh
+# pnet-mode — engine-side replacement for the Laravel store's
+# `artisan mode <action> <object>` command (item C6, store decommission).
+# Symlinked at /usr/local/sbin/mode by the pnetlab postinst; keeps the exact
+# argv contract the old artisan command had: mode <action> [<object>].
+#
+# Reproduces app/Console/Commands/ModeCmd.php (work/store-new) verbatim:
+#
+#   mode default online   -> control.ctrl_default_mode = 'online'
+#   mode default <else>   -> control.ctrl_default_mode = 'offline'
+#   mode reset offline    -> ctrl_default_mode='offline', ctrl_online_mode='0',
+#                            ctrl_offline_mode='1'; upsert admin user with
+#                            role=0, password=sha256('pnet'), offline=1
+#   mode reset all        -> ctrl_default_mode='0', ctrl_online_mode='0',
+#                            ctrl_offline_mode='0'; delete users where role=0
+#
+# `control` is a name/value table (control_name/control_value) — same upsert
+# pattern the installer + postinst already use (ON DUPLICATE KEY UPDATE).
+# `users` columns (username/password/role/offline) match users_cst.php.
+set -e
+
+MYSQL="mysql --host=localhost --user=root --password=pnetlab pnetlab_db"
+LOCAL_PASS="pnet"
+
+action="$1"
+object="$2"
+
+ctrl_set() {
+    # ctrl_set <name> <value>
+    echo "INSERT INTO control (control_name, control_value) VALUES ('$1','$2') \
+ON DUPLICATE KEY UPDATE control_value = VALUES(control_value);" | $MYSQL
+}
+
+case "$action" in
+    default)
+        if [ "$object" = "online" ]; then
+            ctrl_set ctrl_default_mode online
+            echo "ONLINE Mode is set as Default"
+        else
+            ctrl_set ctrl_default_mode offline
+            echo "OFFLINE Mode is set as Default"
+        fi
+        ;;
+    reset)
+        case "$object" in
+            offline)
+                ctrl_set ctrl_default_mode offline
+                ctrl_set ctrl_online_mode 0
+                ctrl_set ctrl_offline_mode 1
+                _pass=$(printf '%s' "$LOCAL_PASS" | sha256sum | cut -d' ' -f1)
+                cat <<SQL | $MYSQL
+INSERT INTO users (username,password,role,offline)
+  SELECT 'admin','$_pass','0','1'
+  WHERE NOT EXISTS (SELECT 1 FROM users WHERE username='admin');
+UPDATE users SET password='$_pass', role='0', offline='1' WHERE username='admin';
+SQL
+                echo "OFFLINE Mode is reset. Default Account is admin/${LOCAL_PASS}"
+                ;;
+            all)
+                ctrl_set ctrl_default_mode 0
+                ctrl_set ctrl_online_mode 0
+                ctrl_set ctrl_offline_mode 0
+                echo "DELETE FROM users WHERE role='0';" | $MYSQL
+                echo "System Mode is reset"
+                ;;
+        esac
+        ;;
+esac

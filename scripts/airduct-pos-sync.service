@@ -1,0 +1,31 @@
+[Unit]
+# PNetLab airduct RF position feed. Every 5s it writes each OPTED-IN lab session's
+# node canvas coordinates to /opt/unetlab/tmp/<session>/airduct-pos.json, which the
+# airhandler (AIRHANDLER_RF=1) reads for its Tier-1 distance->loss model. A session
+# is opted in when /opt/unetlab/tmp/<session>/airduct-rf exists — dropped by
+# pnq-wifi.php when the user turns the Wi-Fi Painter's "Distance roaming (RF)" toggle
+# ON, removed when OFF. Un-opted labs get no pos file, so the airhandler fails OPEN
+# (delivers, no loss) for them. Shipped as a DATA file under /opt/unetlab/scripts/;
+# the installer copies it to /etc/systemd/system and enables it.
+Description=PNetLab airduct RF canvas-position feed (opt-in Tier-1)
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/unetlab/scripts/airduct-pos-sync.py --loop
+Restart=on-failure
+RestartSec=5
+# Reads /etc/mysql/debian.cnf (root-only) + the .unl files, writes the per-session
+# pos/marker files under /opt/unetlab/tmp — runs as root, kept minimal otherwise.
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

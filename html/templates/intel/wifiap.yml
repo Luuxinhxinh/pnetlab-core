@@ -1,0 +1,72 @@
+---
+# PNetLab Wireless AP — emulated 802.11 (mac80211_hwsim + hostapd) over the vwifi
+# medium (vsock). Handler: device_wifiap.php. Image dir auto-discovered as
+# addons/qemu/wifiap-<version>/virtioa.qcow2 (P1a dev image = CML ubuntu-wireless with
+# airduct masked + vwifi-client baked; P4 replaces it with our own license-clean qcow2).
+# Day-0 hostapd role is delivered via cloud-init cidata by the handler; the per-node
+# vsock device (-device vhost-vsock-pci,guest-cid=...) is injected in customFlag().
+type: qemu
+name: Wireless AP
+description: Wireless Access Point
+cpulimit: 1
+icon: Access Point Green.png
+cpu: 1
+ram: 2048
+ethernet: 4
+console: telnet
+qemu_arch: x86_64
+qemu_nic: virtio-net-pci
+qemu_options: -machine type=pc,accel=kvm -serial mon:stdio -nographic -enable-kvm
+Wifi_SSID:
+  type: text
+  value: ''
+  width: 6
+Wifi_HwMode:
+  type: list
+  value: g
+  options:
+    g: 2.4 GHz (802.11g)
+    a: 5 GHz (802.11a)
+  width: 6
+Wifi_Channel:
+  type: text
+  value: '6'
+  width: 6
+AP_Mode:
+  type: list
+  value: bridge
+  options:
+    bridge: bridge
+    routed: routed
+  width: 6
+AP_LAN_CIDR:
+  type: text
+  value: 192.168.10.1/24
+  width: 6
+Security:
+  type: list
+  value: open
+  options:
+    open: open
+    wpa2-psk: wpa2-psk
+    wpa3-sae: wpa3-sae
+    wpa-eap: wpa-eap
+  width: 6
+WPA_Passphrase:
+  type: text
+  value: pnetlab123
+  width: 6
+RADIUS_Server:
+  type: text
+  value: ''
+  width: 6
+RADIUS_Secret:
+  type: text
+  value: pnetlab-radius
+  width: 6
+Initial_startup_config:
+  type: checkbox
+  value: 1
+  width: 6
+  restart: 1
+...

@@ -1,0 +1,48 @@
+---
+# PNetLab Wireless Station/Client — emulated 802.11 (mac80211_hwsim + wpa_supplicant)
+# over the vwifi medium (vsock). Handler: device_wifista.php. Image dir auto-discovered
+# as addons/qemu/wifista-<version>/virtioa.qcow2 (P1a dev image = CML ubuntu-wireless;
+# shares the same prepped base as the AP — role is set by the day-0 cidata seed).
+type: qemu
+name: Wireless STA
+description: Wireless Client
+cpulimit: 1
+icon: Laptop.png
+cpu: 1
+ram: 2048
+ethernet: 4
+console: telnet
+qemu_arch: x86_64
+qemu_nic: virtio-net-pci
+qemu_options: -machine type=pc,accel=kvm -serial mon:stdio -nographic -enable-kvm
+Wifi_SSID:
+  type: text
+  value: ''
+  width: 6
+Security:
+  type: list
+  value: open
+  options:
+    open: open
+    wpa2-psk: wpa2-psk
+    wpa3-sae: wpa3-sae
+    wpa-eap: wpa-eap
+  width: 6
+WPA_Passphrase:
+  type: text
+  value: pnetlab123
+  width: 6
+EAP_Identity:
+  type: text
+  value: pnetuser
+  width: 6
+EAP_Password:
+  type: text
+  value: pnetpass
+  width: 6
+Initial_startup_config:
+  type: checkbox
+  value: 1
+  width: 6
+  restart: 1
+...

@@ -1,0 +1,112 @@
+---
+image: 
+  width: 8
+  wipe: 1
+
+name: 
+  width : 6
+
+description: 
+  show : 0
+
+icon: 
+  width : 6
+
+nvram: 
+  type: number
+  value: 1024
+  unit: (KB)
+  width: 6
+  restart: 1
+
+ram: 
+  type: number
+  value: 1024
+  unit: (MB)
+  width: 6
+  restart: 1
+
+ethernet: 
+  type: number
+  value: 2
+  width: 3
+  restart: 1
+
+mtu: 
+  type: number
+  value: 9000
+  width: 3
+  restart: 1
+
+serial: 
+  type: number
+  value: 0
+  width: 6
+  restart: 1
+
+keepalive: 
+  type: checkbox
+  value: 0
+  width: 6
+  restart: 1
+
+Initial_startup_config: 
+  type: checkbox
+  value: 1
+  width: 6
+  restart: 1
+
+size:
+  type: number
+  width: 4
+  unit: (px)
+
+left: 
+  type: number
+  width: 4
+  unit: (px)
+
+top:
+  type: number
+  width: 4
+  unit: (px)
+
+config_script: 
+  show : 0
+config: 
+  type: list
+  value: 0
+  options:
+    0: None
+    1: Exported
+  wipe: 1
+
+iol_options: 
+  type: text
+  value: ''
+  restart: 1
+  show : 0
+cpulimit :
+  show : 0
+
+backspace: 
+  type: list
+  width: 6
+  value: 127
+  options:
+    127: DEFAULT
+    8: Control-H
+
+terminaltype: 
+  type: list
+  width: 6
+  value: 'linux'
+  options:
+    ainsi : ainsi
+    linux : linux
+    vt100 : vt100
+    vt220 : vt220
+    xtrem : xtrem
+    xterm-256color : xterm-256color
+
+...
