@@ -28,3 +28,4 @@ Thumbs.db
 # Environment specific configurations
 .env
 config.local.php
+data/telemetry/*.db
