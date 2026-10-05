@@ -41,14 +41,35 @@
    - **VirtualBox:** `Settings` -> `System` -> `Processor` -> Tích chọn:
      - `Enable Nested VT-x/AMD-V`
 
-4. **Cấu hình Card Mạng (NAT Port Forwarding):**
-   - **VirtualBox:** Thiết lập Port Forwarding với Host IP là `127.0.0.1` để chỉ máy Host truy cập được:
-     - SSH: Host IP `127.0.0.1`, Host Port `2222` -> Guest Port `22`
-     - Web UI: Host IP `127.0.0.1`, Host Port `8080` -> Guest Port `80`
-   - **VMware Workstation:** Mở `Virtual Network Editor` -> Chọn `NAT Settings` -> Thêm Port Forwarding:
-     - Cổng SSH: Host `2222` -> Guest IP `192.168.x.x`, Port `22`
-     - Cổng Web: Host `8080` -> Guest IP `192.168.x.x`, Port `80`
-     - *Lưu ý an toàn:* VMware không có ô Host IP, hãy dùng Windows Firewall chặn cổng 2222/8080 từ mạng ngoài nếu đang dùng Wi-Fi công cộng.
+4. **Cấu hình Mạng, IP Tĩnh & Card Mạng (NAT Port Forwarding):**
+   Để quy tắc chuyển cổng không bị hỏng khi IP máy ảo thay đổi theo DHCP, khuyến nghị thiết lập IP tĩnh trên máy ảo hoặc gán DHCP cố định:
+   
+   - **Cấu hình IP tĩnh trong Ubuntu (Netplan):**
+     Kiểm tra tên card mạng (`ip link`), chỉnh sửa file `/etc/netplan/01-netcfg.yaml` (ví dụ IP: `192.168.x.50` thuộc dải NAT của phần mềm ảo hóa):
+     ```yaml
+     network:
+       version: 2
+       renderer: networkd
+       ethernets:
+         ens33: # Đổi thành tên card mạng thật của bạn
+           dhcp4: no
+           addresses: [192.168.x.50/24]
+           routes:
+             - to: default
+               via: 192.168.x.2 # Gateway NAT mặc định
+           nameservers:
+             addresses: [8.8.8.8, 1.1.1.1]
+     ```
+     Áp dụng cấu hình: `sudo netplan apply`.
+
+   - **Cấu hình Port Forwarding:**
+     - **VirtualBox:** Mở `Network` -> `Advanced` -> `Port Forwarding`. Điền Host IP là `127.0.0.1` để chỉ máy bạn truy cập được:
+       - SSH: Host IP `127.0.0.1`, Host Port `2222` -> Guest Port `22`
+       - Web UI: Host IP `127.0.0.1`, Host Port `8080` -> Guest Port `80`
+     - **VMware Workstation:** Mở `Edit` -> `Virtual Network Editor` (chú ý kiểm tra dải Subnet IP của VMnet8 trên máy bạn) -> Chọn `NAT Settings` -> Thêm Port Forwarding trỏ về đúng IP tĩnh của máy ảo:
+       - Cổng SSH: Host `2222` -> Guest IP `192.168.x.50`, Port `22`
+       - Cổng Web: Host `8080` -> Guest IP `192.168.x.50`, Port `80`
+       - *Lưu ý an toàn:* VMware không có ô Host IP, hãy dùng Windows Firewall chặn cổng 2222/8080 từ mạng ngoài nếu đang kết nối Wi-Fi công cộng.
 
 5. **Cài đặt nền tảng PNETLab & Môi trường chạy:**
    Máy mẫu cần cài đặt đầy đủ web server, PHP, Python và KVM:
@@ -72,7 +93,7 @@
    ```
 
 7. **Chuẩn bị thư mục `/opt/unetlab` & Mã nguồn:**
-   - Nếu máy mẫu đã cài sẵn PNETLab: chuyển vào thư mục và khởi tạo Git remote.
+   - Nếu máy mẫu đã cài sẵn PNETLab: chuyển vào thư mục và cấu hình Git.
    - Nếu thiết lập máy mới từ repo GitHub:
    ```bash
    sudo mkdir -p /opt/unetlab
@@ -94,6 +115,7 @@
 1. **Import file OVA vào VMware / VirtualBox:**
    - Chọn `File -> Open` -> Chọn file `.ova`.
    - **Bắt buộc:** Tích chọn **Generate new MAC addresses for all network adapters** (hoặc Reinitialize MAC) khi phần mềm hỏi để tránh xung đột IP/MAC trong mạng.
+   - **Kiểm tra dải mạng NAT:** Mở `Virtual Network Editor` (trên VMware) hoặc `Network` (trên VirtualBox) để xem dải mạng NAT trên máy thật của mình và cập nhật lại IP tĩnh/Port Forwarding tương ứng nếu dải mạng khác máy mẫu.
 
 2. **Cấu hình danh tính Git cá nhân trên máy ảo:**
    ```bash
@@ -150,9 +172,10 @@
        ĐẦU NGÀY                       TRONG NGÀY                       CUỐI NGÀY
 +--------------------+          +---------------------+          +--------------------+
 | 1. Resume VM       |          | 1. Commit nhỏ & sớm |          | 1. Fetch & Rebase  |
-| 2. pull --ff-only  | -------> | 2. Push sớm giữ code| -------> | 2. Push --force-   |
-| 3. sync-env (cần)  |          | 3. Rebase giữa ngày |          |    with-lease      |
-| 4. Tiếp tục branch |          | 4. Test clean/smoke |          | 3. PR & dọn branch |
+| 2. Kiểm tra status | -------> | 2. Push sớm giữ code| -------> | 2. Lưu code dở(wip)|
+| 3. pull --ff-only  |          | 3. Rebase giữa ngày |          | 3. Push --force-   |
+| 4. sync-env (cần)  |          | 4. Test clean/smoke |          |    with-lease      |
+| 5. Tiếp tục branch |          |                     |          | 4. PR & dọn branch |
 +--------------------+          +---------------------+          +--------------------+
 ```
 
@@ -161,14 +184,19 @@ Thực hiện tuần tự các bước sau trước khi gõ code:
 
 1. Mở phần mềm ảo hóa -> Nhấn **Resume** máy ảo (mất khoảng 3 giây).
 2. Kết nối VS Code Remote-SSH vào `/opt/unetlab`.
-3. **Cập nhật nhánh `main` mới nhất:**
+3. **Kiểm tra trạng thái làm việc trước khi chuyển nhánh:**
+   ```bash
+   git status
+   ```
+   - Đảm bảo không còn thay đổi dở dang chưa được commit. Nếu hôm qua đã commit `wip`, thư mục làm việc sẽ hoàn toàn sạch sẽ.
+4. **Cập nhật nhánh `main` mới nhất:**
    ```bash
    git switch main
    OLD=$(git rev-parse HEAD)
    git pull --ff-only origin main
    ```
 
-4. **Kiểm tra và chạy `sync-env.sh` (chỉ khi có migration hoặc thư viện mới):**
+5. **Kiểm tra và chạy `sync-env.sh` (chỉ khi có migration hoặc thư viện mới):**
    ```bash
    git diff --name-only "$OLD" HEAD | grep -E '(schema|\.sql|composer|requirements)' \
        || echo "Không có thay đổi DB/package, bỏ qua sync-env."
@@ -178,14 +206,14 @@ Thực hiện tuần tự các bước sau trước khi gõ code:
      sudo ./docs/dev-workflow/scripts/sync-env.sh main
      ```
 
-5. **Chuyển sang nhánh làm việc:**
+6. **Chuyển sang nhánh làm việc:**
    - **Nếu tiếp tục công việc của ngày hôm trước:**
      ```bash
      git switch feature/nhanh-cua-hom-qua
      git fetch origin
      git rebase origin/main
      ```
-     *(Nếu hôm qua có commit tạm "wip": tiếp tục code, sau đó dùng `git commit --amend` để gộp lại).*
+     *(Vì dự án sử dụng Squash and Merge trên GitHub, các commit tạm "wip" sẽ tự động được gộp sạch sẽ thành 1 commit duy nhất khi merge vào main, không cần dùng git commit --amend).*
    - **Nếu bắt đầu một tính năng mới:**
      ```bash
      git switch -c feature/ten-tinh-nang-moi
@@ -215,6 +243,10 @@ Thực hiện tuần tự các bước sau trước khi gõ code:
      git fetch origin
      git rebase origin/main
      ```
+   - **Lưu ý quan trọng:** Vì rebase viết lại lịch sử commit, nếu nhánh này trước đó đã được push lên GitHub thì lần push tiếp theo bắt buộc phải dùng `--force-with-lease`:
+     ```bash
+     git push --force-with-lease origin feature/ten-tinh-nang
+     ```
 
 4. **Kiểm thử nhanh:**
    - **Backend / Daemon:** Chạy dọn rác tài nguyên mạng và restart service:
@@ -229,26 +261,33 @@ Thực hiện tuần tự các bước sau trước khi gõ code:
 ---
 
 ### 3. Cuối ngày
-1. **Hoàn tất rebase với `main` mới nhất:**
+1. **Lưu lại công việc dở dang (nếu chưa hoàn thành tính năng):**
+   Nếu cuối ngày code vẫn đang làm dở và chưa xong tính năng, hãy commit tạm để bảo vệ code không bị thất lạc và không bị "kéo theo" sang nhánh khác:
+   ```bash
+   git status
+   git add <cac-file-dang-sua>
+   git commit -m "wip: save unfinished work of the day"
+   ```
+
+2. **Hoàn tất rebase với `main` mới nhất:**
    ```bash
    git fetch origin
    git rebase origin/main
    ```
    *Nếu có conflict: sửa các vị trí đánh dấu xung đột, `git add <file>`, rồi chạy `git rebase --continue`.*
 
-2. **Đẩy nhánh lên GitHub bằng `--force-with-lease`:**
-   Sau khi rebase, lịch sử commit của nhánh bị viết lại nên lệnh push thường sẽ bị từ chối:
+3. **Đẩy nhánh lên GitHub bằng `--force-with-lease`:**
    ```bash
    git push --force-with-lease origin feature/ten-tinh-nang
    ```
    *Tuyệt đối không dùng cờ `--force` trần vì có thể ghi đè mất commit của người khác.*
 
-3. **Tạo Pull Request trên GitHub & Đợi CI Kiểm thử:**
+4. **Tạo Pull Request trên GitHub & Đợi CI Kiểm thử (Nếu tính năng đã xong):**
    - Tạo PR từ nhánh tính năng vào `main`.
    - **Đợi mục Checks chạy test `smoke-test` ra dấu tick xanh ✅.** Nhánh `main` đã bật Branch Protection / Ruleset; nếu test đỏ hoặc chưa có approval (khi làm nhóm), nút Merge sẽ bị khóa tự động.
    - Thực hiện merge (khuyến nghị **Squash and Merge**).
 
-4. **Dọn dẹp nhánh sau khi đã Merge:**
+5. **Dọn dẹp nhánh sau khi đã Merge:**
    - Sau khi PR đã merge thành công trên GitHub, chuyển về `main` và cập nhật:
      ```bash
      git switch main
@@ -260,7 +299,7 @@ Thực hiện tuần tự các bước sau trước khi gõ code:
      git remote prune origin
      ```
 
-5. **Kết thúc ngày:** Chọn **Suspend / Save State** máy ảo.
+6. **Kết thúc ngày:** Chọn **Suspend / Save State** máy ảo.
 
 ---
 
@@ -277,7 +316,7 @@ Thực hiện tuần tự các bước sau trước khi gõ code:
 ### 2. Quy trình Test 3 Tầng Tự động
 
 - **Tầng 1 - Linting Toàn diện (PHP & Python):**
-  Tự động kiểm tra 212 file PHP và 26 daemon Python backend (chạy cả trên local và CI GitHub Actions):
+  Tự động quét và kiểm tra cú pháp toàn bộ file PHP trong `html/` (bằng `php -l`) và toàn bộ file Python backend/daemon trong `scripts/` (bằng `py_compile`), chạy cả trên local và CI GitHub Actions:
   ```bash
   python3 ./docs/dev-workflow/scripts/smoke-test.py
   ```
@@ -321,4 +360,4 @@ Không chạy ngay `git reset --hard` và `git clean -fd` khi chưa kiểm tra v
    Chỉ cập nhật nhánh chính bằng `git pull --ff-only origin main` để giữ lịch sử commit luôn thẳng và sạch.
 
 4. **Bảo vệ lịch sử nhánh bằng `--force-with-lease`:**
-   Khi đẩy nhánh sau rebase, bắt buộc dùng `--force-with-lease`, không dùng `--force`.
+   Khi đẩy nhánh sau rebase (kể cả rebase giữa ngày hay cuối ngày), bắt buộc dùng `--force-with-lease`, không dùng `--force`.
