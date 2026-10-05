@@ -137,6 +137,55 @@ $app->post("/api/password-reset/consume", function () use ($app, $db) {
     }
 });
 
+$app->post("/api/password-reset/request", function () use ($app, $db) {
+    try {
+        $body = apiFeatureBody($app);
+        $identifier = trim(isset($body["identifier"]) ? (string) $body["identifier"] : "");
+        if ($identifier === "") {
+            apiFeatureReply($app, 400, null, "Please enter your username or email address.");
+            return;
+        }
+
+        $cfg = smtp_settings();
+        if (!$cfg['enabled']) {
+            apiFeatureReply($app, 400, null, "Email service is not configured on this appliance. Please contact your system administrator to reset your password.");
+            return;
+        }
+
+        $select = $db->prepare('SELECT pod, username, email FROM users WHERE LOWER(username) = LOWER(:id1) OR LOWER(email) = LOWER(:id2) LIMIT 1');
+        $select->execute(['id1' => $identifier, 'id2' => $identifier]);
+        $user = $select->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            apiFeatureReply($app, 200, ["sent" => true], "If an account matches that username or email, a password reset link has been sent.");
+            return;
+        }
+
+        $email = trim((string) ($user['email'] ?? ''));
+        if ($email === '') {
+            apiFeatureReply($app, 400, null, "No email address is associated with this account. Please contact your administrator.");
+            return;
+        }
+
+        $deliveryError = password_reset_delivery_error($email);
+        if ($deliveryError !== null) {
+            apiFeatureReply($app, 400, null, "Cannot send reset email: " . $deliveryError . ". Please contact your administrator.");
+            return;
+        }
+
+        list($ok, $err) = password_reset_issue_and_send($db, (int) $user['pod'], $user['username'], $email, 'request');
+        if (!$ok) {
+            apiFeatureReply($app, 500, null, "Could not send reset email: " . $err . ". Please contact your administrator.");
+            return;
+        }
+
+        apiFeatureReply($app, 200, ["sent" => true], "A password reset link has been sent to your email address. Please check your inbox.");
+    } catch (Throwable $e) {
+        error_log("password reset request failed: " . $e->getMessage());
+        apiFeatureReply($app, 500, null, "Could not process password reset request");
+    }
+});
+
 $app->get("/api/admin/mail", function () use ($app) {
     if (apiFeatureAdmin($app) === false) return;
     $cfg = smtp_settings();

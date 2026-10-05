@@ -15,7 +15,7 @@
 	-->
 	<script src="/assets-common/js/pnq-branding.js?v=fa685e58"></script>
 	<script src="/assets-common/js/pnq-theme.js?v=ed2aef02"></script>
-	<link rel="stylesheet" href="/login/login.css?v=blur-v2">
+	<link rel="stylesheet" href="/login/login.css?v=pwd-reset-v1">
 </head>
 <body>
 	<main class="login-wrap">
@@ -37,7 +37,10 @@
 					autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus>
 			</div>
 			<div class="field">
-				<label for="password">Password</label>
+				<div class="field-header">
+					<label for="password">Password</label>
+					<button type="button" class="link-btn" id="forgot-link">Forgot password?</button>
+				</div>
 				<input id="password" name="password" type="password" autocomplete="current-password" required>
 			</div>
 			<div class="field">
@@ -55,9 +58,34 @@
 				<span class="btn-spin" aria-hidden="true"></span>
 			</button>
 		</form>
+
+		<form class="login-card forgot-card" id="forgot-form" autocomplete="on" hidden>
+			<h2 class="card-title">Forgot password?</h2>
+			<p class="card-desc">Enter your username or email address and we'll send you a link to reset your password.</p>
+
+			<div class="field">
+				<label for="forgot-identifier">Username or email</label>
+				<input id="forgot-identifier" name="identifier" type="text" autocomplete="username"
+					autocapitalize="none" autocorrect="off" spellcheck="false" required placeholder="e.g. admin or user@example.com">
+			</div>
+
+			<div class="alert" id="forgot-alert" role="alert" hidden></div>
+			<div class="alert alert-success" id="forgot-success" role="status" hidden></div>
+
+			<button class="btn" id="forgot-submit" type="submit">
+				<span class="btn-label">Send reset link</span>
+				<span class="btn-spin" aria-hidden="true"></span>
+			</button>
+
+			<div class="card-actions">
+				<button type="button" class="link-btn back-btn" id="back-to-login">
+					&larr; Return to sign in
+				</button>
+			</div>
+		</form>
 		<p class="footnote">Offline appliance access</p>
 	</main>
 
-	<script src="/login/login.js?v=a1ee57a7"></script>
+	<script src="/login/login.js?v=pwd-reset-v1"></script>
 </body>
 </html>
