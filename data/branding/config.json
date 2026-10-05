@@ -1,6 +1,6 @@
 {
     "name": "PNETLAB-V8",
     "login_header": "",
-    "hide_default_creds": false,
+    "hide_default_creds": true,
     "theme_profile": "dark"
 }
