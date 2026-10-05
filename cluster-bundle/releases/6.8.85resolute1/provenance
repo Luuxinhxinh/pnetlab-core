@@ -1,0 +1,7 @@
+release=6.8.85resolute1
+manifest_sha256=381a32de468d76244d8de4832655f6b9bcd7501e386fab9e1595210d76209c9a
+manifest_sequence=85
+manifest_reissue=0
+staged_utc=2026-10-05T02:20:35Z
+source=update
+profile=satellite

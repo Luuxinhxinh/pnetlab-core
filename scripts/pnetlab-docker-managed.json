@@ -1,0 +1,136 @@
+{
+  "nodes": [
+    {
+      "managed_repository": "rspnet/pnet-browser",
+      "device_version": "pnet-browser:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 54
+    },
+    {
+      "managed_repository": "rspnet/pnet-capture-web",
+      "device_version": "pnet-capture-web:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 55
+    },
+    {
+      "managed_repository": "rspnet/pnet-aaa",
+      "device_version": "pnet-aaa:1.1",
+      "managed_platform": "linux/amd64",
+      "device_id": 56
+    },
+    {
+      "managed_repository": "rspnet/pnet-services",
+      "device_version": "pnet-services:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 57
+    },
+    {
+      "managed_repository": "rspnet/pnet-flowlab",
+      "device_version": "pnet-flowlab:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 58
+    },
+    {
+      "managed_repository": "rspnet/pnet-librenms",
+      "device_version": "pnet-librenms:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 59
+    },
+    {
+      "managed_repository": "rspnet/pnet-netdevops",
+      "device_version": "pnet-netdevops:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 60
+    },
+    {
+      "managed_repository": "rspnet/pnet-rpki",
+      "device_version": "pnet-rpki:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 61
+    },
+    {
+      "managed_repository": "rspnet/pnet-exabgp",
+      "device_version": "pnet-exabgp:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 62
+    },
+    {
+      "managed_repository": "rspnet/pnet-mcast",
+      "device_version": "pnet-mcast:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 63
+    },
+    {
+      "managed_repository": "rspnet/pnet-adlab",
+      "device_version": "pnet-adlab:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 64
+    },
+    {
+      "managed_repository": "rspnet/pnet-voip",
+      "device_version": "pnet-voip:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 65
+    },
+    {
+      "managed_repository": "rspnet/pnet-secbench",
+      "device_version": "pnet-secbench:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 66
+    },
+    {
+      "managed_repository": "rspnet/pnet-telemetry",
+      "device_version": "pnet-telemetry:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 67
+    },
+    {
+      "managed_repository": "rspnet/pnet-yersinia",
+      "device_version": "pnet-yersinia:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 70
+    },
+    {
+      "managed_repository": "rspnet/pnet-azure",
+      "device_version": "pnet-azure:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 72
+    },
+    {
+      "managed_repository": "rspnet/pnet-aws",
+      "device_version": "pnet-aws:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 73
+    },
+    {
+      "managed_repository": "rspnet/pnet-ltm",
+      "device_version": "pnet-ltm:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 74
+    },
+    {
+      "managed_repository": "rspnet/pnet-wanem",
+      "device_version": "pnet-wanem:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 75
+    },
+    {
+      "managed_repository": "rspnet/pnet-trex",
+      "device_version": "pnet-trex:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 78
+    },
+    {
+      "managed_repository": "rspnet/pnet-gobgp",
+      "device_version": "pnet-gobgp:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 76
+    },
+    {
+      "managed_repository": "rspnet/pnet-zeek",
+      "device_version": "pnet-zeek:1.0",
+      "managed_platform": "linux/amd64",
+      "device_id": 77
+    }
+  ]
+}

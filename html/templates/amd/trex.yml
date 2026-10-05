@@ -1,0 +1,17 @@
+type: docker
+config_script: config_aaa.py
+name: Traffic Generator
+description: Traffic Generator
+cpulimit: 1
+icon: Misc-2D-TREX-S.svg
+ethernet: 2
+lab_eth_offset: 1
+eth_name:
+  - eth1
+  - eth2
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 2048
+mtu: 1500
+docker_options: '--cap-add=NET_ADMIN --cap-add=NET_RAW'

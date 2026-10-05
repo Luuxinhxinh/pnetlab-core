@@ -1,0 +1,18 @@
+# eth0 management; eth1/eth2 transparent lab path. Existing approved capability lane.
+type: docker
+config_script: config_aaa.py
+name: WAN Emulator
+description: WAN Emulator
+cpulimit: 1
+icon: Misc-2D-WANEM-S.svg
+ethernet: 2
+lab_eth_offset: 1
+eth_name:
+  - eth1
+  - eth2
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 2048
+mtu: 1500
+docker_options: '--cap-add=NET_ADMIN'

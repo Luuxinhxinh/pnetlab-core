@@ -1,0 +1,20 @@
+type: docker
+config_script: config_aaa.py
+name: BGP Router
+description: BGP Router
+cpulimit: 1
+icon: Misc-2D-GOBGP-S.svg
+ethernet: 4
+lab_eth_offset: 1
+eth_name:
+  - eth1
+  - eth2
+  - eth3
+  - eth4
+console: http
+console_2nd: telnet
+cpu: 2
+ram: 2048
+mtu: 1500
+# Existing approved capability lane for lab-bound BMP/RTR socket relays.
+docker_options: '--cap-add=NET_RAW'

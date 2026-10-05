@@ -1,0 +1,88 @@
+{
+  "images": [
+    {
+      "config_digest": "sha256:72007e0e00705f063ee3e72a467e27968dfea4fc36d5db766127f956f7fdf59c",
+      "version": "1.2.0",
+      "platform": "linux/amd64",
+      "manifest_digest": "sha256:2f51b7baf344fe4d58500d65830ef6d317a2f58e51676311b233b8cd7bb658e2",
+      "repository": "rspnet/pnet-aaa",
+      "previous_latest_digest": "sha256:b34288370e0c0416d3c3246d1668f1a849d629f7242e6889d2629969f54eb2a2"
+    },
+    {
+      "config_digest": "sha256:e1e0824ef39f8e29c3f3889eae62e754b7a94f18d5d63e396c8d2f1585dce050",
+      "version": "1.2.0",
+      "platform": "linux/amd64",
+      "manifest_digest": "sha256:a87c2412c13d5ef1b7aea7f9488c67c63ca6d2338777b98c660b4b881d49aeef",
+      "repository": "rspnet/pnet-services",
+      "previous_latest_digest": "sha256:bc892a31fc938adb795833fd8a6e906dc34bec80cbb2cb1e3318e66beea58f8b"
+    },
+    {
+      "config_digest": "sha256:b7b96fbc01d031fc18420e4d921764d358818084e91469fdf43a2aa47d8ebd68",
+      "version": "1.2.0",
+      "platform": "linux/amd64",
+      "manifest_digest": "sha256:09cbd1e4c76856a3e235b1caf25aa7f5300ecb938667dfa4937e0aded4af20be",
+      "repository": "rspnet/pnet-flowlab",
+      "previous_latest_digest": "sha256:dbf3fcc9bc4c9c8d91e40b81b9a6b1ee887abc5803ff6b4a0ee4be5d587b628a"
+    },
+    {
+      "config_digest": "sha256:869c4c0e07bb3d60b34f6fdc998653afde980cbb8ae983d9526d2da9891f2cb6",
+      "version": "1.2.0",
+      "platform": "linux/amd64",
+      "manifest_digest": "sha256:a7473e993ac1222e289bc416699fbab1a0b985b70a2a2951a3ff644612aa05da",
+      "repository": "rspnet/pnet-rpki",
+      "previous_latest_digest": "sha256:644625efa494234ddefab936dbe804a757864b4389eaf93f27fb1a22866651b4"
+    },
+    {
+      "config_digest": "sha256:2e7437785a6cf28922f1c335fe573c8454c095bc2aef078b0cf023f73df4eb5b",
+      "version": "1.2.0",
+      "platform": "linux/amd64",
+      "manifest_digest": "sha256:86270f0bc94a78983b02fb30fe02f6fe59608703ca1424fcefd1e72a370b71d0",
+      "repository": "rspnet/pnet-exabgp",
+      "previous_latest_digest": "sha256:20122e10610045d6d2a2d4858a3101b7811ad3e1b19010b6aff3a74b1eee2f27"
+    },
+    {
+      "config_digest": "sha256:8a23c43c6accb5a14712edd795bf24a5deda0e59061a3ec5a48d0807565ef019",
+      "version": "1.2.0",
+      "platform": "linux/amd64",
+      "manifest_digest": "sha256:c97d8a87b151ed0f508d173d841ae2bb6776375b0c984b47299c9a1b38a7b2ff",
+      "repository": "rspnet/pnet-adlab",
+      "previous_latest_digest": "sha256:f31bbc6255b7a2cea2512dfe52c59a66169cbf7ba67e64494a70a79a91d2510c"
+    },
+    {
+      "config_digest": "sha256:98641953de33c225d4f5c8ae8c06f2dac2ba943b82173a095831c625b7f13545",
+      "version": "1.2.0",
+      "platform": "linux/amd64",
+      "manifest_digest": "sha256:089d600afc0fdfec0f4ca483e68e2523f050fa254a2c0890e93bb8242da53f7f",
+      "repository": "rspnet/pnet-telemetry",
+      "previous_latest_digest": "sha256:e96d776ba7e826df84bf98c9d70e093a33f760fad052875ae0b1c6e868f52fb5"
+    },
+    {
+      "repository": "rspnet/pnet-wanem",
+      "version": "1.0",
+      "platform": "linux/amd64",
+      "manifest_digest": "sha256:07b393f5eec8647d6d08ab55f7b15a37f06564c4b6dafe30284341e2e5adab4a",
+      "config_digest": "sha256:52d0de2ad6c14c2d1757662c0c140c43afc33c3947d9f952c0bdc458f02fda7b"
+    },
+    {
+      "repository": "rspnet/pnet-trex",
+      "version": "1.0",
+      "platform": "linux/amd64",
+      "manifest_digest": "sha256:fb01a0ffa0a6ea91744173587433c28f9a6a9f615b2cdaed437067153f9f3f28",
+      "config_digest": "sha256:c882c45d720be4aeb58c6709cf6bae7a832960aa23ac52b1b93a2835ada7c585"
+    },
+    {
+      "repository": "rspnet/pnet-gobgp",
+      "version": "1.0",
+      "platform": "linux/amd64",
+      "manifest_digest": "sha256:f690190cf21425046aedbc00dfaa6a052dfa63f9b386a493fb8918444aa1f134",
+      "config_digest": "sha256:c03ca200e5a8d21855b93f33a67ca27931e46a501ecc95c199400e9747280d49"
+    },
+    {
+      "repository": "rspnet/pnet-zeek",
+      "version": "1.0",
+      "platform": "linux/amd64",
+      "manifest_digest": "sha256:1c468047f76cd93f80da7f639bdc6dc8069a7c0cdefb771de47a29db9d9c04e1",
+      "config_digest": "sha256:a3ba664a4605fa981e8ed33553ec5771ec781607e629e896646ea72c5ddd9276"
+    }
+  ]
+}
