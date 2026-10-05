@@ -86,6 +86,128 @@
 
 	form.addEventListener('submit', submit);
 
+	/* ========================================================================
+	   Forgot password flow
+	   ======================================================================== */
+	var forgotForm = document.getElementById('forgot-form');
+	var forgotLink = document.getElementById('forgot-link');
+	var backToLoginBtn = document.getElementById('back-to-login');
+	var forgotIdentifierEl = document.getElementById('forgot-identifier');
+	var forgotSubmitBtn = document.getElementById('forgot-submit');
+	var forgotAlertEl = document.getElementById('forgot-alert');
+	var forgotSuccessEl = document.getElementById('forgot-success');
+
+	function showForgotAlert(msg) {
+		if (forgotSuccessEl) forgotSuccessEl.hidden = true;
+		if (forgotAlertEl) {
+			forgotAlertEl.textContent = msg || 'Could not process request.';
+			forgotAlertEl.hidden = false;
+		}
+	}
+
+	function showForgotSuccess(msg) {
+		if (forgotAlertEl) forgotAlertEl.hidden = true;
+		if (forgotSuccessEl) {
+			forgotSuccessEl.textContent = msg || 'A password reset link has been sent.';
+			forgotSuccessEl.hidden = false;
+		}
+	}
+
+	function clearForgotAlerts() {
+		if (forgotAlertEl) {
+			forgotAlertEl.hidden = true;
+			forgotAlertEl.textContent = '';
+		}
+		if (forgotSuccessEl) {
+			forgotSuccessEl.hidden = true;
+			forgotSuccessEl.textContent = '';
+		}
+	}
+
+	function setForgotBusy(on) {
+		if (forgotSubmitBtn) {
+			forgotSubmitBtn.disabled = on;
+			forgotSubmitBtn.classList.toggle('is-busy', on);
+		}
+	}
+
+	if (forgotLink && forgotForm && form) {
+		forgotLink.addEventListener('click', function () {
+			clearError();
+			clearForgotAlerts();
+			form.hidden = true;
+			forgotForm.hidden = false;
+			if (userEl && userEl.value && forgotIdentifierEl) {
+				forgotIdentifierEl.value = userEl.value.trim();
+			}
+			if (forgotIdentifierEl) {
+				forgotIdentifierEl.focus();
+			}
+		});
+	}
+
+	if (backToLoginBtn && forgotForm && form) {
+		backToLoginBtn.addEventListener('click', function () {
+			clearError();
+			clearForgotAlerts();
+			forgotForm.hidden = true;
+			form.hidden = false;
+			if (userEl) {
+				userEl.focus();
+			}
+		});
+	}
+
+	// Allow Escape to return to sign in view
+	document.addEventListener('keydown', function (e) {
+		if (e.key === 'Escape' && forgotForm && !forgotForm.hidden) {
+			clearError();
+			clearForgotAlerts();
+			forgotForm.hidden = true;
+			if (form) {
+				form.hidden = false;
+				if (userEl) userEl.focus();
+			}
+		}
+	});
+
+	if (forgotForm) {
+		forgotForm.addEventListener('submit', function (e) {
+			if (e) e.preventDefault();
+			clearForgotAlerts();
+			var identifier = (forgotIdentifierEl ? forgotIdentifierEl.value : '').trim();
+			if (!identifier) {
+				showForgotAlert('Enter your username or email address.');
+				if (forgotIdentifierEl) forgotIdentifierEl.focus();
+				return;
+			}
+			setForgotBusy(true);
+			fetch('/api/password-reset/request', {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+				body: JSON.stringify({ identifier: identifier })
+			}).then(function (r) {
+				return r.text().then(function (txt) {
+					var body = {};
+					try { body = txt ? JSON.parse(txt) : {}; } catch (err) { body = {}; }
+					return { status: r.status, body: body };
+				});
+			}).then(function (res) {
+				setForgotBusy(false);
+				if (res.status === 200) {
+					showForgotSuccess((res.body && res.body.message) || 'A password reset link has been dispatched to your email.');
+					if (forgotIdentifierEl) forgotIdentifierEl.value = '';
+				} else {
+					showForgotAlert((res.body && res.body.message) || 'Unable to process reset request. Contact your administrator.');
+				}
+			}).catch(function () {
+				setForgotBusy(false);
+				showForgotAlert('Cannot reach the server. Check that the appliance is running.');
+			});
+		});
+	}
+
 	/* Logo fallback: if the engine-side asset 404s, drop to the "PN" wordmark
 	   (CSP-safe — no inline onerror handler). */
 	var logoEl = document.getElementById('brand-logo');
