@@ -14,7 +14,8 @@
 2. [Phần II: Quy trình Làm việc Hàng ngày (Daily Workflow)](#phan-ii-quy-trinh-lam-viec-hang-ngay-daily-workflow)
    - [1. Đầu ngày](#1-dau-ngay)
    - [2. Trong ngày](#2-trong-ngay)
-   - [3. Cuối ngày](#3-cuoi-ngay)
+   - [3. Cuối ngày & Tạo Pull Request](#3-cuoi-ngay--tao-pull-request)
+   - [4. Bảng tra cứu & Xử lý sự cố nhanh (Troubleshooting)](#4-bang-tra-cuu--xu-ly-su-co-nhanh-troubleshooting)
 3. [Phần III: Quy trình Refactor, Kiểm thử & An toàn Dữ liệu](#phan-iii-quy-trinh-refactor-kiem-thu--an-toan-du-lieu)
    - [1. Quản lý Snapshot Thông minh & Bảo dưỡng Ổ đĩa Ảo](#1-quan-ly-snapshot-thong-minh--bao-duong-o-dia-ao)
    - [2. Quy trình Test 3 Tầng Tự động](#2-quy-trinh-test-3-tang-tu-dong)
@@ -171,135 +172,133 @@
 ```text
        ĐẦU NGÀY                       TRONG NGÀY                       CUỐI NGÀY
 +--------------------+          +---------------------+          +--------------------+
-| 1. Resume VM       |          | 1. Commit nhỏ & sớm |          | 1. Fetch & Rebase  |
-| 2. Kiểm tra status | -------> | 2. Push sớm giữ code| -------> | 2. Lưu code dở(wip)|
-| 3. pull --ff-only  |          | 3. Rebase giữa ngày |          | 3. Push --force-   |
-| 4. sync-env (cần)  |          | 4. Test clean/smoke |          |    with-lease      |
-| 5. Tiếp tục branch |          |                     |          | 4. PR & dọn branch |
+| 1. Resume VM       |          | 1. Commit nhỏ & sớm |          | 1. Lưu code dở(wip)|
+| 2. Kiểm tra status | -------> | 2. Push sớm giữ code| -------> | 2. Rebase origin   |
+| 3. Fetch origin    |          | 3. Rebase giữa ngày |          | 3. Push --force-   |
+| 4. Chọn nhánh làm  |          | 4. Test clean/smoke |          |    with-lease      |
+| 5. sync-env (nếu cầ|          |                     |          | 4. PR & dọn branch |
 +--------------------+          +---------------------+          +--------------------+
 ```
 
 ### 1. Đầu ngày
-Thực hiện tuần tự các bước sau trước khi gõ code:
-
 1. Mở phần mềm ảo hóa -> Nhấn **Resume** máy ảo (mất khoảng 3 giây).
 2. Kết nối VS Code Remote-SSH vào `/opt/unetlab`.
-3. **Kiểm tra trạng thái làm việc trước khi chuyển nhánh:**
+3. Mở Terminal VS Code, kiểm tra xem có file nào đang bị sửa dở hay không:
    ```bash
    git status
    ```
-   - Đảm bảo không còn thay đổi dở dang chưa được commit. Nếu hôm qua đã commit `wip`, thư mục làm việc sẽ hoàn toàn sạch sẽ.
-4. **Cập nhật nhánh `main` mới nhất:**
+   *Nếu thấy chữ đỏ (có file bị sửa):* Gõ `git add .` rồi `git commit -m "wip: luu tam dau ngay"` trước khi làm tiếp.
+4. Đồng bộ dữ liệu mới nhất từ GitHub về máy (không cần chuyển qua lại giữa các nhánh):
    ```bash
-   git switch main
-   OLD=$(git rev-parse HEAD)
-   git pull --ff-only origin main
+   git fetch origin
    ```
-
-5. **Kiểm tra và chạy `sync-env.sh` (chỉ khi có migration hoặc thư viện mới):**
-   ```bash
-   git diff --name-only "$OLD" HEAD | grep -E '(schema|\.sql|composer|requirements)' \
-       || echo "Không có thay đổi DB/package, bỏ qua sync-env."
-   ```
-   - **Nếu có thay đổi DB/migration xuất hiện:** **Bắt buộc chụp nhanh 1 snapshot máy ảo** (đặt tên: `Before-DB-Migration`), sau đó mới chạy:
+5. Chọn nhánh làm việc:
+   - **Trường hợp A: Tiếp tục làm tính năng của hôm qua:**
      ```bash
-     sudo ./docs/dev-workflow/scripts/sync-env.sh main
-     ```
-
-6. **Chuyển sang nhánh làm việc:**
-   - **Nếu tiếp tục công việc của ngày hôm trước:**
-     ```bash
-     git switch feature/nhanh-cua-hom-qua
-     git fetch origin
+     git switch feature/ten-nhanh-hom-qua
      git rebase origin/main
      ```
-     *(Vì dự án sử dụng Squash and Merge trên GitHub, các commit tạm "wip" sẽ tự động được gộp sạch sẽ thành 1 commit duy nhất khi merge vào main, không cần dùng git commit --amend).*
-   - **Nếu bắt đầu một tính năng mới:**
+   - **Trường hợp B: Bắt đầu làm tính năng hoàn toàn mới:**
      ```bash
+     git switch main
+     git pull --ff-only origin main
      git switch -c feature/ten-tinh-nang-moi
      ```
+6. *(Tùy chọn)* Kiểm tra nếu có thay đổi Database hoặc thư viện:
+   ```bash
+   git diff --name-only HEAD origin/main | grep -E '(\.sql|requirements\.txt|composer\.json)'
+   ```
+   *Nếu terminal in ra tên file:* Hãy Snapshot máy ảo (`Before-Sync`), sau đó chạy:
+   ```bash
+   sudo ./docs/dev-workflow/scripts/sync-env.sh main
+   ```
+   *(Nếu không in ra gì thì bỏ qua).*
 
 ---
 
 ### 2. Trong ngày
-1. **Commit nhỏ, kiểm tra kỹ lưỡng:**
-   - Không lạm dụng `git add .` để tránh commit nhầm file cấu hình bí mật, mật khẩu hay token API.
-   - Luôn kiểm tra danh sách file bằng `git status` và nội dung bằng `git diff`.
-   - Dùng `git add <file>` cụ thể hoặc `git add -p` để kiểm tra từng đoạn code trước khi commit:
-     ```bash
-     git add path/to/file.php
-     git commit -m "feat(api): validate node input payload"
-     ```
+1. **Lưu code theo từng cụm thay đổi nhỏ:**
+   Dùng Source Control trên thanh công cụ bên trái của VS Code (nhấn dấu `+` cạnh file để Stage), hoặc gõ lệnh:
+   ```bash
+   git add <duong-dan-file>
+   git commit -m "feat(api): mo ta ngan gon viec vua lam"
+   ```
 
-2. **Push sớm lên GitHub để bảo vệ dữ liệu:**
-   - Không dồn commit đến cuối ngày. Đĩa ảo có thể gặp sự cố hỏng file bất ngờ; GitHub là nơi lưu an toàn nhất:
+2. **Đẩy code lên GitHub để chống mất dữ liệu:**
+   - Lần push đầu tiên của một nhánh mới:
      ```bash
-     git push -u origin feature/ten-tinh-nang
+     git push -u origin HEAD
+     ```
+   - Những lần push tiếp theo trong ngày:
+     ```bash
+     git push
      ```
 
 3. **Rebase giữa ngày nếu `main` có nhiều cập nhật:**
-   - Giúp phát hiện và giải quyết xung đột sớm theo từng phần nhỏ thay vì dồn cục vào cuối ngày:
-     ```bash
-     git fetch origin
-     git rebase origin/main
-     ```
-   - **Lưu ý quan trọng:** Vì rebase viết lại lịch sử commit, nếu nhánh này trước đó đã được push lên GitHub thì lần push tiếp theo bắt buộc phải dùng `--force-with-lease`:
-     ```bash
-     git push --force-with-lease origin feature/ten-tinh-nang
-     ```
+   Giúp phát hiện và giải quyết xung đột sớm theo từng phần nhỏ:
+   ```bash
+   git fetch origin
+   git rebase origin/main
+   ```
+   *Lưu ý:* Vì rebase viết lại lịch sử commit, sau khi rebase lần push tiếp theo bắt buộc dùng:
+   ```bash
+   git push --force-with-lease origin HEAD
+   ```
 
-4. **Kiểm thử nhanh:**
+4. **Kiểm tra tính đúng đắn trước khi bàn giao:**
    - **Backend / Daemon:** Chạy dọn rác tài nguyên mạng và restart service:
      ```bash
      sudo ./docs/dev-workflow/scripts/clean-test.sh
      ```
-   - **Cú pháp toàn hệ thống:**
+   - **Chạy test kiểm tra cú pháp:**
      ```bash
      python3 ./docs/dev-workflow/scripts/smoke-test.py
      ```
 
 ---
 
-### 3. Cuối ngày
-1. **Lưu lại công việc dở dang (nếu chưa hoàn thành tính năng):**
-   Nếu cuối ngày code vẫn đang làm dở và chưa xong tính năng, hãy commit tạm để bảo vệ code không bị thất lạc và không bị "kéo theo" sang nhánh khác:
+### 3. Cuối ngày & Tạo Pull Request
+1. **Lưu toàn bộ những gì còn dở dang:**
    ```bash
-   git status
-   git add <cac-file-dang-sua>
-   git commit -m "wip: save unfinished work of the day"
+   git add .
+   git commit -m "wip: luu code cuoi ngay"
    ```
 
-2. **Hoàn tất rebase với `main` mới nhất:**
+2. **Cập nhật code mới nhất từ nhánh chính (`main`):**
    ```bash
    git fetch origin
    git rebase origin/main
    ```
-   *Nếu có conflict: sửa các vị trí đánh dấu xung đột, `git add <file>`, rồi chạy `git rebase --continue`.*
+   *(Nếu xảy ra xung đột / conflict, xem ngay mục Bảng xử lý sự cố phía dưới).*
 
-3. **Đẩy nhánh lên GitHub bằng `--force-with-lease`:**
+3. **Đẩy code lên nhánh từ xa:**
    ```bash
-   git push --force-with-lease origin feature/ten-tinh-nang
+   git push --force-with-lease origin HEAD
    ```
-   *Tuyệt đối không dùng cờ `--force` trần vì có thể ghi đè mất commit của người khác.*
 
-4. **Tạo Pull Request trên GitHub & Đợi CI Kiểm thử (Nếu tính năng đã xong):**
-   - Tạo PR từ nhánh tính năng vào `main`.
-   - **Đợi mục Checks chạy test `smoke-test` ra dấu tick xanh ✅.** Nhánh `main` đã bật Branch Protection / Ruleset; nếu test đỏ hoặc chưa có approval (khi làm nhóm), nút Merge sẽ bị khóa tự động.
-   - Thực hiện merge (khuyến nghị **Squash and Merge**).
-
-5. **Dọn dẹp nhánh sau khi đã Merge:**
-   - Sau khi PR đã merge thành công trên GitHub, chuyển về `main` và cập nhật:
+4. **Tạo Pull Request (PR) & Dọn dẹp sau khi Merge (Nếu tính năng đã hoàn tất):**
+   - Lên GitHub repo, nhấn **Compare & pull request** -> Tạo PR vào `main`.
+   - Chờ CI chạy xong tick xanh ✅ và hoàn tất **Squash and Merge**.
+   - Sau khi merge xong trên GitHub, quay lại VS Code dọn nhánh local:
      ```bash
      git switch main
      git pull --ff-only origin main
-     ```
-   - **Lưu ý về xóa nhánh:** Vì dùng Squash Merge nên Git ở local sẽ thấy nhánh tính năng "chưa merge". Hãy dùng cờ **`-D`** (chữ D hoa) để xóa cưỡng chế nhánh local đã hoàn thành:
-     ```bash
-     git branch -D feature/ten-tinh-nang
+     git branch -D feature/ten-tinh-nang-vua-xong
      git remote prune origin
      ```
 
-6. **Kết thúc ngày:** Chọn **Suspend / Save State** máy ảo.
+5. Chọn **Suspend / Save State** máy ảo để nghỉ.
+
+---
+
+### 4. Bảng tra cứu & Xử lý sự cố nhanh (Troubleshooting)
+
+| Tình huống / Thông báo lỗi | Nguyên nhân | Cách khắc phục ngay lập tức |
+| :--- | :--- | :--- |
+| `error: Your local changes to the following files would be overwritten by checkout...` | Đang đổi nhánh trong khi có file bị sửa chưa commit. | Chạy `git add .` rồi `git commit -m "wip: save"` sau đó mới gõ lại lệnh đổi nhánh. |
+| Terminal hiện `(feature/...\|REBASE 1/2)` hoặc `CONFLICT (content): Merge conflict in...` | Code của bạn sửa trùng dòng với code người khác vừa merge vào `main`. | **1.** Mở các file bị đánh dấu đỏ trên VS Code, chọn nút bấm hiển thị sẵn: `Accept Current Change` (giữ code của mình) hoặc `Accept Incoming Change` (lấy code trên `main`).<br>**2.** Lưu file lại, gõ: `git add <file-do>`.<br>**3.** Tiếp tục rebase: `git rebase --continue`. *(Tuyệt đối không gõ `git commit`).* |
+| Muốn hủy Rebase vì bị rối / làm sai | Không tự tin xử lý tiếp xung đột khi rebase. | Hủy toàn bộ thao tác, đưa nhánh về lại trạng thái an toàn ban đầu bằng lệnh:<br>`git rebase --abort` |
+| `error: Cannot delete branch '...' checked out at...` | Bạn đang đứng ở chính nhánh bạn muốn xóa. | Chuyển về `main` trước: `git switch main`, sau đó mới gõ lại: `git branch -D <ten-nhanh>`. |
 
 ---
 
@@ -360,4 +359,4 @@ Không chạy ngay `git reset --hard` và `git clean -fd` khi chưa kiểm tra v
    Chỉ cập nhật nhánh chính bằng `git pull --ff-only origin main` để giữ lịch sử commit luôn thẳng và sạch.
 
 4. **Bảo vệ lịch sử nhánh bằng `--force-with-lease`:**
-   Khi đẩy nhánh sau rebase (kể cả rebase giữa ngày hay cuối ngày), bắt buộc dùng `--force-with-lease`, không dùng `--force`.
+   Khi đẩy nhánh sau rebase (kể cả rebase giữa ngày hay cuối ngày), bắt buộc dùng `--force-with-lease origin HEAD`, không dùng `--force`.
