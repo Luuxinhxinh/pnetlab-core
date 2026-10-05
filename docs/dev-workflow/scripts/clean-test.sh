@@ -38,6 +38,7 @@ fi
 # Chạy tự động Smoke Test nếu có cờ --smoke hoặc có script
 if [ "$1" == "--smoke" ] || [ -f "$(dirname "$0")/smoke-test.py" ]; then
     echo ""
+    sleep 1
     python3 "$(dirname "$0")/smoke-test.py"
 fi
 
