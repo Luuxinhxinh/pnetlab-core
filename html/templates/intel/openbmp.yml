@@ -1,0 +1,15 @@
+---
+type: qemu
+description: BMP Collector
+name: BMP Collector
+cpulimit: 1
+icon: Misc-2D-OPENBMP-S.svg
+cpu: 4
+ram: 8192
+ethernet: 2
+console: vnc
+shutdown: 1
+qemu_arch: x86_64
+qemu_nic: virtio-net-pci
+qemu_options: -machine type=pc,accel=kvm -vga std -usbdevice tablet -boot order=c -cpu host
+...

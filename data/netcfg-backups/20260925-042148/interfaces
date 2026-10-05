@@ -1,0 +1,77 @@
+source /etc/network/interfaces.d/*
+# BEGIN pnetlab-netcfg pnet0
+# Managed by pnetlab-netcfg. Mode: DHCP (stock non-blocking design).
+# `inet manual` + a BACKGROUNDED dhcpcd (NOT `inet dhcp`, which blocks ifup and
+# stretches boot to ~1m41s). allow-hotplug (NOT auto) lets the pnet0 bridge come
+# up via the udev hotplug event without ifup -a blocking on it -> ~10s boot.
+allow-hotplug pnet0
+iface pnet0 inet dhcp
+    pre-up ip link set dev eth0 up
+    bridge_ports eth0
+    bridge_stp off
+
+auto pnet1
+iface pnet1 inet manual
+    bridge_ports none
+    bridge_stp off
+    post-up [ -e /sys/class/net/eth1 ] && ip link set dev eth1 master pnet1 up || true
+
+auto pnet2
+iface pnet2 inet manual
+    bridge_ports none
+    bridge_stp off
+    post-up [ -e /sys/class/net/eth2 ] && ip link set dev eth2 master pnet2 up || true
+
+auto pnet3
+iface pnet3 inet manual
+    bridge_ports none
+    bridge_stp off
+    post-up [ -e /sys/class/net/eth3 ] && ip link set dev eth3 master pnet3 up || true
+
+auto pnet4
+iface pnet4 inet manual
+    bridge_ports none
+    bridge_stp off
+    post-up [ -e /sys/class/net/eth4 ] && ip link set dev eth4 master pnet4 up || true
+
+auto pnet5
+iface pnet5 inet manual
+    bridge_ports none
+    bridge_stp off
+    post-up [ -e /sys/class/net/eth5 ] && ip link set dev eth5 master pnet5 up || true
+
+auto pnet6
+iface pnet6 inet manual
+    bridge_ports none
+    bridge_stp off
+    post-up [ -e /sys/class/net/eth6 ] && ip link set dev eth6 master pnet6 up || true
+
+auto pnet7
+iface pnet7 inet manual
+    bridge_ports none
+    bridge_stp off
+    post-up [ -e /sys/class/net/eth7 ] && ip link set dev eth7 master pnet7 up || true
+
+auto pnet8
+iface pnet8 inet manual
+    bridge_ports none
+    bridge_stp off
+    post-up [ -e /sys/class/net/eth8 ] && ip link set dev eth8 master pnet8 up || true
+
+auto pnet9
+iface pnet9 inet manual
+    bridge_ports none
+    bridge_stp off
+    post-up [ -e /sys/class/net/eth9 ] && ip link set dev eth9 master pnet9 up || true
+
+# NAT cloud
+auto natmac
+iface natmac inet manual
+    pre-up ip link add natmac address 00:01:01:01:01:01 type dummy
+auto nat0
+iface nat0 inet static
+    bridge_ports natmac
+    bridge_stp off
+    address 10.0.137.254
+    netmask 255.255.255.0
+    up systemctl --no-block restart udhcpd
