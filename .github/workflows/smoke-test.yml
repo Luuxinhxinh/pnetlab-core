@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   smoke-test:
+    name: 7-Layer CI Quality Gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -21,4 +22,7 @@ jobs:
         with:
           php-version: "8.3"
       - run: php -v
-      - run: python3 ./docs/dev-workflow/scripts/smoke-test.py
+      - name: Run 7-Layer CI Quality Gate
+        run: python3 ./docs/dev-workflow/scripts/ci-guardrail.py
+      - name: Run Backend Smoke Test
+        run: python3 ./docs/dev-workflow/scripts/smoke-test.py
