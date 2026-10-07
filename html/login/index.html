@@ -3,89 +3,228 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>PNetLab — Sign in</title>
+	<title>PNetLab — Sign in to Workbench</title>
 	<link rel="icon" href="/branding/api.php?action=logo">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 	<!--
-		Engine-native login (replaces the retired Laravel store login at
-		/store/public/auth/login/offline). Reachable at the DIRECT path
-		/login/ — a real directory with a real index.html, so the .htaccess
-		catch-all (RewriteCond !-d / !-f) never rewrites it to /store/public.
-		CSP is enforced (script-src 'self'): all JS is the external login.js;
-		no inline script, no inline handlers.
+		PNetLab Modern Landing & Login Modal
+		CSP compliant: No inline script, purely driven by tokens.css and login.js
 	-->
+	<link rel="stylesheet" href="/login/tokens.css?v=fe2-v1">
+	<link rel="stylesheet" href="/login/login.css?v=fe2-v1">
 	<script src="/assets-common/js/pnq-branding.js?v=fa685e58"></script>
-	<script src="/assets-common/js/pnq-theme.js?v=ed2aef02"></script>
-	<link rel="stylesheet" href="/login/login.css?v=pwd-reset-v1">
 </head>
 <body>
-	<main class="login-wrap">
-		<div class="brand">
-			<img class="brand-logo" id="brand-logo" data-brand-logo src="/branding/api.php?action=logo" alt="PNetLab">
-			<span class="brand-mark" id="brand-mark" hidden>PN</span>
-			<span class="brand-text" data-brand-name>PNETLAB-V8</span>
-		</div>
-		<!-- Admin-supplied header line (branding/api.php). Hidden until the config
-		     fetch resolves; painted with textContent, never innerHTML. -->
-		<p class="login-header" id="login-header" hidden></p>
-		<p class="version-line" id="version-line">Version: <span id="version-value">&hellip;</span></p>
-		<p class="default-account" id="default-account">Default account: <strong>admin</strong> / <strong>pnet</strong></p>
+	<!-- Background Layer & Interactive 3D Constellation Canvas -->
+	<div class="bg-layer" aria-hidden="true"></div>
+	<canvas id="particle-canvas" aria-hidden="true"></canvas>
 
-		<form class="login-card" id="login-form" autocomplete="on">
-			<div class="field">
-				<label for="username">Username</label>
-				<input id="username" name="username" type="text" autocomplete="username"
-					autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus>
-			</div>
-			<div class="field">
-				<div class="field-header">
-					<label for="password">Password</label>
-					<button type="button" class="link-btn" id="forgot-link">Forgot password?</button>
+	<!-- Top-Right Toolbar: Settings & Small Sign In CTA -->
+	<header class="top-toolbar">
+		<div style="position: relative;">
+			<button type="button" class="icon-btn" id="settings-toggle-btn" title="Settings / Cài đặt" aria-label="Open settings">
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<circle cx="12" cy="12" r="3"></circle>
+					<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+				</svg>
+			</button>
+
+			<!-- Settings Popover Menu (Slide-down, does not cover full page) -->
+			<div class="settings-popover" id="settings-popover" hidden>
+				<div class="popover-header">
+					<span class="popover-title" data-i18n="settings_title">Appearance & Grid</span>
 				</div>
-				<input id="password" name="password" type="password" autocomplete="current-password" required>
+
+				<!-- Color Theme Selection (5 Themes) -->
+				<div class="setting-group">
+					<label class="setting-label" for="theme-select" data-i18n="label_theme">Color Theme</label>
+					<select class="setting-select" id="theme-select">
+						<option value="dreamy-violet">Dreamy Violet (Default)</option>
+						<option value="nord-slate">Nord Slate</option>
+						<option value="catppuccin-frappe">Catppuccin Frappe</option>
+						<option value="macos-graphite">macOS Graphite</option>
+						<option value="light">Light Mode</option>
+					</select>
+				</div>
+
+				<!-- Language Selection -->
+				<div class="setting-group">
+					<label class="setting-label" for="lang-select" data-i18n="label_language">Language</label>
+					<select class="setting-select" id="lang-select">
+						<option value="en">English (US)</option>
+						<option value="vi">Tiếng Việt</option>
+					</select>
+				</div>
+
+				<!-- 3D Particle Grid Toggle -->
+				<div class="setting-group setting-switch-row">
+					<span class="setting-label" data-i18n="label_particle_toggle">3D Particle Grid</span>
+					<label class="switch">
+						<input type="checkbox" id="particle-toggle" checked>
+						<span class="slider"></span>
+					</label>
+				</div>
+
+				<!-- Glow Color -->
+				<div class="setting-group">
+					<label class="setting-label" for="particle-color-select" data-i18n="label_particle_color">Particle Glow Color</label>
+					<select class="setting-select" id="particle-color-select">
+						<option value="theme" data-i18n="opt_color_theme">Match Theme (Auto)</option>
+						<option value="#a855f7">Neon Violet</option>
+						<option value="#06b6d4">Cyber Cyan</option>
+						<option value="#f59e0b">Warm Amber</option>
+						<option value="#10b981">Matrix Emerald</option>
+					</select>
+				</div>
+
+				<!-- Particle Speed -->
+				<div class="setting-group">
+					<label class="setting-label" for="particle-speed-select" data-i18n="label_particle_speed">Motion Speed</label>
+					<select class="setting-select" id="particle-speed-select">
+						<option value="0.5" data-i18n="opt_speed_relaxed">Relaxed (Slow)</option>
+						<option value="1.0" selected data-i18n="opt_speed_normal">Normal</option>
+						<option value="2.0" data-i18n="opt_speed_dynamic">Dynamic (Fast)</option>
+					</select>
+				</div>
 			</div>
-			<div class="field">
-				<label for="console-pref">Console</label>
-				<select id="console-pref" name="console-pref">
-					<option value="native" selected>Default Console</option>
-					<option value="html5">HTML5 Console</option>
-				</select>
+		</div>
+
+		<button type="button" class="top-signin-btn" id="top-signin-btn" data-i18n="btn_signin">Sign In</button>
+	</header>
+
+	<!-- Main Landing / Overview (Hero Space) -->
+	<main class="hero-container">
+		<div class="brand-hero">
+			<img class="hero-logo" id="brand-logo" data-brand-logo src="/branding/api.php?action=logo" alt="PNetLab Logo">
+			<h1 class="hero-title" data-brand-name>PNETLAB-V8</h1>
+			<p class="hero-desc" id="login-header" data-i18n="hero_desc">Enterprise Network Simulation & Topology Emulation Platform</p>
+			
+			<div class="version-badge">
+				<span class="version-dot"></span>
+				<span>Version: <strong id="version-value">&hellip;</strong></span>
 			</div>
+		</div>
 
-			<div class="alert" id="alert" role="alert" hidden></div>
+		<!-- Central CTA Button -->
+		<button type="button" class="cta-signin-btn" id="cta-signin-btn">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+				<polyline points="10 17 15 12 10 7"></polyline>
+				<line x1="15" y1="12" x2="3" y2="12"></line>
+			</svg>
+			<span data-i18n="cta_button">Sign In to Workbench</span>
+		</button>
 
-			<button class="btn" id="submit" type="submit">
-				<span class="btn-label">Sign in</span>
-				<span class="btn-spin" aria-hidden="true"></span>
-			</button>
-		</form>
-
-		<form class="login-card forgot-card" id="forgot-form" autocomplete="on" hidden>
-			<h2 class="card-title">Forgot password?</h2>
-			<p class="card-desc">Enter your username or email address and we'll send you a link to reset your password.</p>
-
-			<div class="field">
-				<label for="forgot-identifier">Username or email</label>
-				<input id="forgot-identifier" name="identifier" type="text" autocomplete="username"
-					autocapitalize="none" autocorrect="off" spellcheck="false" required placeholder="e.g. admin or user@example.com">
-			</div>
-
-			<div class="alert" id="forgot-alert" role="alert" hidden></div>
-			<div class="alert alert-success" id="forgot-success" role="status" hidden></div>
-
-			<button class="btn" id="forgot-submit" type="submit">
-				<span class="btn-label">Send reset link</span>
-				<span class="btn-spin" aria-hidden="true"></span>
-			</button>
-
-			<div class="card-actions">
-				<button type="button" class="link-btn back-btn" id="back-to-login">
-					&larr; Return to sign in
-				</button>
-			</div>
-		</form>
-		<p class="footnote">Offline appliance access</p>
+		<p class="hero-footnote" data-i18n="footnote">Offline appliance access &bull; Powered by PNetLab Next-Gen Engine</p>
 	</main>
 
-	<script src="/login/login.js?v=pwd-reset-v1"></script>
+	<!-- Popup Modal Dialog for Authentication (Hidden by default) -->
+	<div class="modal-overlay" id="login-modal-overlay" hidden>
+		<div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+			<button type="button" class="modal-close-btn" id="modal-close-btn" aria-label="Close modal">✕</button>
+
+			<div class="modal-brand">
+				<h2 class="modal-brand-title" id="modal-title" data-i18n="modal_title">Welcome Back</h2>
+				<p class="modal-brand-subtitle" data-i18n="modal_subtitle">Enter credentials to unlock your workbench</p>
+			</div>
+
+			<!-- Standard Sign-in Form -->
+			<form class="login-form" id="login-form" autocomplete="on">
+				<!-- Username Field -->
+				<div class="field">
+					<label for="username" data-i18n="label_username">Username</label>
+					<div class="input-wrap">
+						<input id="username" name="username" type="text" autocomplete="username"
+							autocapitalize="none" autocorrect="off" spellcheck="false" required
+							placeholder="admin" data-i18n-ph="ph_username">
+					</div>
+				</div>
+
+				<!-- Password Field with Single SVG Eye Toggle -->
+				<div class="field">
+					<div class="field-header">
+						<label for="password" data-i18n="label_password">Password</label>
+						<button type="button" class="link-btn" id="forgot-link" data-i18n="btn_forgot_pwd">Forgot password?</button>
+					</div>
+					<div class="input-wrap has-toggle">
+						<input id="password" name="password" type="password" autocomplete="current-password" required
+							placeholder="••••••••" data-i18n-ph="ph_password">
+						
+						<!-- Exactly ONE SVG eye element with dynamic slash line -->
+						<button type="button" class="password-toggle-btn" id="password-toggle-btn"
+							aria-label="Toggle password visibility" title="Show/Hide password">
+							<svg class="eye-svg" viewBox="0 0 24 24">
+								<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+								<circle cx="12" cy="12" r="3"></circle>
+								<!-- Slash line displayed only when password visible -->
+								<line class="eye-slash-path" x1="2" y1="2" x2="22" y2="22"></line>
+							</svg>
+						</button>
+					</div>
+				</div>
+
+				<!-- Console Preference -->
+				<div class="field">
+					<label for="console-pref" data-i18n="label_console">Console Preference</label>
+					<select id="console-pref" name="console-pref">
+						<option value="native" selected data-i18n="opt_console_native">Default Native Console</option>
+						<option value="html5" data-i18n="opt_console_html5">HTML5 Web Console</option>
+					</select>
+				</div>
+
+				<!-- Remember Username Checkbox -->
+				<div class="field-row">
+					<label class="remember-label" for="remember-user">
+						<input type="checkbox" id="remember-user">
+						<span data-i18n="label_remember_user">Remember Username</span>
+					</label>
+				</div>
+
+				<!-- Failure / Info Alert -->
+				<div class="alert" id="alert" role="alert" hidden></div>
+
+				<!-- Submit Button -->
+				<button class="btn-submit" id="submit" type="submit">
+					<span class="btn-label" data-i18n="btn_signin">Sign in</span>
+					<span class="btn-spin" aria-hidden="true"></span>
+				</button>
+
+				<p class="default-account-tag" id="default-account">
+					<span data-i18n="default_creds">Default account:</span> <strong>admin</strong> / <strong>pnet</strong>
+				</p>
+			</form>
+
+			<!-- Forgot Password Subform -->
+			<form class="login-form" id="forgot-form" autocomplete="on" hidden>
+				<div class="field">
+					<label for="forgot-identifier" data-i18n="label_forgot_id">Username or email</label>
+					<div class="input-wrap">
+						<input id="forgot-identifier" name="identifier" type="text" autocomplete="username"
+							autocapitalize="none" autocorrect="off" spellcheck="false" required
+							placeholder="admin or user@domain.com" data-i18n-ph="ph_forgot_id">
+					</div>
+				</div>
+
+				<div class="alert" id="forgot-alert" role="alert" hidden></div>
+				<div class="alert alert-success" id="forgot-success" role="status" hidden></div>
+
+				<button class="btn-submit" id="forgot-submit" type="submit">
+					<span class="btn-label" data-i18n="btn_send_reset">Send reset link</span>
+					<span class="btn-spin" aria-hidden="true"></span>
+				</button>
+
+				<div style="text-align: center; margin-top: 8px;">
+					<button type="button" class="link-btn" id="back-to-login" data-i18n="btn_return_login">
+						&larr; Return to sign in
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+
+	<!-- Login Logic, 3D Constellation Particle Canvas, Theme & i18n Engine -->
+	<script src="/login/login.js?v=fe2-v1"></script>
 </body>
 </html>

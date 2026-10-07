@@ -1,0 +1,183 @@
+/* ============================================================================
+   PNetLab Design System Tokens - FE2 UI/UX
+   Supports 5 curated themes:
+   1. Dreamy Violet (Default)
+   2. Nord Slate
+   3. Catppuccin Frappe
+   4. macOS Graphite
+   5. Light Mode
+   ============================================================================ */
+
+:root {
+	/* Font family */
+	--pnq-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+	/* Default Theme: Dreamy Violet */
+	--pnq-theme-name: "Dreamy Violet";
+	--pnq-bg: #090614;
+	--pnq-bg-alt: #130e26;
+	--pnq-card-bg: rgba(22, 16, 43, 0.75);
+	--pnq-card-border: rgba(168, 85, 247, 0.28);
+	--pnq-card-border-glow: rgba(168, 85, 247, 0.55);
+	--pnq-field-bg: rgba(30, 22, 60, 0.65);
+	--pnq-field-border: rgba(168, 85, 247, 0.35);
+	--pnq-field-focus: #a855f7;
+	--pnq-field-focus-ring: rgba(168, 85, 247, 0.35);
+
+	--pnq-text: #ffffff;
+	--pnq-text-muted: #c4b5fd;
+	--pnq-text-subtle: #8b5cf6;
+
+	--pnq-primary: #8b5cf6;
+	--pnq-primary-hover: #7c3aed;
+	--pnq-primary-glow: rgba(139, 92, 246, 0.5);
+	--pnq-primary-text: #ffffff;
+
+	--pnq-danger: #f43f5e;
+	--pnq-danger-bg: rgba(244, 63, 94, 0.15);
+	--pnq-danger-border: rgba(244, 63, 94, 0.35);
+
+	--pnq-overlay: rgba(7, 5, 14, 0.78);
+	--pnq-popover-bg: rgba(19, 14, 38, 0.94);
+	--pnq-popover-border: rgba(168, 85, 247, 0.3);
+
+	--pnq-particle-default: #a855f7;
+	--pnq-shadow-card: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(139, 92, 246, 0.2);
+}
+
+/* Theme 2: Nord Slate */
+:root[data-theme="nord-slate"] {
+	--pnq-theme-name: "Nord Slate";
+	--pnq-bg: #1e222a;
+	--pnq-bg-alt: #242933;
+	--pnq-card-bg: rgba(36, 41, 51, 0.82);
+	--pnq-card-border: rgba(129, 161, 193, 0.28);
+	--pnq-card-border-glow: rgba(136, 192, 208, 0.55);
+	--pnq-field-bg: rgba(46, 52, 64, 0.75);
+	--pnq-field-border: rgba(129, 161, 193, 0.35);
+	--pnq-field-focus: #88c0d0;
+	--pnq-field-focus-ring: rgba(136, 192, 208, 0.35);
+
+	--pnq-text: #eceff4;
+	--pnq-text-muted: #d8dee9;
+	--pnq-text-subtle: #81a1c1;
+
+	--pnq-primary: #5e81ac;
+	--pnq-primary-hover: #81a1c1;
+	--pnq-primary-glow: rgba(94, 129, 172, 0.5);
+	--pnq-primary-text: #eceff4;
+
+	--pnq-danger: #bf616a;
+	--pnq-danger-bg: rgba(191, 97, 106, 0.18);
+	--pnq-danger-border: rgba(191, 97, 106, 0.4);
+
+	--pnq-overlay: rgba(15, 17, 21, 0.8);
+	--pnq-popover-bg: rgba(36, 41, 51, 0.95);
+	--pnq-popover-border: rgba(129, 161, 193, 0.3);
+
+	--pnq-particle-default: #88c0d0;
+	--pnq-shadow-card: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(136, 192, 208, 0.2);
+}
+
+/* Theme 3: Catppuccin Frappe */
+:root[data-theme="catppuccin-frappe"] {
+	--pnq-theme-name: "Catppuccin Frappe";
+	--pnq-bg: #232634;
+	--pnq-bg-alt: #292c3c;
+	--pnq-card-bg: rgba(41, 44, 60, 0.82);
+	--pnq-card-border: rgba(202, 158, 230, 0.3);
+	--pnq-card-border-glow: rgba(234, 153, 156, 0.55);
+	--pnq-field-bg: rgba(48, 52, 70, 0.75);
+	--pnq-field-border: rgba(181, 191, 226, 0.35);
+	--pnq-field-focus: #ca9ee6;
+	--pnq-field-focus-ring: rgba(202, 158, 230, 0.35);
+
+	--pnq-text: #c6d0f5;
+	--pnq-text-muted: #b5bfe2;
+	--pnq-text-subtle: #8caaee;
+
+	--pnq-primary: #ca9ee6;
+	--pnq-primary-hover: #b48ead;
+	--pnq-primary-glow: rgba(202, 158, 230, 0.5);
+	--pnq-primary-text: #232634;
+
+	--pnq-danger: #e78284;
+	--pnq-danger-bg: rgba(231, 130, 132, 0.18);
+	--pnq-danger-border: rgba(231, 130, 132, 0.4);
+
+	--pnq-overlay: rgba(17, 19, 27, 0.82);
+	--pnq-popover-bg: rgba(41, 44, 60, 0.95);
+	--pnq-popover-border: rgba(202, 158, 230, 0.3);
+
+	--pnq-particle-default: #ca9ee6;
+	--pnq-shadow-card: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(202, 158, 230, 0.2);
+}
+
+/* Theme 4: macOS Graphite */
+:root[data-theme="macos-graphite"] {
+	--pnq-theme-name: "macOS Graphite";
+	--pnq-bg: #121214;
+	--pnq-bg-alt: #1c1c1f;
+	--pnq-card-bg: rgba(28, 28, 31, 0.82);
+	--pnq-card-border: rgba(255, 255, 255, 0.16);
+	--pnq-card-border-glow: rgba(255, 255, 255, 0.35);
+	--pnq-field-bg: rgba(44, 44, 48, 0.7);
+	--pnq-field-border: rgba(255, 255, 255, 0.22);
+	--pnq-field-focus: #0a84ff;
+	--pnq-field-focus-ring: rgba(10, 132, 255, 0.35);
+
+	--pnq-text: #ffffff;
+	--pnq-text-muted: #a1a1a6;
+	--pnq-text-subtle: #6e6e73;
+
+	--pnq-primary: #0a84ff;
+	--pnq-primary-hover: #0071e3;
+	--pnq-primary-glow: rgba(10, 132, 255, 0.5);
+	--pnq-primary-text: #ffffff;
+
+	--pnq-danger: #ff453a;
+	--pnq-danger-bg: rgba(255, 69, 58, 0.18);
+	--pnq-danger-border: rgba(255, 69, 58, 0.4);
+
+	--pnq-overlay: rgba(10, 10, 12, 0.82);
+	--pnq-popover-bg: rgba(28, 28, 31, 0.96);
+	--pnq-popover-border: rgba(255, 255, 255, 0.18);
+
+	--pnq-particle-default: #0a84ff;
+	--pnq-shadow-card: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 40px rgba(10, 132, 255, 0.2);
+}
+
+/* Theme 5: Light */
+:root[data-theme="light"] {
+	--pnq-theme-name: "Light Mode";
+	--pnq-bg: #f4f6fa;
+	--pnq-bg-alt: #e8ecf4;
+	--pnq-card-bg: rgba(255, 255, 255, 0.92);
+	--pnq-card-border: rgba(99, 102, 241, 0.24);
+	--pnq-card-border-glow: rgba(99, 102, 241, 0.45);
+	--pnq-field-bg: #ffffff;
+	--pnq-field-border: rgba(148, 163, 184, 0.45);
+	--pnq-field-focus: #6366f1;
+	--pnq-field-focus-ring: rgba(99, 102, 241, 0.3);
+
+	--pnq-text: #0f172a;
+	--pnq-text-muted: #475569;
+	--pnq-text-subtle: #64748b;
+
+	--pnq-primary: #6366f1;
+	--pnq-primary-hover: #4f46e5;
+	--pnq-primary-glow: rgba(99, 102, 241, 0.35);
+	--pnq-primary-text: #ffffff;
+
+	--pnq-danger: #ef4444;
+	--pnq-danger-bg: rgba(239, 68, 68, 0.12);
+	--pnq-danger-border: rgba(239, 68, 68, 0.35);
+
+	--pnq-overlay: rgba(15, 23, 42, 0.65);
+	--pnq-popover-bg: rgba(255, 255, 255, 0.98);
+	--pnq-popover-border: rgba(99, 102, 241, 0.25);
+
+	--pnq-particle-default: #6366f1;
+	--pnq-shadow-card: 0 20px 50px rgba(15, 23, 42, 0.15), 0 0 30px rgba(99, 102, 241, 0.15);
+	color-scheme: light;
+}
