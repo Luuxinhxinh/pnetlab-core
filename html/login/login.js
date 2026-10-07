@@ -345,11 +345,21 @@
 		});
 	}
 
+	var particleColorGroup = document.getElementById('particle-color-group');
+	var particleSpeedGroup = document.getElementById('particle-speed-group');
+
+	function updateParticleControlsVisibility(enabled) {
+		if (particleColorGroup) particleColorGroup.hidden = !enabled;
+		if (particleSpeedGroup) particleSpeedGroup.hidden = !enabled;
+	}
+
 	if (particleToggle) {
 		particleToggle.checked = particleEnabled;
+		updateParticleControlsVisibility(particleEnabled);
 		particleToggle.addEventListener('change', function () {
 			particleEnabled = this.checked;
 			localStorage.setItem('pnq_particle_enabled', particleEnabled ? 'true' : 'false');
+			updateParticleControlsVisibility(particleEnabled);
 			startParticleAnimation();
 		});
 	}
