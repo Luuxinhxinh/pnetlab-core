@@ -49,8 +49,39 @@ MOCK_RESPONSES = {
     ("GET", "/api/labs/session/nodes"): {
         "code": 200, "status": "success",
         "data": {
-            "1": {"id": 1, "name": "R1-Core", "type": "qemu", "template": "cisco-iol", "status": 2, "cpu": 1, "ram": 1024, "left": 240, "top": 180},
-            "2": {"id": 2, "name": "R2-Edge", "type": "qemu", "template": "cisco-iol", "status": 0, "cpu": 1, "ram": 1024, "left": 540, "top": 180}
+            "1": {
+                "id": 1, "name": "R1-Core", "type": "qemu", "template": "cisco-iol",
+                "status": 2, "cpu": 1, "ram": 1024, "left": 240, "top": 180,
+                "icon": "router.png", "console": "telnet", "port": 32769,
+                "ethernets": {
+                    "0": {"id": 0, "name": "e0/0", "network_id": 1, "suspend": 0},
+                    "1": {"id": 1, "name": "e0/1", "network_id": 0, "suspend": 0}
+                }
+            },
+            "2": {
+                "id": 2, "name": "R2-Edge", "type": "qemu", "template": "cisco-iol",
+                "status": 0, "cpu": 1, "ram": 1024, "left": 540, "top": 180,
+                "icon": "router.png", "console": "telnet", "port": 32770,
+                "ethernets": {
+                    "0": {"id": 0, "name": "e0/0", "network_id": 1, "suspend": 0},
+                    "1": {"id": 1, "name": "e0/1", "network_id": 0, "suspend": 0}
+                }
+            }
+        }
+    },
+    ("GET", "/api/labs/session/networks"): {
+        "code": 200, "status": "success",
+        "data": {
+            "1": {"id": 1, "name": "Net-Core-Link", "type": "bridge", "left": 390, "top": 180}
+        }
+    },
+    ("GET", "/api/labs/session/links"): {
+        "code": 200, "status": "success",
+        "data": {
+            "ethernet": {
+                "1": "Net-Core-Link"
+            },
+            "serial": {}
         }
     },
     ("POST", "/api/labs/session/nodes/start"): {
@@ -58,6 +89,9 @@ MOCK_RESPONSES = {
     },
     ("POST", "/api/labs/session/nodes/stop"): {
         "code": 200, "status": "success", "message": "Node stopped."
+    },
+    ("POST", "/api/labs/session/nodes/wipe"): {
+        "code": 200, "status": "success", "message": "Node wiped."
     }
 }
 
