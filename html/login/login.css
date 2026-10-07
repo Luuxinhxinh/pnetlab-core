@@ -432,6 +432,10 @@ input:checked + .slider:before {
 	gap: 18px;
 }
 
+.login-form[hidden], [hidden] {
+	display: none !important;
+}
+
 .field {
 	display: flex;
 	flex-direction: column;

@@ -277,13 +277,18 @@
 
 	function openLoginModal() {
 		if (!modalOverlay) return;
+		// Ensure standard sign in form is active, forgot form is hidden
+		if (forgotForm) forgotForm.hidden = true;
+		if (form) form.hidden = false;
+		clearError();
+		clearForgotAlerts();
 		modalOverlay.hidden = false;
 		if (userEl) {
 			// Auto focus
 			setTimeout(function () {
 				userEl.focus();
-				if (userEl.value) {
-					if (passEl) passEl.focus();
+				if (userEl.value && passEl) {
+					passEl.focus();
 				}
 			}, 80);
 		}
