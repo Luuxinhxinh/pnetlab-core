@@ -39,7 +39,8 @@ INSERT INTO `schema_version` (`version`, `description`) VALUES
   (9, 'cluster_hosts'),
   (10, 'cluster_placements'),
   (11, 'activity_log'),
-  (12, 'password_resets');
+  (12, 'password_resets'),
+  (13, 'fk_cascade_node_sessions');
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `activity_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -155,7 +156,8 @@ CREATE TABLE `node_sessions` (
   KEY `node_session_type` (`node_session_type`),
   KEY `node_session_running` (`node_session_running`),
   KEY `node_session_pod` (`node_session_pod`),
-  KEY `node_session_iol` (`node_session_iol`)
+  KEY `node_session_iol` (`node_session_iol`),
+  CONSTRAINT `fk_node_sessions_lab` FOREIGN KEY (`node_session_lab`) REFERENCES `lab_sessions` (`lab_session_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `cluster_hosts`;
