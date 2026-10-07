@@ -1,0 +1,218 @@
+openapi: 3.0.3
+info:
+  title: PNetLab Core API Specification
+  description: OpenAPI 3.0 Contract for PNetLab V8 Frontend and Backend synchronization.
+  version: 8.2.0
+servers:
+  - url: http://127.0.0.1:4010
+    description: Mock API Server for Frontend Development
+  - url: https://127.0.0.1
+    description: Production Backend Appliance
+
+paths:
+  /api/health:
+    get:
+      summary: Health check endpoint
+      responses:
+        '200':
+          description: System health status
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                message: OK
+
+  /api/auth:
+    post:
+      summary: Authenticate user session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  example: admin
+                password:
+                  type: string
+                  example: pnet
+                html5:
+                  type: integer
+                  example: 0
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                message: User authenticated (90013).
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              example:
+                code: 401
+                status: unauthorized
+                message: Invalid credentials (90002).
+
+    get:
+      summary: Get current authenticated user info
+      responses:
+        '200':
+          description: User profile info
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                data:
+                  username: admin
+                  role: admin
+                  email: admin@pnetlab.local
+                  pod: 0
+
+  /api/auth/logout:
+    get:
+      summary: Invalidate user session
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                message: User logged out.
+
+  /api/folders:
+    get:
+      summary: List all lab folders
+      responses:
+        '200':
+          description: Folder tree
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                data:
+                  folders:
+                    - id: 1
+                      name: CCNA Labs
+                      path: /CCNA Labs
+                    - id: 2
+                      name: CCNP Enterprise
+                      path: /CCNP Enterprise
+                  labs:
+                    - id: 101
+                      name: BGP-Flapping-Lab.unl
+                      path: /CCNA Labs/BGP-Flapping-Lab.unl
+                      nodes_count: 6
+
+  /api/list/templates:
+    get:
+      summary: List available device templates
+      responses:
+        '200':
+          description: Templates list
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                data:
+                  - template: cisco-iol
+                    name: Cisco IOL Router
+                    type: iol
+                    icon: router.png
+                  - template: linux
+                    name: Ubuntu 24.04 Server
+                    type: qemu
+                    icon: linux.png
+                  - template: docker-alpine
+                    name: Alpine Linux Container
+                    type: docker
+                    icon: docker.png
+
+  /api/labs/session/nodes:
+    get:
+      summary: Get all nodes in active lab session
+      responses:
+        '200':
+          description: Node list
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                data:
+                  "1":
+                    id: 1
+                    name: R1-Core
+                    type: qemu
+                    template: cisco-iol
+                    status: 2
+                    cpu: 1
+                    ram: 1024
+                    left: 240
+                    top: 180
+                  "2":
+                    id: 2
+                    name: R2-Edge
+                    type: qemu
+                    template: cisco-iol
+                    status: 0
+                    cpu: 1
+                    ram: 1024
+                    left: 540
+                    top: 180
+
+  /api/labs/session/nodes/start:
+    post:
+      summary: Start a node or multiple nodes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Node started successfully
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                message: Node started.
+
+  /api/labs/session/nodes/stop:
+    post:
+      summary: Stop a node or multiple nodes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Node stopped successfully
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                message: Node stopped.
