@@ -217,12 +217,18 @@
 ---
 
 ### 2. Trong ngày
-1. **Lưu code theo từng cụm thay đổi nhỏ:**
-   Dùng Source Control trên thanh công cụ bên trái của VS Code (nhấn dấu `+` cạnh file để Stage), hoặc gõ lệnh:
+1. **Lưu code sạch sẽ tự động theo Role (BE1, BE2, FE1, FE2):**
+   Thay vì gõ `git add .` bừa bãi dễ dính file rác runtime (.lock, logs, session), sử dụng script tự động quét và lọc file theo đúng vai trò của mình:
    ```bash
-   git add <duong-dan-file>
-   git commit -m "feat(api): mo ta ngan gon viec vua lam"
+   ./scripts/tools/pnet-commit.sh <ROLE> "<Nội dung commit>"
    ```
+   *Ví dụ:*
+   - **BE1:** `./scripts/tools/pnet-commit.sh BE1 "test: add broker socket integration tests"`
+   - **BE2:** `./scripts/tools/pnet-commit.sh BE2 "feat(db): add foreign key cascade migrations"`
+   - **FE1:** `./scripts/tools/pnet-commit.sh FE1 "feat(canvas): optimize quadtree viewport culling"`
+   - **FE2:** `./scripts/tools/pnet-commit.sh FE2 "feat(ui): add quick command palette shortcut"`
+
+   *Script sẽ tự động: Loại bỏ toàn bộ file rác `data/`, logs, `.lock`; chỉ chọn đúng file thuộc phân hệ của bạn và tạo commit chuẩn chỉnh.*
 
 2. **Đẩy code lên GitHub để chống mất dữ liệu:**
    - Lần push đầu tiên của một nhánh mới:
@@ -360,3 +366,28 @@ Không chạy ngay `git reset --hard` và `git clean -fd` khi chưa kiểm tra v
 
 4. **Bảo vệ lịch sử nhánh bằng `--force-with-lease`:**
    Khi đẩy nhánh sau rebase (kể cả rebase giữa ngày hay cuối ngày), bắt buộc dùng `--force-with-lease origin HEAD`, không dùng `--force`.
+
+---
+
+## PHẦN V: BẢNG TRA CỨU CÚ PHÁP GIT TOÀN TẬP (DÀNH CHO NGƯỜI TAY NGANG)
+
+> Bảng tra cứu "cứu cánh" giải thích bằng ngôn ngữ đời thường tác dụng của mọi câu lệnh Git được dùng trong toàn bộ dự án.
+
+| Câu lệnh Git | Tác dụng giải thích dễ hiểu | Khi nào thì dùng? |
+| :--- | :--- | :--- |
+| **`git status`** | **"Kiểm tra tình trạng":** Xem hiện tại mình đang đứng ở nhánh nào, có file nào bị sửa, có file nào mới tạo hay chưa. | Dùng bất cứ khi nào bạn băn khoăn "mình đang ở đâu, có file nào đang đổi". |
+| **`git switch main`**<br>*(hoặc `git checkout main`)* | **"Nhảy về nhánh chính":** Đưa máy ảo của bạn quay trở lại nhánh `main` (nơi chứa code chuẩn nhất của cả nhóm). | Dùng đầu ngày hoặc khi muốn kéo code mới nhất từ team về. |
+| **`git pull --ff-only origin main`** | **"Kéo code mới nhất về":** Tải toàn bộ code mới nhất trên GitHub về máy ảo của bạn một cách an toàn (chỉ nhận cập nhật thẳng, không tự ý ghép lộn xộn). | Dùng mỗi đầu ngày trước khi bắt đầu làm bất kỳ việc gì. |
+| **`git switch -c feature/<ten-nhanh>`**<br>*(hoặc `git checkout -b ...`)* | **"Tạo phòng làm việc riêng":** Tạo ra 1 nhánh mới toanh từ code chuẩn để bạn tha hồ sửa, xóa mà không sợ làm hỏng code của người khác. | Dùng khi bắt đầu làm một đầu việc mới. |
+| **`./scripts/tools/pnet-commit.sh <ROLE> "<Nội dung>"`** | **"Lưu thành quả thông minh":** Tự động phát hiện vai trò của bạn (BE1, BE2, FE1, FE2), lọc bỏ toàn bộ file rác (`.lock`, logs, session) và CHỈ lưu đúng các file bạn được phép sửa. | Dùng khi bạn vừa code xong và test chạy ngon 1 đầu việc cụ thể. |
+| **`git push -u origin HEAD`** | **"Đẩy nhánh lên GitHub lần đầu":** Đẩy nhánh bạn vừa làm việc trên máy ảo lên kho lưu trữ GitHub của nhóm để mọi người cùng thấy. | Dùng sau khi vừa tạo commit đầu tiên của nhánh mới. |
+| **`git push`** | **"Đẩy tiếp các commit sau":** Tiếp tục đẩy các thay đổi mới lên GitHub (khi nhánh đã được đẩy lên trước đó rồi). | Dùng sau các lần commit tiếp theo trong ngày. |
+| **`git fetch origin`** | **"Hỏi thăm GitHub":** Kiểm tra xem trên GitHub hiện tại có ai vừa đẩy thêm code mới hay không (chỉ tải thông tin về kiểm tra, chưa đè vào code bạn đang viết). | Dùng trước khi muốn rebase hoặc kiểm tra độ lệch pha. |
+| **`git rebase origin/main`** | **"Nối đuôi code mới":** Lấy các commit mới nhất mà đồng đội vừa đẩy lên `main`, lót xuống dưới đáy, rồi đặt nhánh của bạn lên trên cùng để code của bạn luôn mới nhất. | Dùng giữa ngày hoặc trước khi tạo Pull Request để tránh xung đột. |
+| **`git push --force-with-lease origin HEAD`** | **"Cập nhật đè an toàn":** Đẩy code lên GitHub sau khi đã rebase. Lệnh này an toàn vì nếu có ai khác vừa vô tình đẩy code lên nhánh đó, Git sẽ tự động từ chối để tránh mất code. | Bắt buộc phải dùng sau khi vừa chạy xong lệnh `git rebase`. |
+| **`git stash`** | **"Cất tạm vào ngăn kéo bí mật":** Tạm thời giấu các file bạn đang sửa dở đi để thư mục làm việc trở nên sạch sẽ như mới. | Dùng khi muốn đổi nhánh gấp hoặc muốn `git pull` mà Git báo đang vướng file sửa dở. |
+| **`git stash pop`** | **"Mở ngăn kéo lấy lại":** Lấy lại toàn bộ các file bạn vừa cất tạm trước đó để tiếp tục ngồi code tiếp. | Dùng ngay sau khi đã pull xong hoặc đổi nhánh xong. |
+| **`git clean -nd`** | **"Xem trước file rác":** Xem thử nếu dọn rác thì những file nào sẽ bị xóa (chưa xóa thật, cực kỳ an toàn). | Dùng trước khi muốn dọn dẹp thư mục máy ảo. |
+| **`git diff`** | **"Soi chỗ khác biệt":** Xem chi tiết từng dòng code bạn vừa thêm (`+ màu xanh`) hoặc vừa xóa (`- màu đỏ`) so với code gốc. | Dùng trước khi commit để kiểm tra xem mình có gõ nhầm gì không. |
+| **`git branch -v`** | **"Xem danh sách nhánh":** Liệt kê toàn bộ các nhánh đang có trên máy ảo và cho biết bạn đang ở nhánh nào. | Dùng để kiểm tra tên nhánh hiện tại. |
+| **`git rebase --abort`** | **"Nút bấm khẩn cấp hủy Rebase":** Khi đang rebase mà bị báo conflict rối quá không biết sửa thế nào, gõ lệnh này là Git tự động hủy bỏ toàn bộ và trả về nguyên trạng ban đầu. | Dùng khi bị bí lúc xử lý xung đột Git. |
