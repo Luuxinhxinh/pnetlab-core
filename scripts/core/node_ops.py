@@ -60,13 +60,30 @@ def op_node_delete(lab_id: str, node_id: int | None = None) -> Tuple[int, list[s
 
 
 def op_node_lifecycle(action: str, tenant: int, session: int, lab_path: str, node_id: int | None = None) -> Tuple[int, list[str], str]:
-    """Execute node start/stop/export directly via pure PHP engine runner."""
+    """Execute node start/stop/export directly via pure PHP engine runner with Event Hooks Bus support."""
+    from core.plugin_manager import bus
+
+    event_data = {
+        "action": action,
+        "tenant": tenant,
+        "session": session,
+        "lab": lab_path,
+        "node_id": node_id,
+    }
+
+    # Emit pre-hook (e.g. node.pre_start, node.pre_stop)
+    bus.emit(f"node.pre_{action}", event_data)
+
     if action == "wipe":
         lab_id = os.path.splitext(os.path.basename(lab_path))[0]
-        return op_node_wipe(tenant, session, lab_id, node_id)
+        rc, out, err = op_node_wipe(tenant, session, lab_id, node_id)
+        bus.emit("node.post_wipe", event_data, rc=rc)
+        return rc, out, err
     elif action == "delete":
         lab_id = os.path.splitext(os.path.basename(lab_path))[0]
-        return op_node_delete(lab_id, node_id)
+        rc, out, err = op_node_delete(lab_id, node_id)
+        bus.emit("node.post_delete", event_data, rc=rc)
+        return rc, out, err
 
     # For start, stop, export: run CLI engine worker directly
     cmd = [
@@ -83,4 +100,8 @@ def op_node_lifecycle(action: str, tenant: int, session: int, lab_path: str, nod
     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=600, check=False)
     out_lines = [line for line in res.stdout.splitlines() if line]
     err_str = res.stderr.strip()
+
+    # Emit post-hook (e.g. node.post_start, node.post_stop)
+    bus.emit(f"node.post_{action}", event_data, rc=res.returncode)
+
     return res.returncode, out_lines, err_str

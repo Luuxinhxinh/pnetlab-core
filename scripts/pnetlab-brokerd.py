@@ -43,11 +43,11 @@ except Exception:      # pragma: no cover - broker refuses docker_create without
     yaml = None
 
 try:
-    from core import system_ops, netlink_ops, node_ops
+    from core import system_ops, netlink_ops, node_ops, plugin_manager
 except ImportError:
     import sys
     sys.path.insert(0, "/opt/unetlab/scripts")
-    from core import system_ops, netlink_ops, node_ops
+    from core import system_ops, netlink_ops, node_ops, plugin_manager
 
 SOCK_PATH = "/run/pnetlab/broker.sock"
 SOCK_GROUP = "www-data"
@@ -1220,6 +1220,20 @@ def verb_ksm_toggle(args):
 
 def verb_netlink_cleanup(args):
     return netlink_ops.op_netlink_stopall(LABS_DIR)
+
+
+def verb_plugin_list(args):
+    """List loaded plugins and active hooks."""
+    plugins_info = {
+        name: data["metadata"] for name, data in plugin_manager.plugin_manager.loaded_plugins.items()
+    }
+    return 0, [json.dumps({"plugins": plugins_info, "hooks": plugin_manager.bus.list_hooks()})], ""
+
+
+def verb_plugin_reload(args):
+    """Rescan and reload all plugins."""
+    count, loaded = plugin_manager.plugin_manager.discover_and_load()
+    return 0, [f"Reloaded {count} plugins: {loaded}"], ""
 
 
 def verb_wrapper(args):
@@ -7578,6 +7592,8 @@ VERBS = {
     "platform": verb_platform,
     "ksm_toggle": verb_ksm_toggle,
     "netlink_cleanup": verb_netlink_cleanup,
+    "plugin_list": verb_plugin_list,
+    "plugin_reload": verb_plugin_reload,
     "wrapper": verb_wrapper,
     "worker_import": verb_worker_import,
     "worker_ishare2": verb_worker_ishare2,
