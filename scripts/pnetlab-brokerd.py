@@ -1232,7 +1232,7 @@ def verb_plugin_list(args):
 
 def verb_plugin_reload(args):
     """Rescan and reload all plugins."""
-    count, loaded = plugin_manager.plugin_manager.discover_and_load()
+    count, loaded = plugin_manager.plugin_manager.discover_and_load(verbs_dict=VERBS)
     return 0, [f"Reloaded {count} plugins: {loaded}"], ""
 
 
@@ -7780,6 +7780,13 @@ class Server(socketserver.ThreadingUnixStreamServer):
 
 
 def main():
+    # Load plugins and register dynamic verbs directly into VERBS in RAM
+    try:
+        p_count, p_loaded = plugin_manager.plugin_manager.discover_and_load(verbs_dict=VERBS)
+        log("PluginManager loaded %d plugins: %s" % (p_count, p_loaded))
+    except Exception as exc:
+        log("PluginManager startup warning: %s" % exc)
+
     os.makedirs(os.path.dirname(SOCK_PATH), exist_ok=True)
     try:
         os.unlink(SOCK_PATH)

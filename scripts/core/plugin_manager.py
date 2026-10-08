@@ -76,8 +76,8 @@ class PluginManager:
         self.event_bus = event_bus or EventHooksBus()
         self.loaded_plugins: Dict[str, Dict[str, Any]] = {}
 
-    def discover_and_load(self) -> Tuple[int, List[str]]:
-        """Scan plugins directory and load valid plugins."""
+    def discover_and_load(self, verbs_dict: Dict[str, Any] | None = None) -> Tuple[int, List[str]]:
+        """Scan plugins directory and load valid plugins with zero-overhead VERBS registration."""
         if not os.path.exists(self.plugins_dir):
             os.makedirs(self.plugins_dir, exist_ok=True)
             return 0, []
@@ -112,11 +112,17 @@ class PluginManager:
                     sys.modules[module_name] = module
                     spec.loader.exec_module(module)
 
-                    # Initialize plugin if setup/register function exists
+                    # Initialize plugin with event bus and optional VERBS dict
                     if hasattr(module, "register"):
-                        module.register(self.event_bus)
+                        try:
+                            module.register(self.event_bus, verbs_dict=verbs_dict)
+                        except TypeError:
+                            module.register(self.event_bus)
                     elif hasattr(module, "setup"):
-                        module.setup(self.event_bus)
+                        try:
+                            module.setup(self.event_bus, verbs_dict=verbs_dict)
+                        except TypeError:
+                            module.setup(self.event_bus)
 
                     self.loaded_plugins[entry] = {
                         "metadata": metadata,
