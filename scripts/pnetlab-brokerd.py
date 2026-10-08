@@ -160,6 +160,10 @@ def log(msg):
 class Reject(Exception):
     pass
 
+# Bind shared Reject class to all ops modules so exception catching is uniform
+for _mod in (extauth_ops, docker_ops, telemetry_ops, cluster_ops, wireless_ops, network_ops, storage_ops):
+    _mod.Reject = Reject
+
 
 # ---- argument validators ---------------------------------------------------
 
