@@ -85,7 +85,12 @@ def _ai_save_config(cfg: Dict[str, Any]) -> None:
     tmp = AI_CONFIG + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
-    os.chmod(tmp, 0o600)
+    try:
+        import shutil
+        shutil.chown(tmp, "root", "pnetlab-mcp")
+        os.chmod(tmp, 0o640)
+    except Exception:
+        os.chmod(tmp, 0o640)
     os.replace(tmp, AI_CONFIG)
 
     # Sync bridge secret if present
