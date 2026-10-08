@@ -43,11 +43,11 @@ except Exception:      # pragma: no cover - broker refuses docker_create without
     yaml = None
 
 try:
-    from core import system_ops
+    from core import system_ops, netlink_ops
 except ImportError:
     import sys
     sys.path.insert(0, "/opt/unetlab/scripts")
-    from core import system_ops
+    from core import system_ops, netlink_ops
 
 SOCK_PATH = "/run/pnetlab/broker.sock"
 SOCK_GROUP = "www-data"
@@ -1218,11 +1218,17 @@ def verb_ksm_toggle(args):
     return system_ops.op_ksm(enabled)
 
 
+def verb_netlink_cleanup(args):
+    return netlink_ops.op_netlink_stopall(LABS_DIR)
+
+
 def verb_wrapper(args):
     action = args.get("action")
 
-    # Native Python rebroker for trivial switch cases (TASK-009)
-    if action == "platform":
+    # Native Python Netlink & System rebroker (TASK-009 & TASK-0013)
+    if action == "stopall":
+        return netlink_ops.op_netlink_stopall(LABS_DIR)
+    elif action == "platform":
         return system_ops.op_platform()
     elif action == "fixpermissions":
         return system_ops.op_fixpermissions()
@@ -7580,6 +7586,7 @@ VERBS = {
     "fixpermissions": verb_fixpermissions,
     "platform": verb_platform,
     "ksm_toggle": verb_ksm_toggle,
+    "netlink_cleanup": verb_netlink_cleanup,
     "wrapper": verb_wrapper,
     "worker_import": verb_worker_import,
     "worker_ishare2": verb_worker_ishare2,
