@@ -31,3 +31,5 @@ config.local.php
 data/telemetry/*.db
 __pycache__/
 *.pyc
+html/vendor/
+html/composer.lock

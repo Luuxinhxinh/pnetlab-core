@@ -43,11 +43,11 @@ except Exception:      # pragma: no cover - broker refuses docker_create without
     yaml = None
 
 try:
-    from core import system_ops, netlink_ops
+    from core import system_ops, netlink_ops, node_ops
 except ImportError:
     import sys
     sys.path.insert(0, "/opt/unetlab/scripts")
-    from core import system_ops, netlink_ops
+    from core import system_ops, netlink_ops, node_ops
 
 SOCK_PATH = "/run/pnetlab/broker.sock"
 SOCK_GROUP = "www-data"
@@ -1249,25 +1249,16 @@ def verb_wrapper(args):
         enabled = val in (1, "1")
         return system_ops.op_ipv6(enabled)
 
-    argv = [UNL_WRAPPER, "-a"]
-    if action in WRAPPER_LAB_ACTIONS:
-        argv += [action,
-                 "-T", str(v_int(args, "tenant")),
-                 "-S", str(v_int(args, "session"))]
-        if args.get("node") is not None:
-            argv += ["-D", str(v_int(args, "node"))]
+    elif action in WRAPPER_LAB_ACTIONS:
+        tenant = v_int(args, "tenant")
+        session = v_int(args, "session")
+        node_id = v_int(args, "node") if args.get("node") is not None else None
         lab = v_path_under(args, "lab", LABS_DIR)
         if not lab.endswith(".unl"):
             raise Reject("lab must be a .unl file")
-        argv += ["-F", lab]
-    elif action in WRAPPER_BARE_ACTIONS:
-        argv += [action]
+        return node_ops.op_node_lifecycle(action, tenant, session, lab, node_id)
     else:
         raise Reject("bad action")
-    os.makedirs(os.path.dirname(WRAPPER_LOG), exist_ok=True)
-    with open(WRAPPER_LOG, "ab") as logf:
-        rc, out, err = run(argv, timeout=600, stderr=logf)
-    return rc, out, err
 
 
 def verb_worker_import(args):
