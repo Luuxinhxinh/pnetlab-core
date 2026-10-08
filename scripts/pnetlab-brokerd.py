@@ -42,6 +42,13 @@ try:
 except Exception:      # pragma: no cover - broker refuses docker_create without it
     yaml = None
 
+try:
+    from core import system_ops
+except ImportError:
+    import sys
+    sys.path.insert(0, "/opt/unetlab/scripts")
+    from core import system_ops
+
 SOCK_PATH = "/run/pnetlab/broker.sock"
 SOCK_GROUP = "www-data"
 MAX_REQUEST = 65536
@@ -1195,13 +1202,49 @@ def verb_ping(args):
     return 0, ["pong"], ""
 
 
+def verb_fixpermissions(args):
+    return system_ops.op_fixpermissions()
+
+
+def verb_platform(args):
+    return system_ops.op_platform()
+
+
+def verb_ksm_toggle(args):
+    raw = args.get("enabled")
+    if raw not in (0, 1, False, True, "0", "1"):
+        raise Reject("bad arg enabled")
+    enabled = raw in (1, True, "1")
+    return system_ops.op_ksm(enabled)
+
+
 def verb_wrapper(args):
     action = args.get("action")
+
+    # Native Python rebroker for trivial switch cases (TASK-009)
+    if action == "platform":
+        return system_ops.op_platform()
+    elif action == "fixpermissions":
+        return system_ops.op_fixpermissions()
+    elif action == "ksmon":
+        return system_ops.op_ksm(True)
+    elif action == "ksmoff":
+        return system_ops.op_ksm(False)
+    elif action == "uksmon":
+        return system_ops.op_uksm(True)
+    elif action == "uksmoff":
+        return system_ops.op_uksm(False)
+    elif action == "cpulimiton":
+        return verb_qemu_cpu_policy({"enabled": 1})
+    elif action == "cpulimitoff":
+        return verb_qemu_cpu_policy({"enabled": 0})
+    elif action == "ipv6":
+        val = v_enum(args, "i", {0, 1, "0", "1"})
+        enabled = val in (1, "1")
+        return system_ops.op_ipv6(enabled)
+
     argv = [UNL_WRAPPER, "-a"]
-    if action == "ipv6":
-        # store System page toggle: unl_wrapper -a ipv6 -i 0|1
-        argv += ["ipv6", "-i", str(v_enum(args, "i", {0, 1, "0", "1"}))]
-    elif action in WRAPPER_LAB_ACTIONS:
+    if action in WRAPPER_LAB_ACTIONS:
         argv += [action,
                  "-T", str(v_int(args, "tenant")),
                  "-S", str(v_int(args, "session"))]
@@ -7534,6 +7577,9 @@ VERBS = {
     "ai_usage_read": verb_ai_usage_read,
     "mcp_token_new": verb_mcp_token_new,
     "mcp_token_del": verb_mcp_token_del,
+    "fixpermissions": verb_fixpermissions,
+    "platform": verb_platform,
+    "ksm_toggle": verb_ksm_toggle,
     "wrapper": verb_wrapper,
     "worker_import": verb_worker_import,
     "worker_ishare2": verb_worker_ishare2,
