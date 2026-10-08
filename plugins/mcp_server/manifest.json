@@ -1,0 +1,23 @@
+{
+  "id": "mcp_server",
+  "name": "Model Context Protocol & AI Lab Builder",
+  "version": "1.0.0",
+  "author": "PNETLab Core Team",
+  "description": "Exposes standard MCP tools on port 8090/5701 and powers the AI Lab Builder engine",
+  "autostart": true,
+  "verbs": [
+    "mcp_service",
+    "mcp_health",
+    "mcp_token_new",
+    "mcp_token_del",
+    "ai_settings_read",
+    "ai_settings_write",
+    "ai_lab_build",
+    "ai_progress_read",
+    "ai_usage_read"
+  ],
+  "hooks": [
+    "node.post_start",
+    "node.post_stop"
+  ]
+}
