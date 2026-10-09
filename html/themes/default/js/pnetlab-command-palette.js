@@ -2,23 +2,24 @@
  * pnetlab-command-palette.js
  * 
  * Command Palette (Ctrl + K / Cmd + K) cho PNetLab
- * Tìm kiếm & điều khiển thiết bị nhanh trong bài lab:
+ * Tìm kiếm theo nhóm, danh sách thiết bị & điều khiển hàng loạt / riêng lẻ:
  * 1. Phím tắt kích hoạt & điều hướng:
  *    - Ctrl + K (hoặc Cmd + K trên macOS) mở/đóng popup
  *    - Esc hoặc click ra ngoài backdrop để đóng lại
- *    - Phím mũi tên ↑ / ↓ duyệt danh sách, Enter chọn & phát sáng tại chỗ, Shift + Enter mở ngay Web Console
- * 2. Tìm kiếm & Phát sáng tại chỗ (Highlight Node):
- *    - Lọc tức thì theo tên thiết bị (R1, SW), Node ID, loại thiết bị (IOL, QEMU, Docker), hoặc image
- *    - Chỉ phát sáng nổi bật tại chỗ (viền sáng nhấp nháy đa sắc #38bdf8 trong 4s), KHÔNG di chuyển/cuộn canvas
- * 3. Mở nhanh Web Console / Telnet:
+ *    - Phím mũi tên ↑ / ↓ duyệt danh sách kết quả, Enter chọn & phát sáng tại chỗ, Shift + Enter mở ngay Web Console
+ * 2. Tìm kiếm nhóm theo tên (ví dụ gõ switch, router, sw, vpcs...):
+ *    - Lọc ra toàn bộ danh sách thiết bị khớp tên / image / loại (01, 02, 03...)
+ *    - Hiển thị thanh thao tác hàng loạt (Batch Actions Bar):
+ *      [▶ Start All Match] [⏹ Stop All Match] [🔄 Restart All Match] [🗑 Wipe All Match] [💻 Console All Match]
+ * 3. Tìm kiếm & Phát sáng tại chỗ (Highlight Node):
+ *    - Lọc tức thì theo tên thiết bị (R1, SW1), Node ID (#1), loại thiết bị (IOL, QEMU, Docker), hoặc image
+ *    - Phát sáng nổi bật tại chỗ (viền sáng nhấp nháy đa sắc #38bdf8 trong 4s), KHÔNG di chuyển/cuộn canvas
+ * 4. Mở nhanh Web Console / Telnet:
  *    - Tích hợp pnqOpenConsoleAuto / pnqOpenWebConsole / openNodeConsole
- *    - Kích hoạt bằng Shift + Enter hoặc nút Console trên từng dòng
- * 4. Xem nhanh thông tin tóm tắt (Quick Info):
- *    - Badge trạng thái: Running (xanh lá kèm đèn LED sáng) hoặc Stopped (xám)
- *    - Loại thiết bị (Template/Type: IOL, QEMU, DOCKER...) và Image (đã bỏ thông tin Ports theo yêu cầu)
+ *    - Kích hoạt bằng Shift + Enter hoặc nút Console trên từng dòng, hoặc "Console All Match" cho cả nhóm
  * 5. Điều khiển nguồn & Dữ liệu riêng lẻ (Node Actions):
- *    - Hiển thị đầy đủ cả 2 nút Start VÀ Stop (cùng Restart, Wipe) để thao tác tức thì
- *    - Start / Stop: Gọi API /api/labs/session/nodes/start và stop
+ *    - Hiển thị đầy đủ cả 2 nút Start VÀ Stop (cùng Restart, Wipe) để thao tác tức thì từng node
+ *    - Start / Stop: Gọi API /api/labs/session/nodes/start và stop (tương thích cả window.start / window.stop)
  *    - Restart: Tự động stop và khởi động lại sau 1.2s
  *    - Wipe node: Gọi API /api/labs/session/nodes/wipe kèm hộp thoại xác nhận an toàn
  *
@@ -57,7 +58,7 @@
       }
       .pnq-cp-dialog {
         width: 100%;
-        max-width: 680px;
+        max-width: 720px;
         background: var(--pnq-popover-bg, rgba(22, 16, 43, 0.96));
         border: 1px solid var(--pnq-card-border, rgba(168, 85, 247, 0.35));
         border-radius: 14px;
@@ -107,6 +108,103 @@
         font-weight: 600;
         cursor: pointer;
       }
+
+      /* Group & Batch Actions Toolbar */
+      .pnq-cp-batch-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 18px;
+        background: rgba(139, 92, 246, 0.08);
+        border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+        font-size: 12px;
+        gap: 12px;
+      }
+      .pnq-cp-batch-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--pnq-text-muted, #c4b5fd);
+        font-weight: 500;
+      }
+      .pnq-cp-batch-tag {
+        background: rgba(56, 189, 248, 0.15);
+        color: #38bdf8;
+        border: 1px solid rgba(56, 189, 248, 0.35);
+        padding: 2px 7px;
+        border-radius: 9999px;
+        font-weight: 600;
+        font-size: 11px;
+      }
+      .pnq-cp-batch-buttons {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .pnq-cp-btn-batch {
+        padding: 5px 10px;
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.15s ease;
+        border: 1px solid transparent;
+      }
+      .pnq-cp-btn-batch-start {
+        background: rgba(34, 197, 94, 0.15);
+        border-color: rgba(34, 197, 94, 0.35);
+        color: #4ade80;
+      }
+      .pnq-cp-btn-batch-start:hover {
+        background: rgba(34, 197, 94, 0.28);
+        border-color: #22c55e;
+        color: #ffffff;
+      }
+      .pnq-cp-btn-batch-stop {
+        background: rgba(239, 68, 68, 0.15);
+        border-color: rgba(239, 68, 68, 0.35);
+        color: #f87171;
+      }
+      .pnq-cp-btn-batch-stop:hover {
+        background: rgba(239, 68, 68, 0.28);
+        border-color: #ef4444;
+        color: #ffffff;
+      }
+      .pnq-cp-btn-batch-restart {
+        background: rgba(245, 158, 11, 0.15);
+        border-color: rgba(245, 158, 11, 0.35);
+        color: #fbbf24;
+      }
+      .pnq-cp-btn-batch-restart:hover {
+        background: rgba(245, 158, 11, 0.28);
+        border-color: #f59e0b;
+        color: #ffffff;
+      }
+      .pnq-cp-btn-batch-wipe {
+        background: rgba(249, 115, 22, 0.15);
+        border-color: rgba(249, 115, 22, 0.35);
+        color: #fb923c;
+      }
+      .pnq-cp-btn-batch-wipe:hover {
+        background: rgba(249, 115, 22, 0.28);
+        border-color: #f97316;
+        color: #ffffff;
+      }
+      .pnq-cp-btn-batch-console {
+        background: rgba(56, 189, 248, 0.15);
+        border-color: rgba(56, 189, 248, 0.35);
+        color: #7dd3fc;
+      }
+      .pnq-cp-btn-batch-console:hover {
+        background: rgba(56, 189, 248, 0.28);
+        border-color: #38bdf8;
+        color: #ffffff;
+      }
+
       .pnq-cp-list {
         max-height: 420px;
         overflow-y: auto;
@@ -340,7 +438,7 @@
         border-color: rgba(236, 72, 153, 0.35);
       }
 
-      /* Pulse glow animation #38bdf8 in 4 seconds - NO transform: scale to avoid overriding Svelte Flow inline translate() */
+      /* Pulse glow animation #38bdf8 in 4 seconds */
       @keyframes pnqNodePulseHighlight38bdf8 {
         0% {
           outline: 4px solid #38bdf8;
@@ -384,7 +482,6 @@
       Object.assign(raw, window.__pnqCanvas.rawNodes);
     }
     if (window.nodes) {
-      // In classic or stub, window.nodes may have objects or accessors
       Object.keys(window.nodes).forEach(function (k) {
         var nodeObj = window.nodes[k];
         if (nodeObj && typeof nodeObj.getAll === 'function') {
@@ -405,14 +502,12 @@
   function resolveNodeType(n, stNode, rawNode) {
     var candidate = (n.type || (rawNode && rawNode.type) || n.template || (rawNode && rawNode.template) || (stNode && stNode.type) || '').toLowerCase();
     
-    // Check known keywords in type or template
     if (candidate.indexOf('qemu') !== -1) return 'QEMU';
     if (candidate.indexOf('iol') !== -1) return 'IOL';
     if (candidate.indexOf('docker') !== -1) return 'DOCKER';
     if (candidate.indexOf('dynamips') !== -1) return 'DYNAMIPS';
     if (candidate.indexOf('vpcs') !== -1) return 'VPCS';
 
-    // Fallback: deduce from image name or extension
     var img = (n.image || (rawNode && rawNode.image) || (stNode && stNode.image) || '').toLowerCase();
     if (img.endsWith('.bin') || img.indexOf('adventerprise') !== -1 || img.indexOf('iron') !== -1) {
       return 'IOL';
@@ -476,8 +571,31 @@
       <div class="pnq-cp-dialog" role="dialog" aria-modal="true">
         <div class="pnq-cp-search-wrap">
           <i class="fa fa-search pnq-cp-search-icon"></i>
-          <input type="text" class="pnq-cp-input" placeholder="Search device name, ID (e.g. 1), type (IOL, QEMU), or image..." autocomplete="off" spellcheck="false" />
+          <input type="text" class="pnq-cp-input" placeholder="Search device group (e.g. switch, router), name (SW1), #ID, type..." autocomplete="off" spellcheck="false" />
           <span class="pnq-cp-badge-esc" title="Close (Esc)">ESC</span>
+        </div>
+        <div class="pnq-cp-batch-bar" id="pnq-cp-batch-bar" style="display: none;">
+          <div class="pnq-cp-batch-info">
+            <span class="pnq-cp-batch-tag" id="pnq-cp-batch-tag">All matched</span>
+            <span id="pnq-cp-batch-text">Group Actions</span>
+          </div>
+          <div class="pnq-cp-batch-buttons">
+            <button type="button" class="pnq-cp-btn-batch pnq-cp-btn-batch-start" id="pnq-cp-batch-start" title="Start all matched devices">
+              <i class="fa fa-play"></i> Start All
+            </button>
+            <button type="button" class="pnq-cp-btn-batch pnq-cp-btn-batch-stop" id="pnq-cp-batch-stop" title="Stop all matched devices">
+              <i class="fa fa-stop"></i> Stop All
+            </button>
+            <button type="button" class="pnq-cp-btn-batch pnq-cp-btn-batch-restart" id="pnq-cp-batch-restart" title="Restart all matched devices">
+              <i class="fa fa-refresh"></i> Restart All
+            </button>
+            <button type="button" class="pnq-cp-btn-batch pnq-cp-btn-batch-wipe" id="pnq-cp-batch-wipe" title="Wipe all matched devices">
+              <i class="fa fa-eraser"></i> Wipe All
+            </button>
+            <button type="button" class="pnq-cp-btn-batch pnq-cp-btn-batch-console" id="pnq-cp-batch-console" title="Open consoles for matched devices">
+              <i class="fa fa-terminal"></i> Console All
+            </button>
+          </div>
         </div>
         <ul class="pnq-cp-list" id="pnq-cp-results"></ul>
         <div class="pnq-cp-footer">
@@ -535,6 +653,47 @@
         closePalette();
       }
     });
+
+    // Batch Action Handlers
+    var btnBatchStart = overlay.querySelector('#pnq-cp-batch-start');
+    if (btnBatchStart) {
+      btnBatchStart.addEventListener('click', function (e) {
+        e.stopPropagation();
+        batchStartMatched();
+      });
+    }
+
+    var btnBatchStop = overlay.querySelector('#pnq-cp-batch-stop');
+    if (btnBatchStop) {
+      btnBatchStop.addEventListener('click', function (e) {
+        e.stopPropagation();
+        batchStopMatched();
+      });
+    }
+
+    var btnBatchRestart = overlay.querySelector('#pnq-cp-batch-restart');
+    if (btnBatchRestart) {
+      btnBatchRestart.addEventListener('click', function (e) {
+        e.stopPropagation();
+        batchRestartMatched();
+      });
+    }
+
+    var btnBatchWipe = overlay.querySelector('#pnq-cp-batch-wipe');
+    if (btnBatchWipe) {
+      btnBatchWipe.addEventListener('click', function (e) {
+        e.stopPropagation();
+        batchWipeMatched();
+      });
+    }
+
+    var btnBatchConsole = overlay.querySelector('#pnq-cp-batch-console');
+    if (btnBatchConsole) {
+      btnBatchConsole.addEventListener('click', function (e) {
+        e.stopPropagation();
+        batchConsoleMatched();
+      });
+    }
   }
 
   function moveSelection(step) {
@@ -573,7 +732,27 @@
     currentSelectedIndex = 0;
     var container = document.getElementById('pnq-cp-results');
     var countEl = document.getElementById('pnq-cp-count');
+    var batchBar = document.getElementById('pnq-cp-batch-bar');
+    var batchText = document.getElementById('pnq-cp-batch-text');
+    var batchTag = document.getElementById('pnq-cp-batch-tag');
+
     if (countEl) countEl.textContent = String(filteredNodes.length);
+
+    // Hiển thị thanh thao tác hàng loạt nếu có từ 1 thiết bị trở lên
+    if (batchBar) {
+      if (filteredNodes.length > 0) {
+        batchBar.style.display = 'flex';
+        if (filterText) {
+          batchTag.textContent = filteredNodes.length + ' matched';
+          batchText.textContent = '"' + filterText + '"';
+        } else {
+          batchTag.textContent = filteredNodes.length + ' total';
+          batchText.textContent = 'All Nodes';
+        }
+      } else {
+        batchBar.style.display = 'none';
+      }
+    }
 
     if (!container) return;
     container.innerHTML = '';
@@ -724,7 +903,6 @@
 
   function applyHighlight(element) {
     if (!element) return;
-    // Prefer inner wrapper/icon if inside Svelte Flow so the root node's transform is completely untouched
     var target = element.querySelector('.pnq-node__body') ||
                  element.querySelector('.pnq-node') ||
                  element.querySelector('.pnq-node__icon') ||
@@ -843,6 +1021,111 @@
     }
   }
 
+  /* 5. THAO TÁC HÀNG LOẠT (BATCH ACTIONS CHO NHÓM ĐÃ LỌC) */
+  async function batchStartMatched() {
+    if (!filteredNodes || filteredNodes.length === 0) return;
+    var count = filteredNodes.length;
+    notify('info', 'Starting ' + count + ' matched devices...');
+    
+    // Update all pills to running UI immediately
+    document.querySelectorAll('#pnq-cp-results .pnq-cp-item').forEach(function (el) {
+      updateNodeStatusPill(el, true);
+    });
+
+    var ids = filteredNodes.map(function (n) { return n.id; });
+    
+    if (typeof window.staggeredPoolRun === 'function') {
+      await window.staggeredPoolRun(ids.map(function (id) {
+        return function () {
+          return (typeof window.start === 'function') ? window.start(id) : startNode(id);
+        };
+      }));
+    } else {
+      // Chạy tuần tự kèm stagger 500ms để tránh sốc tải CPU
+      for (var i = 0; i < ids.length; i++) {
+        var id = ids[i];
+        if (typeof window.start === 'function') {
+          window.start(id);
+        } else {
+          startNode(id);
+        }
+        if (i < ids.length - 1) {
+          await new Promise(function (res) { setTimeout(res, 500); });
+        }
+      }
+    }
+    notify('success', 'Sent start command to ' + count + ' devices');
+  }
+
+  function batchStopMatched() {
+    if (!filteredNodes || filteredNodes.length === 0) return;
+    var count = filteredNodes.length;
+    notify('info', 'Stopping ' + count + ' matched devices...');
+
+    document.querySelectorAll('#pnq-cp-results .pnq-cp-item').forEach(function (el) {
+      updateNodeStatusPill(el, false);
+    });
+
+    filteredNodes.forEach(function (n) {
+      if (typeof window.stop === 'function') {
+        window.stop(n.id);
+      } else {
+        stopNode(n.id);
+      }
+    });
+    notify('success', 'Sent stop command to ' + count + ' devices');
+  }
+
+  async function batchRestartMatched() {
+    if (!filteredNodes || filteredNodes.length === 0) return;
+    var count = filteredNodes.length;
+    notify('info', 'Restarting ' + count + ' matched devices...');
+
+    batchStopMatched();
+    await new Promise(function (res) { setTimeout(res, 1500); });
+    await batchStartMatched();
+  }
+
+  function batchWipeMatched() {
+    if (!filteredNodes || filteredNodes.length === 0) return;
+    var count = filteredNodes.length;
+    if (!confirm('Are you sure you want to WIPE all ' + count + ' matched devices?')) {
+      return;
+    }
+
+    notify('warning', 'Wiping ' + count + ' matched devices...');
+
+    document.querySelectorAll('#pnq-cp-results .pnq-cp-item').forEach(function (el) {
+      updateNodeStatusPill(el, false);
+    });
+
+    var ids = filteredNodes.map(function (n) { return n.id; });
+    if (typeof window.poolRun === 'function' && typeof window.WIPE_CONCURRENCY === 'number') {
+      window.poolRun(ids.map(function (id) {
+        return function () {
+          return (typeof window.wipe === 'function') ? window.wipe(id) : wipeNode(id);
+        };
+      }), window.WIPE_CONCURRENCY);
+    } else {
+      ids.forEach(function (id) {
+        if (typeof window.wipe === 'function') {
+          window.wipe(id);
+        } else {
+          wipeNode(id);
+        }
+      });
+    }
+  }
+
+  function batchConsoleMatched() {
+    if (!filteredNodes || filteredNodes.length === 0) return;
+    var count = filteredNodes.length;
+    notify('info', 'Opening console for ' + count + ' devices...');
+    filteredNodes.forEach(function (n) {
+      openConsole(n.id);
+    });
+  }
+
   // Global Keyboard Listener: Ctrl+K / Cmd+K
   document.addEventListener('keydown', function (e) {
     var isCtrlK = (e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K');
@@ -862,7 +1145,12 @@
     open: openPalette,
     close: closePalette,
     highlightNode: highlightNodeInPlace,
-    openConsole: openConsole
+    openConsole: openConsole,
+    startAllMatched: batchStartMatched,
+    stopAllMatched: batchStopMatched,
+    restartAllMatched: batchRestartMatched,
+    wipeAllMatched: batchWipeMatched,
+    consoleAllMatched: batchConsoleMatched
   };
 
 })();
