@@ -51,7 +51,7 @@ function pnq_mem_info()
 {
     $data = @file_get_contents('/proc/meminfo');
     if ($data === false) {
-        return array('pct' => -1, 'total_mb' => 0, 'avail_mb' => 0);
+        return array('pct' => -1, 'total_mb' => 0, 'avail_mb' => 0, 'used_mb' => 0);
     }
     $m = array();
     foreach (explode("\n", $data) as $l) {
@@ -60,27 +60,16 @@ function pnq_mem_info()
         }
     }
     if (empty($m['MemTotal'])) {
-        return array('pct' => -1, 'total_mb' => 0, 'avail_mb' => 0);
+        return array('pct' => -1, 'total_mb' => 0, 'avail_mb' => 0, 'used_mb' => 0);
     }
     $avail = isset($m['MemAvailable'])
         ? $m['MemAvailable']
         : (isset($m['MemFree']) ? $m['MemFree'] : 0);
+    $total_mb = (int) round($m['MemTotal'] / 1024);
+    $avail_mb = (int) round($avail / 1024);
+    $used_mb = max(0, $total_mb - $avail_mb);
     $pct = max(0, min(100, (int) round(100 - ($avail / $m['MemTotal'] * 100))));
-    return array(
-        'pct' => $pct,
-        'total_mb' => (int) round($m['MemTotal'] / 1024),
-        'avail_mb' => (int) round($avail / 1024)
-    );
-}
-
-function pnq_cpu_cores()
-{
-    $data = @file_get_contents('/proc/cpuinfo');
-    if ($data === false) {
-        return 1;
-    }
-    preg_match_all('/^processor\s*:/m', $data, $matches);
-    return !empty($matches[0]) ? count($matches[0]) : 1;
+    return array('pct' => $pct, 'total_mb' => $total_mb, 'avail_mb' => $avail_mb, 'used_mb' => $used_mb);
 }
 
 function pnq_disk_pct()
@@ -100,13 +89,18 @@ function pnq_disk_pct()
     return -1;
 }
 
-$mem_info = pnq_mem_info();
+$memInfo = pnq_mem_info();
+$cpuCores = 1;
+if (is_file('/proc/cpuinfo')) {
+    $cpuCores = max(1, (int) substr_count(@file_get_contents('/proc/cpuinfo'), 'processor'));
+}
 
 echo json_encode(array(
     'cpu' => pnq_cpu_pct(),
-    'cpu_cores' => pnq_cpu_cores(),
-    'mem' => $mem_info['pct'],
-    'mem_total_mb' => $mem_info['total_mb'],
-    'mem_avail_mb' => $mem_info['avail_mb'],
+    'mem' => $memInfo['pct'],
     'disk' => pnq_disk_pct(),
+    'mem_total_mb' => $memInfo['total_mb'],
+    'mem_avail_mb' => $memInfo['avail_mb'],
+    'mem_used_mb' => $memInfo['used_mb'],
+    'cpu_cores' => $cpuCores,
 ));
