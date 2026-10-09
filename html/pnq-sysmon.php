@@ -107,6 +107,9 @@ if (is_file('/proc/cpuinfo')) {
 $ksmRun = @trim((string) @file_get_contents('/sys/kernel/mm/ksm/run'));
 $ksmSharing = (int) @trim((string) @file_get_contents('/sys/kernel/mm/ksm/pages_sharing'));
 $ksmShared = (int) @trim((string) @file_get_contents('/sys/kernel/mm/ksm/pages_shared'));
+$ksmSharingMb = (int) round(($ksmSharing * 4) / 1024);
+$kvmAvailable = file_exists('/dev/kvm') && is_readable('/dev/kvm');
+$zramEnabled = is_dir('/sys/block/zram0');
 
 echo json_encode(array(
     'cpu' => pnq_cpu_pct(),
@@ -119,6 +122,9 @@ echo json_encode(array(
     'mem_reclaimable_mb' => $memInfo['reclaimable_mb'],
     'cpu_cores' => $cpuCores,
     'ksm_enabled' => $ksmRun === '1',
+    'ksm_pages_sharing_mb' => $ksmSharingMb,
     'ksm_sharing_pages' => $ksmSharing,
     'ksm_shared_pages' => $ksmShared,
+    'kvm_available' => $kvmAvailable,
+    'zram_enabled' => $zramEnabled,
 ));
