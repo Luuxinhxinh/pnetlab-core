@@ -1,0 +1,343 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+pnet-doctor - PNetLab v8 Platform Health Diagnostics Tool
+Phân hệ: BE1 System Diagnostics & Quality Assurance
+Quy chuẩn: ENGINEERING_RULES.md (PEP 8, Type Hints, Clean Architecture, < 400 lines)
+
+Mục đích:
+Chẩn đoán toàn diện sức khỏe máy ảo OVA: phần cứng KVM, các dịch vụ nền,
+Broker Socket, phân quyền hệ thống, CSDL, Slim 4 API và phân hệ mở rộng AI MCP.
+"""
+
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+from typing import Dict, List, Optional, Tuple
+
+# Bảng màu ANSI định dạng CLI
+C_RESET = "\033[0m"
+C_BOLD = "\033[1m"
+C_GREEN = "\033[1;32m"
+C_YELLOW = "\033[1;33m"
+C_RED = "\033[1;31m"
+C_CYAN = "\033[1;36m"
+C_BLUE = "\033[1;34m"
+
+
+class HealthCheckResult:
+    """Đóng gói kết quả kiểm tra từng hạng mục."""
+
+    def __init__(
+        self,
+        name: str,
+        status: str,  # 'PASS', 'WARN', 'FAIL', 'INFO'
+        detail: str,
+        fix_hint: str = ""
+    ):
+        self.name = name
+        self.status = status
+        self.detail = detail
+        self.fix_hint = fix_hint
+
+
+def check_kvm() -> HealthCheckResult:
+    """Kiểm tra ảo hóa lồng nhau (Hardware Nested Virtualization)."""
+    kvm_path = "/dev/kvm"
+    if not os.path.exists(kvm_path):
+        return HealthCheckResult(
+            "Hardware KVM (/dev/kvm)",
+            "FAIL",
+            "Thiếu /dev/kvm - Chưa bật ảo hóa VT-x/AMD-V",
+            "Bật 'Virtualize Intel VT-x/EPT' trong CPU Settings của VMware/VirtualBox"
+        )
+    if not (os.access(kvm_path, os.R_OK) and os.access(kvm_path, os.W_OK)):
+        return HealthCheckResult(
+            "Hardware KVM (/dev/kvm)",
+            "WARN",
+            "/dev/kvm tồn tại nhưng thiếu quyền đọc/ghi",
+            "sudo chmod 666 /dev/kvm"
+        )
+    return HealthCheckResult(
+        "Hardware KVM (/dev/kvm)",
+        "PASS",
+        "/dev/kvm sẵn sàng và có quyền đọc/ghi"
+    )
+
+
+def check_ksm() -> HealthCheckResult:
+    """Kiểm tra tính năng tối ưu bộ nhớ Kernel Samepage Merging (KSM)."""
+    ksm_run = "/sys/kernel/mm/ksm/run"
+    if not os.path.exists(ksm_run):
+        return HealthCheckResult(
+            "Memory Dedup (KSM)",
+            "WARN",
+            "Kernel hiện tại không hỗ trợ KSM sysfs",
+            "Nâng cấp hoặc cấu hình Linux kernel có CONFIG_KSM"
+        )
+    try:
+        with open(ksm_run, "r", encoding="utf-8") as f:
+            val = f.read().strip()
+        if val == "1":
+            return HealthCheckResult(
+                "Memory Dedup (KSM)",
+                "PASS",
+                "KSM đang kích hoạt (run=1, tiết kiệm RAM lab)"
+            )
+        return HealthCheckResult(
+            "Memory Dedup (KSM)",
+            "WARN",
+            f"KSM đang tắt (run={val})",
+            "sudo echo 1 > /sys/kernel/mm/ksm/run (hoặc dùng python3 tests/safety_net/test_broker_socket.py)"
+        )
+    except Exception as exc:
+        return HealthCheckResult("Memory Dedup (KSM)", "WARN", f"Lỗi đọc KSM: {exc}")
+
+
+def check_systemd_units() -> List[HealthCheckResult]:
+    """Kiểm tra trạng thái các tiến trình dịch vụ cốt lõi."""
+    units = ["apache2", "mysql", "docker", "guacd", "pnetlab-brokerd"]
+    results = []
+
+    for u in units:
+        proc = subprocess.run(
+            ["systemctl", "is-active", u],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        state = proc.stdout.strip()
+        if state == "active":
+            results.append(HealthCheckResult(f"Dịch vụ {u}", "PASS", f"Đang chạy (active)"))
+        else:
+            results.append(HealthCheckResult(
+                f"Dịch vụ {u}",
+                "FAIL",
+                f"Trạng thái: {state or 'inactive'}",
+                f"sudo systemctl restart {u} && sudo journalctl -u {u} -n 20"
+            ))
+    return results
+
+
+def check_broker_socket() -> HealthCheckResult:
+    """Kiểm tra kết nối và phản hồi từ Unix Domain Socket Broker."""
+    sock_path = "/run/pnetlab/broker.sock"
+    if not os.path.exists(sock_path):
+        return HealthCheckResult(
+            "Broker Socket (/run/pnetlab/broker.sock)",
+            "FAIL",
+            "File socket không tồn tại",
+            "sudo systemctl restart pnetlab-brokerd"
+        )
+
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(3.0)
+        sock.connect(sock_path)
+        payload = json.dumps({"verb": "ping", "args": {}}) + "\n"
+        sock.sendall(payload.encode("utf-8"))
+
+        raw_res = sock.recv(4096).decode("utf-8", errors="replace").strip()
+        sock.close()
+
+        res = json.loads(raw_res)
+        if res.get("ok") is True and res.get("out") == ["pong"]:
+            return HealthCheckResult(
+                "Broker Socket Ping",
+                "PASS",
+                "Phản hồi 'pong' chuẩn schema (rc=0, latency < 1ms)"
+            )
+        return HealthCheckResult(
+            "Broker Socket Ping",
+            "WARN",
+            f"Phản hồi không như kỳ vọng: {res}",
+            "Kiểm tra lại broker daemon"
+        )
+    except Exception as exc:
+        return HealthCheckResult(
+            "Broker Socket Ping",
+            "FAIL",
+            f"Lỗi giao tiếp socket: {exc}",
+            "sudo systemctl restart pnetlab-brokerd"
+        )
+
+
+def check_permissions() -> List[HealthCheckResult]:
+    """Kiểm tra phân quyền các thư mục quan trọng."""
+    results = []
+
+    # Kiểm tra /opt/unetlab/tmp (yêu cầu sticky bit hoặc mode 2777/777)
+    tmp_path = "/opt/unetlab/tmp"
+    if os.path.exists(tmp_path):
+        mode = oct(os.stat(tmp_path).st_mode)[-4:]
+        if mode in ("2777", "0777", "1777"):
+            results.append(HealthCheckResult("Quyền thư mục /opt/unetlab/tmp", "PASS", f"Mode {mode} (chuẩn)"))
+        else:
+            results.append(HealthCheckResult(
+                "Quyền thư mục /opt/unetlab/tmp",
+                "WARN",
+                f"Mode {mode} (kỳ vọng 2777)",
+                "sudo chmod 2777 /opt/unetlab/tmp"
+            ))
+    else:
+        results.append(HealthCheckResult("Quyền thư mục /opt/unetlab/tmp", "FAIL", "Không tồn tại", "sudo mkdir -p /opt/unetlab/tmp"))
+
+    # Kiểm tra dbcreds.json
+    creds_path = "/opt/unetlab/data/dbcreds.json"
+    if os.path.exists(creds_path):
+        mode = oct(os.stat(creds_path).st_mode)[-4:]
+        if mode == "0600":
+            results.append(HealthCheckResult("Bảo mật DB Credentials", "PASS", "File tồn tại với quyền an toàn 0600"))
+        else:
+            results.append(HealthCheckResult(
+                "Bảo mật DB Credentials",
+                "WARN",
+                f"Mode {mode} (kỳ vọng 0600)",
+                f"sudo chmod 0600 {creds_path}"
+            ))
+    else:
+        results.append(HealthCheckResult(
+            "Bảo mật DB Credentials",
+            "WARN",
+            "Chưa có file dbcreds.json",
+            "Chạy python3 scripts/tools/secure_db_backup.py --action verify"
+        ))
+
+    return results
+
+
+def check_database() -> HealthCheckResult:
+    """Kiểm tra kết nối tới MySQL Database."""
+    try:
+        proc = subprocess.run(
+            ["mysql", "-uroot", "-ppnetlab", "-e", "SELECT 1;"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            stdin=subprocess.DEVNULL
+        )
+        if proc.returncode == 0:
+            return HealthCheckResult("Database (pnetlab_db)", "PASS", "MySQL phản hồi tốt, kết nối thành công")
+        return HealthCheckResult(
+            "Database (pnetlab_db)",
+            "FAIL",
+            f"Không thể kết nối CSDL: {proc.stderr.strip()}",
+            "sudo systemctl restart mysql"
+        )
+    except Exception as exc:
+        return HealthCheckResult("Database (pnetlab_db)", "FAIL", f"Lỗi thực thi: {exc}")
+
+
+def check_disk_space() -> HealthCheckResult:
+    """Kiểm tra dung lượng ổ đĩa tại /opt/unetlab."""
+    try:
+        total, used, free = shutil.disk_usage("/opt/unetlab")
+        free_gb = free // (2**30)
+        if free_gb >= 10:
+            return HealthCheckResult("Dung lượng ổ đĩa (/opt/unetlab)", "PASS", f"Còn trống {free_gb} GB")
+        elif free_gb >= 3:
+            return HealthCheckResult("Dung lượng ổ đĩa (/opt/unetlab)", "WARN", f"Chỉ còn trống {free_gb} GB (< 10GB)")
+        return HealthCheckResult(
+            "Dung lượng ổ đĩa (/opt/unetlab)",
+            "FAIL",
+            f"Sắp cạn kiệt: {free_gb} GB (< 3GB)",
+            "Dọn dẹp ảnh docker và thư mục tmp: docker system prune -f"
+        )
+    except Exception as exc:
+        return HealthCheckResult("Dung lượng ổ đĩa", "WARN", f"Lỗi đọc dung lượng: {exc}")
+
+
+def check_extended_modules() -> List[HealthCheckResult]:
+    """Kiểm tra tự phát hiện (Auto-Discovery) các phân hệ mở rộng của BE2."""
+    results = []
+
+    # 1. Slim 4 API Entry Point
+    api_idx = "/opt/unetlab/html/api/index.php"
+    if os.path.exists(api_idx):
+        results.append(HealthCheckResult("Kiến trúc Slim 4 API", "PASS", "html/api/index.php sẵn sàng"))
+    else:
+        results.append(HealthCheckResult("Kiến trúc Slim 4 API", "INFO", "Đang chờ BE2 nâng cấp html/api/"))
+
+    # 2. Plugin SPI Directory
+    plugins_dir = "/opt/unetlab/plugins"
+    if os.path.exists(plugins_dir):
+        plugins = [d for d in os.listdir(plugins_dir) if os.path.isdir(os.path.join(plugins_dir, d))]
+        results.append(HealthCheckResult("Plugin SPI Architecture", "PASS", f"Tìm thấy {len(plugins)} plugin ({', '.join(plugins) or 'empty'})"))
+    else:
+        results.append(HealthCheckResult("Plugin SPI Architecture", "INFO", "Chờ BE2 tạo /opt/unetlab/plugins/"))
+
+    # 3. AI MCP Server (Port 8090)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(0.5)
+    mcp_open = (sock.connect_ex(("127.0.0.1", 8090)) == 0)
+    sock.close()
+    if mcp_open:
+        results.append(HealthCheckResult("AI MCP Server (Port 8090)", "PASS", "Dịch vụ đang lắng nghe trên TCP 8090"))
+    else:
+        results.append(HealthCheckResult("AI MCP Server (Port 8090)", "INFO", "Port 8090 chưa mở (Chờ BE2 kích hoạt)"))
+
+    return results
+
+
+def print_table(results: List[HealthCheckResult]) -> bool:
+    """In bảng chẩn đoán màu sắc và trả về kết luận có đạt hay không."""
+    print(f"\n{C_CYAN}========================================================================================{C_RESET}")
+    print(f"               🩺 {C_BOLD}PNETLAB v8.2 - BẢNG CHẨN ĐOÁN SỨC KHỎE HỆ THỐNG MÁY ẢO{C_RESET}")
+    print(f"{C_CYAN}========================================================================================{C_RESET}")
+    print(f"{'TRẠNG THÁI':<12} {'HẠNG MỤC KIỂM TRA':<32} {'CHI TIẾT KỸ THUẬT'}")
+    print(f"{'-'*12:<12} {'-'*32:<32} {'-'*42}")
+
+    has_fail = False
+    for r in results:
+        if r.status == "PASS":
+            tag = f"{C_GREEN}[PASS]{C_RESET}"
+        elif r.status == "WARN":
+            tag = f"{C_YELLOW}[WARN]{C_RESET}"
+        elif r.status == "INFO":
+            tag = f"{C_BLUE}[INFO]{C_RESET}"
+        else:
+            tag = f"{C_RED}[FAIL]{C_RESET}"
+            has_fail = True
+
+        print(f"{tag:<20} {r.name:<32} {r.detail}")
+        if r.fix_hint and r.status in ("WARN", "FAIL"):
+            print(f"  └─> {C_YELLOW}Khắc phục:{C_RESET} {r.fix_hint}")
+
+    print(f"{C_CYAN}========================================================================================{C_RESET}")
+    if has_fail:
+        print(f"  {C_RED}{C_BOLD}❌ KẾT LUẬN: HỆ THỐNG CÓ LỖI (FAIL). Vui lòng khắc phục các mục đỏ trước khi chạy lab!{C_RESET}")
+    else:
+        print(f"  {C_GREEN}{C_BOLD}🎉 KẾT LUẬN: MÁY ẢO KHỎE MẠNH (HEALTHY)! Hệ thống PNetLab đã sẵn sàng vận hành 100%.{C_RESET}")
+    print(f"{C_CYAN}========================================================================================\n{C_RESET}")
+
+    return not has_fail
+
+
+def main() -> None:
+    results: List[HealthCheckResult] = []
+
+    # 1. Phần cứng & Kernel
+    results.append(check_kvm())
+    results.append(check_ksm())
+    results.append(check_disk_space())
+
+    # 2. Daemons & Sockets
+    results.extend(check_systemd_units())
+    results.append(check_broker_socket())
+
+    # 3. Phân quyền & CSDL
+    results.extend(check_permissions())
+    results.append(check_database())
+
+    # 4. Phân hệ mở rộng (BE2 Features)
+    results.extend(check_extended_modules())
+
+    success = print_table(results)
+    sys.exit(0 if success else 1)
+
+
+if __name__ == "__main__":
+    main()

@@ -25,15 +25,17 @@ require_once BASE_DIR . "/html/devices/interfc.php";
 
 \Slim\Slim::registerAutoloader();
 
-$app = new \Slim\Slim([
+$apiLogFp = @fopen("/opt/unetlab/data/Logs/api.txt", "a");
+$slimSettings = [
     "mode" => "production",
     "debug" => true, // Change to False for production
     "log.level" => \Slim\Log::WARN, // Change to WARN for production, DEBUG to develop
     "log.enabled" => true,
-    "log.writer" => new \Slim\LogWriter(
-        fopen("/opt/unetlab/data/Logs/api.txt", "a")
-    ),
-]);
+];
+if (is_resource($apiLogFp)) {
+    $slimSettings["log.writer"] = new \Slim\LogWriter($apiLogFp);
+}
+$app = new \Slim\Slim($slimSettings);
 
 $app->hook("slim.after.router", function () use ($app) {
     // Log all requests and responses
