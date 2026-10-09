@@ -1,0 +1,557 @@
+Sep 24 06:17:25 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=1" -d /opt/unetlab/users/1 -g unl -M -s /bin/bash -u 32769 unl1 2>&1
+Sep 24 06:17:25 INFO: sudo tunctl -u unl1 -g root -t vunl1_0 2>&1
+Sep 24 06:17:25 INFO: sudo sysctl -w net.ipv6.conf.vunl1_0.disable_ipv6=1
+Sep 24 06:17:25 INFO: sudo ip link set dev vunl1_0 mtu 9000
+Sep 24 06:17:25 brctl addif vnet1_1 vunl1_0 2>&1
+Sep 24 06:17:25 INFO: sudo tunctl -u unl1 -g root -t vunl1_16 2>&1
+Sep 24 06:17:25 INFO: sudo sysctl -w net.ipv6.conf.vunl1_16.disable_ipv6=1
+Sep 24 06:17:25 INFO: sudo ip link set dev vunl1_16 mtu 9000
+Sep 24 06:17:25 brctl addif vnet1_2 vunl1_16 2>&1
+Sep 24 06:17:25 INFO: sudo tunctl -u unl1 -g root -t vunl1_32 2>&1
+Sep 24 06:17:25 INFO: sudo sysctl -w net.ipv6.conf.vunl1_32.disable_ipv6=1
+Sep 24 06:17:26 INFO: sudo ip link set dev vunl1_32 mtu 9000
+Sep 24 06:17:26 brctl addif vnet1_3 vunl1_32 2>&1
+Sep 24 06:17:26 INFO: sudo tunctl -u unl1 -g root -t vunl1_48 2>&1
+Sep 24 06:17:26 INFO: sudo sysctl -w net.ipv6.conf.vunl1_48.disable_ipv6=1
+Sep 24 06:17:26 INFO: sudo ip link set dev vunl1_48 mtu 9000
+Sep 24 06:17:26 brctl addif vnet1_4 vunl1_48 2>&1
+Sep 24 06:17:26 INFO: sudo tunctl -u unl1 -g root -t vunl1_1 2>&1
+Sep 24 06:17:26 INFO: sudo sysctl -w net.ipv6.conf.vunl1_1.disable_ipv6=1
+Sep 24 06:17:26 INFO: sudo ip link set dev vunl1_1 mtu 9000
+Sep 24 06:17:26 brctl addif pnet0 vunl1_1 2>&1
+Sep 24 06:17:26 INFO: sudo tunctl -u unl1 -g root -t vunl1_17 2>&1
+Sep 24 06:17:26 INFO: sudo sysctl -w net.ipv6.conf.vunl1_17.disable_ipv6=1
+Sep 24 06:17:26 INFO: sudo ip link set dev vunl1_17 mtu 9000
+Sep 24 06:17:26 INFO: sudo tunctl -u unl1 -g root -t vunl1_33 2>&1
+Sep 24 06:17:26 INFO: sudo sysctl -w net.ipv6.conf.vunl1_33.disable_ipv6=1
+Sep 24 06:17:26 INFO: sudo ip link set dev vunl1_33 mtu 9000
+Sep 24 06:17:26 INFO: sudo tunctl -u unl1 -g root -t vunl1_49 2>&1
+Sep 24 06:17:26 INFO: sudo sysctl -w net.ipv6.conf.vunl1_49.disable_ipv6=1
+Sep 24 06:17:26 INFO: sudo ip link set dev vunl1_49 mtu 9000
+Sep 24 06:17:26 INFO: CWD is /opt/unetlab/tmp/1/1
+Sep 24 06:17:26 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 1 -S 1 -P 30001 -t "Core-SW1" -F /opt/unetlab/tmp/1/1/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 2 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/1/wrapper.txt 2>&1 &
+Sep 24 06:17:26 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=2" -d /opt/unetlab/users/2 -g unl -M -s /bin/bash -u 32770 unl2 2>&1
+Sep 24 06:17:26 INFO: sudo tunctl -u unl2 -g root -t vunl2_0 2>&1
+Sep 24 06:17:26 INFO: sudo sysctl -w net.ipv6.conf.vunl2_0.disable_ipv6=1
+Sep 24 06:17:26 INFO: sudo ip link set dev vunl2_0 mtu 9000
+Sep 24 06:17:26 brctl addif vnet1_1 vunl2_0 2>&1
+Sep 24 06:17:26 INFO: sudo tunctl -u unl2 -g root -t vunl2_16 2>&1
+Sep 24 06:17:26 INFO: sudo sysctl -w net.ipv6.conf.vunl2_16.disable_ipv6=1
+Sep 24 06:17:26 INFO: sudo ip link set dev vunl2_16 mtu 9000
+Sep 24 06:17:26 brctl addif vnet1_5 vunl2_16 2>&1
+Sep 24 06:17:26 INFO: sudo tunctl -u unl2 -g root -t vunl2_32 2>&1
+Sep 24 06:17:26 INFO: sudo sysctl -w net.ipv6.conf.vunl2_32.disable_ipv6=1
+Sep 24 06:17:26 INFO: sudo ip link set dev vunl2_32 mtu 9000
+Sep 24 06:17:26 brctl addif vnet1_6 vunl2_32 2>&1
+Sep 24 06:17:26 INFO: sudo tunctl -u unl2 -g root -t vunl2_48 2>&1
+Sep 24 06:17:26 INFO: sudo sysctl -w net.ipv6.conf.vunl2_48.disable_ipv6=1
+Sep 24 06:17:26 INFO: sudo ip link set dev vunl2_48 mtu 9000
+Sep 24 06:17:26 brctl addif vnet1_7 vunl2_48 2>&1
+Sep 24 06:17:26 INFO: CWD is /opt/unetlab/tmp/1/2
+Sep 24 06:17:26 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 2 -S 2 -P 30002 -t "Core-SW2" -F /opt/unetlab/tmp/1/2/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/2/wrapper.txt 2>&1 &
+Sep 24 06:17:27 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=3" -d /opt/unetlab/users/3 -g unl -M -s /bin/bash -u 32771 unl3 2>&1
+Sep 24 06:17:27 INFO: sudo tunctl -u unl3 -g root -t vunl3_0 2>&1
+Sep 24 06:17:27 INFO: sudo sysctl -w net.ipv6.conf.vunl3_0.disable_ipv6=1
+Sep 24 06:17:27 INFO: sudo ip link set dev vunl3_0 mtu 9000
+Sep 24 06:17:27 brctl addif vnet1_2 vunl3_0 2>&1
+Sep 24 06:17:27 INFO: sudo tunctl -u unl3 -g root -t vunl3_16 2>&1
+Sep 24 06:17:27 INFO: sudo sysctl -w net.ipv6.conf.vunl3_16.disable_ipv6=1
+Sep 24 06:17:27 INFO: sudo ip link set dev vunl3_16 mtu 9000
+Sep 24 06:17:27 brctl addif vnet1_8 vunl3_16 2>&1
+Sep 24 06:17:27 INFO: sudo tunctl -u unl3 -g root -t vunl3_32 2>&1
+Sep 24 06:17:27 INFO: sudo sysctl -w net.ipv6.conf.vunl3_32.disable_ipv6=1
+Sep 24 06:17:27 INFO: sudo ip link set dev vunl3_32 mtu 9000
+Sep 24 06:17:27 brctl addif vnet1_9 vunl3_32 2>&1
+Sep 24 06:17:27 INFO: sudo tunctl -u unl3 -g root -t vunl3_48 2>&1
+Sep 24 06:17:27 INFO: sudo sysctl -w net.ipv6.conf.vunl3_48.disable_ipv6=1
+Sep 24 06:17:27 INFO: sudo ip link set dev vunl3_48 mtu 9000
+Sep 24 06:17:27 brctl addif vnet1_10 vunl3_48 2>&1
+Sep 24 06:17:27 INFO: CWD is /opt/unetlab/tmp/1/3
+Sep 24 06:17:27 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 3 -S 3 -P 30003 -t "Dist-SW01" -F /opt/unetlab/tmp/1/3/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/3/wrapper.txt 2>&1 &
+Sep 24 06:17:27 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=4" -d /opt/unetlab/users/4 -g unl -M -s /bin/bash -u 32772 unl4 2>&1
+Sep 24 06:17:27 INFO: sudo tunctl -u unl4 -g root -t vunl4_0 2>&1
+Sep 24 06:17:27 INFO: sudo sysctl -w net.ipv6.conf.vunl4_0.disable_ipv6=1
+Sep 24 06:17:27 INFO: sudo ip link set dev vunl4_0 mtu 9000
+Sep 24 06:17:27 brctl addif vnet1_3 vunl4_0 2>&1
+Sep 24 06:17:27 INFO: sudo tunctl -u unl4 -g root -t vunl4_16 2>&1
+Sep 24 06:17:27 INFO: sudo sysctl -w net.ipv6.conf.vunl4_16.disable_ipv6=1
+Sep 24 06:17:27 INFO: sudo ip link set dev vunl4_16 mtu 9000
+Sep 24 06:17:27 brctl addif vnet1_11 vunl4_16 2>&1
+Sep 24 06:17:27 INFO: sudo tunctl -u unl4 -g root -t vunl4_32 2>&1
+Sep 24 06:17:27 INFO: sudo sysctl -w net.ipv6.conf.vunl4_32.disable_ipv6=1
+Sep 24 06:17:27 INFO: sudo ip link set dev vunl4_32 mtu 9000
+Sep 24 06:17:27 brctl addif vnet1_12 vunl4_32 2>&1
+Sep 24 06:17:27 INFO: sudo tunctl -u unl4 -g root -t vunl4_48 2>&1
+Sep 24 06:17:27 INFO: sudo sysctl -w net.ipv6.conf.vunl4_48.disable_ipv6=1
+Sep 24 06:17:27 INFO: sudo ip link set dev vunl4_48 mtu 9000
+Sep 24 06:17:27 brctl addif vnet1_13 vunl4_48 2>&1
+Sep 24 06:17:27 INFO: CWD is /opt/unetlab/tmp/1/4
+Sep 24 06:17:27 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 4 -S 4 -P 30004 -t "Dist-SW02" -F /opt/unetlab/tmp/1/4/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/4/wrapper.txt 2>&1 &
+Sep 24 06:17:28 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=5" -d /opt/unetlab/users/5 -g unl -M -s /bin/bash -u 32773 unl5 2>&1
+Sep 24 06:17:28 INFO: sudo tunctl -u unl5 -g root -t vunl5_0 2>&1
+Sep 24 06:17:28 INFO: sudo sysctl -w net.ipv6.conf.vunl5_0.disable_ipv6=1
+Sep 24 06:17:28 INFO: sudo ip link set dev vunl5_0 mtu 9000
+Sep 24 06:17:28 brctl addif vnet1_4 vunl5_0 2>&1
+Sep 24 06:17:28 INFO: sudo tunctl -u unl5 -g root -t vunl5_16 2>&1
+Sep 24 06:17:28 INFO: sudo sysctl -w net.ipv6.conf.vunl5_16.disable_ipv6=1
+Sep 24 06:17:28 INFO: sudo ip link set dev vunl5_16 mtu 9000
+Sep 24 06:17:28 brctl addif vnet1_14 vunl5_16 2>&1
+Sep 24 06:17:28 INFO: sudo tunctl -u unl5 -g root -t vunl5_32 2>&1
+Sep 24 06:17:28 INFO: sudo sysctl -w net.ipv6.conf.vunl5_32.disable_ipv6=1
+Sep 24 06:17:28 INFO: sudo ip link set dev vunl5_32 mtu 9000
+Sep 24 06:17:28 brctl addif vnet1_15 vunl5_32 2>&1
+Sep 24 06:17:28 INFO: sudo tunctl -u unl5 -g root -t vunl5_48 2>&1
+Sep 24 06:17:28 INFO: sudo sysctl -w net.ipv6.conf.vunl5_48.disable_ipv6=1
+Sep 24 06:17:28 INFO: sudo ip link set dev vunl5_48 mtu 9000
+Sep 24 06:17:28 brctl addif vnet1_16 vunl5_48 2>&1
+Sep 24 06:17:28 INFO: CWD is /opt/unetlab/tmp/1/5
+Sep 24 06:17:28 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 5 -S 5 -P 30005 -t "Dist-SW03" -F /opt/unetlab/tmp/1/5/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/5/wrapper.txt 2>&1 &
+Sep 24 06:17:28 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=6" -d /opt/unetlab/users/6 -g unl -M -s /bin/bash -u 32774 unl6 2>&1
+Sep 24 06:17:28 INFO: sudo tunctl -u unl6 -g root -t vunl6_0 2>&1
+Sep 24 06:17:28 INFO: sudo sysctl -w net.ipv6.conf.vunl6_0.disable_ipv6=1
+Sep 24 06:17:28 INFO: sudo ip link set dev vunl6_0 mtu 9000
+Sep 24 06:17:28 brctl addif vnet1_5 vunl6_0 2>&1
+Sep 24 06:17:28 INFO: sudo tunctl -u unl6 -g root -t vunl6_16 2>&1
+Sep 24 06:17:28 INFO: sudo sysctl -w net.ipv6.conf.vunl6_16.disable_ipv6=1
+Sep 24 06:17:28 INFO: sudo ip link set dev vunl6_16 mtu 9000
+Sep 24 06:17:28 brctl addif vnet1_17 vunl6_16 2>&1
+Sep 24 06:17:28 INFO: sudo tunctl -u unl6 -g root -t vunl6_32 2>&1
+Sep 24 06:17:28 INFO: sudo sysctl -w net.ipv6.conf.vunl6_32.disable_ipv6=1
+Sep 24 06:17:28 INFO: sudo ip link set dev vunl6_32 mtu 9000
+Sep 24 06:17:28 brctl addif vnet1_18 vunl6_32 2>&1
+Sep 24 06:17:28 INFO: sudo tunctl -u unl6 -g root -t vunl6_48 2>&1
+Sep 24 06:17:28 INFO: sudo sysctl -w net.ipv6.conf.vunl6_48.disable_ipv6=1
+Sep 24 06:17:28 INFO: sudo ip link set dev vunl6_48 mtu 9000
+Sep 24 06:17:28 brctl addif vnet1_19 vunl6_48 2>&1
+Sep 24 06:17:28 INFO: CWD is /opt/unetlab/tmp/1/6
+Sep 24 06:17:28 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 6 -S 6 -P 30006 -t "Dist-SW04" -F /opt/unetlab/tmp/1/6/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/6/wrapper.txt 2>&1 &
+Sep 24 06:17:29 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=7" -d /opt/unetlab/users/7 -g unl -M -s /bin/bash -u 32775 unl7 2>&1
+Sep 24 06:17:29 INFO: sudo tunctl -u unl7 -g root -t vunl7_0 2>&1
+Sep 24 06:17:29 INFO: sudo sysctl -w net.ipv6.conf.vunl7_0.disable_ipv6=1
+Sep 24 06:17:29 INFO: sudo ip link set dev vunl7_0 mtu 9000
+Sep 24 06:17:29 brctl addif vnet1_6 vunl7_0 2>&1
+Sep 24 06:17:29 INFO: sudo tunctl -u unl7 -g root -t vunl7_16 2>&1
+Sep 24 06:17:29 INFO: sudo sysctl -w net.ipv6.conf.vunl7_16.disable_ipv6=1
+Sep 24 06:17:29 INFO: sudo ip link set dev vunl7_16 mtu 9000
+Sep 24 06:17:29 brctl addif vnet1_20 vunl7_16 2>&1
+Sep 24 06:17:29 INFO: sudo tunctl -u unl7 -g root -t vunl7_32 2>&1
+Sep 24 06:17:29 INFO: sudo sysctl -w net.ipv6.conf.vunl7_32.disable_ipv6=1
+Sep 24 06:17:29 INFO: sudo ip link set dev vunl7_32 mtu 9000
+Sep 24 06:17:29 brctl addif vnet1_21 vunl7_32 2>&1
+Sep 24 06:17:29 INFO: sudo tunctl -u unl7 -g root -t vunl7_48 2>&1
+Sep 24 06:17:29 INFO: sudo sysctl -w net.ipv6.conf.vunl7_48.disable_ipv6=1
+Sep 24 06:17:29 INFO: sudo ip link set dev vunl7_48 mtu 9000
+Sep 24 06:17:29 brctl addif vnet1_22 vunl7_48 2>&1
+Sep 24 06:17:29 INFO: CWD is /opt/unetlab/tmp/1/7
+Sep 24 06:17:29 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 7 -S 7 -P 30007 -t "Dist-SW05" -F /opt/unetlab/tmp/1/7/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/7/wrapper.txt 2>&1 &
+Sep 24 06:17:29 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=8" -d /opt/unetlab/users/8 -g unl -M -s /bin/bash -u 32776 unl8 2>&1
+Sep 24 06:17:29 INFO: sudo tunctl -u unl8 -g root -t vunl8_0 2>&1
+Sep 24 06:17:29 INFO: sudo sysctl -w net.ipv6.conf.vunl8_0.disable_ipv6=1
+Sep 24 06:17:29 INFO: sudo ip link set dev vunl8_0 mtu 9000
+Sep 24 06:17:29 brctl addif vnet1_7 vunl8_0 2>&1
+Sep 24 06:17:29 INFO: sudo tunctl -u unl8 -g root -t vunl8_16 2>&1
+Sep 24 06:17:29 INFO: sudo sysctl -w net.ipv6.conf.vunl8_16.disable_ipv6=1
+Sep 24 06:17:29 INFO: sudo ip link set dev vunl8_16 mtu 9000
+Sep 24 06:17:29 brctl addif vnet1_23 vunl8_16 2>&1
+Sep 24 06:17:29 INFO: sudo tunctl -u unl8 -g root -t vunl8_32 2>&1
+Sep 24 06:17:29 INFO: sudo sysctl -w net.ipv6.conf.vunl8_32.disable_ipv6=1
+Sep 24 06:17:29 INFO: sudo ip link set dev vunl8_32 mtu 9000
+Sep 24 06:17:29 brctl addif vnet1_24 vunl8_32 2>&1
+Sep 24 06:17:29 INFO: sudo tunctl -u unl8 -g root -t vunl8_48 2>&1
+Sep 24 06:17:29 INFO: sudo sysctl -w net.ipv6.conf.vunl8_48.disable_ipv6=1
+Sep 24 06:17:29 INFO: sudo ip link set dev vunl8_48 mtu 9000
+Sep 24 06:17:29 brctl addif vnet1_25 vunl8_48 2>&1
+Sep 24 06:17:29 INFO: CWD is /opt/unetlab/tmp/1/8
+Sep 24 06:17:29 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 8 -S 8 -P 30008 -t "Dist-SW06" -F /opt/unetlab/tmp/1/8/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/8/wrapper.txt 2>&1 &
+Sep 24 06:17:30 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=9" -d /opt/unetlab/users/9 -g unl -M -s /bin/bash -u 32777 unl9 2>&1
+Sep 24 06:17:30 INFO: sudo tunctl -u unl9 -g root -t vunl9_0 2>&1
+Sep 24 06:17:30 INFO: sudo sysctl -w net.ipv6.conf.vunl9_0.disable_ipv6=1
+Sep 24 06:17:30 INFO: sudo ip link set dev vunl9_0 mtu 9000
+Sep 24 06:17:30 brctl addif vnet1_8 vunl9_0 2>&1
+Sep 24 06:17:30 INFO: sudo tunctl -u unl9 -g root -t vunl9_16 2>&1
+Sep 24 06:17:30 INFO: sudo sysctl -w net.ipv6.conf.vunl9_16.disable_ipv6=1
+Sep 24 06:17:30 INFO: sudo ip link set dev vunl9_16 mtu 9000
+Sep 24 06:17:30 INFO: sudo tunctl -u unl9 -g root -t vunl9_32 2>&1
+Sep 24 06:17:30 INFO: sudo sysctl -w net.ipv6.conf.vunl9_32.disable_ipv6=1
+Sep 24 06:17:30 INFO: sudo ip link set dev vunl9_32 mtu 9000
+Sep 24 06:17:30 INFO: sudo tunctl -u unl9 -g root -t vunl9_48 2>&1
+Sep 24 06:17:30 INFO: sudo sysctl -w net.ipv6.conf.vunl9_48.disable_ipv6=1
+Sep 24 06:17:30 INFO: sudo ip link set dev vunl9_48 mtu 9000
+Sep 24 06:17:30 INFO: CWD is /opt/unetlab/tmp/1/9
+Sep 24 06:17:30 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 9 -S 9 -P 30009 -t "Acc-SW01" -F /opt/unetlab/tmp/1/9/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/9/wrapper.txt 2>&1 &
+Sep 24 06:17:30 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=10" -d /opt/unetlab/users/10 -g unl -M -s /bin/bash -u 32778 unl10 2>&1
+Sep 24 06:17:30 INFO: sudo tunctl -u unl10 -g root -t vunl10_0 2>&1
+Sep 24 06:17:30 INFO: sudo sysctl -w net.ipv6.conf.vunl10_0.disable_ipv6=1
+Sep 24 06:17:30 INFO: sudo ip link set dev vunl10_0 mtu 9000
+Sep 24 06:17:30 brctl addif vnet1_9 vunl10_0 2>&1
+Sep 24 06:17:30 INFO: sudo tunctl -u unl10 -g root -t vunl10_16 2>&1
+Sep 24 06:17:30 INFO: sudo sysctl -w net.ipv6.conf.vunl10_16.disable_ipv6=1
+Sep 24 06:17:30 INFO: sudo ip link set dev vunl10_16 mtu 9000
+Sep 24 06:17:30 INFO: sudo tunctl -u unl10 -g root -t vunl10_32 2>&1
+Sep 24 06:17:30 INFO: sudo sysctl -w net.ipv6.conf.vunl10_32.disable_ipv6=1
+Sep 24 06:17:30 INFO: sudo ip link set dev vunl10_32 mtu 9000
+Sep 24 06:17:30 INFO: sudo tunctl -u unl10 -g root -t vunl10_48 2>&1
+Sep 24 06:17:30 INFO: sudo sysctl -w net.ipv6.conf.vunl10_48.disable_ipv6=1
+Sep 24 06:17:30 INFO: sudo ip link set dev vunl10_48 mtu 9000
+Sep 24 06:17:30 INFO: CWD is /opt/unetlab/tmp/1/10
+Sep 24 06:17:30 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 10 -S 10 -P 30010 -t "Acc-SW02" -F /opt/unetlab/tmp/1/10/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/10/wrapper.txt 2>&1 &
+Sep 24 06:17:31 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=11" -d /opt/unetlab/users/11 -g unl -M -s /bin/bash -u 32779 unl11 2>&1
+Sep 24 06:17:31 INFO: sudo tunctl -u unl11 -g root -t vunl11_0 2>&1
+Sep 24 06:17:31 INFO: sudo sysctl -w net.ipv6.conf.vunl11_0.disable_ipv6=1
+Sep 24 06:17:31 INFO: sudo ip link set dev vunl11_0 mtu 9000
+Sep 24 06:17:31 brctl addif vnet1_10 vunl11_0 2>&1
+Sep 24 06:17:31 INFO: sudo tunctl -u unl11 -g root -t vunl11_16 2>&1
+Sep 24 06:17:31 INFO: sudo sysctl -w net.ipv6.conf.vunl11_16.disable_ipv6=1
+Sep 24 06:17:31 INFO: sudo ip link set dev vunl11_16 mtu 9000
+Sep 24 06:17:31 INFO: sudo tunctl -u unl11 -g root -t vunl11_32 2>&1
+Sep 24 06:17:31 INFO: sudo sysctl -w net.ipv6.conf.vunl11_32.disable_ipv6=1
+Sep 24 06:17:31 INFO: sudo ip link set dev vunl11_32 mtu 9000
+Sep 24 06:17:31 INFO: sudo tunctl -u unl11 -g root -t vunl11_48 2>&1
+Sep 24 06:17:31 INFO: sudo sysctl -w net.ipv6.conf.vunl11_48.disable_ipv6=1
+Sep 24 06:17:31 INFO: sudo ip link set dev vunl11_48 mtu 9000
+Sep 24 06:17:31 INFO: CWD is /opt/unetlab/tmp/1/11
+Sep 24 06:17:31 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 11 -S 11 -P 30011 -t "Acc-SW03" -F /opt/unetlab/tmp/1/11/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/11/wrapper.txt 2>&1 &
+Sep 24 06:17:31 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=12" -d /opt/unetlab/users/12 -g unl -M -s /bin/bash -u 32780 unl12 2>&1
+Sep 24 06:17:31 INFO: sudo tunctl -u unl12 -g root -t vunl12_0 2>&1
+Sep 24 06:17:31 INFO: sudo sysctl -w net.ipv6.conf.vunl12_0.disable_ipv6=1
+Sep 24 06:17:31 INFO: sudo ip link set dev vunl12_0 mtu 9000
+Sep 24 06:17:31 brctl addif vnet1_11 vunl12_0 2>&1
+Sep 24 06:17:31 INFO: sudo tunctl -u unl12 -g root -t vunl12_16 2>&1
+Sep 24 06:17:31 INFO: sudo sysctl -w net.ipv6.conf.vunl12_16.disable_ipv6=1
+Sep 24 06:17:31 INFO: sudo ip link set dev vunl12_16 mtu 9000
+Sep 24 06:17:31 INFO: sudo tunctl -u unl12 -g root -t vunl12_32 2>&1
+Sep 24 06:17:31 INFO: sudo sysctl -w net.ipv6.conf.vunl12_32.disable_ipv6=1
+Sep 24 06:17:31 INFO: sudo ip link set dev vunl12_32 mtu 9000
+Sep 24 06:17:31 INFO: sudo tunctl -u unl12 -g root -t vunl12_48 2>&1
+Sep 24 06:17:31 INFO: sudo sysctl -w net.ipv6.conf.vunl12_48.disable_ipv6=1
+Sep 24 06:17:31 INFO: sudo ip link set dev vunl12_48 mtu 9000
+Sep 24 06:17:31 INFO: CWD is /opt/unetlab/tmp/1/12
+Sep 24 06:17:31 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 12 -S 12 -P 30012 -t "Acc-SW04" -F /opt/unetlab/tmp/1/12/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/12/wrapper.txt 2>&1 &
+Sep 24 06:17:32 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=13" -d /opt/unetlab/users/13 -g unl -M -s /bin/bash -u 32781 unl13 2>&1
+Sep 24 06:17:32 INFO: sudo tunctl -u unl13 -g root -t vunl13_0 2>&1
+Sep 24 06:17:32 INFO: sudo sysctl -w net.ipv6.conf.vunl13_0.disable_ipv6=1
+Sep 24 06:17:32 INFO: sudo ip link set dev vunl13_0 mtu 9000
+Sep 24 06:17:32 brctl addif vnet1_12 vunl13_0 2>&1
+Sep 24 06:17:32 INFO: sudo tunctl -u unl13 -g root -t vunl13_16 2>&1
+Sep 24 06:17:32 INFO: sudo sysctl -w net.ipv6.conf.vunl13_16.disable_ipv6=1
+Sep 24 06:17:32 INFO: sudo ip link set dev vunl13_16 mtu 9000
+Sep 24 06:17:32 INFO: sudo tunctl -u unl13 -g root -t vunl13_32 2>&1
+Sep 24 06:17:32 INFO: sudo sysctl -w net.ipv6.conf.vunl13_32.disable_ipv6=1
+Sep 24 06:17:32 INFO: sudo ip link set dev vunl13_32 mtu 9000
+Sep 24 06:17:32 INFO: sudo tunctl -u unl13 -g root -t vunl13_48 2>&1
+Sep 24 06:17:32 INFO: sudo sysctl -w net.ipv6.conf.vunl13_48.disable_ipv6=1
+Sep 24 06:17:32 INFO: sudo ip link set dev vunl13_48 mtu 9000
+Sep 24 06:17:32 INFO: CWD is /opt/unetlab/tmp/1/13
+Sep 24 06:17:32 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 13 -S 13 -P 30013 -t "Acc-SW05" -F /opt/unetlab/tmp/1/13/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/13/wrapper.txt 2>&1 &
+Sep 24 06:17:32 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=14" -d /opt/unetlab/users/14 -g unl -M -s /bin/bash -u 32782 unl14 2>&1
+Sep 24 06:17:32 INFO: sudo tunctl -u unl14 -g root -t vunl14_0 2>&1
+Sep 24 06:17:32 INFO: sudo sysctl -w net.ipv6.conf.vunl14_0.disable_ipv6=1
+Sep 24 06:17:32 INFO: sudo ip link set dev vunl14_0 mtu 9000
+Sep 24 06:17:32 brctl addif vnet1_13 vunl14_0 2>&1
+Sep 24 06:17:32 INFO: sudo tunctl -u unl14 -g root -t vunl14_16 2>&1
+Sep 24 06:17:32 INFO: sudo sysctl -w net.ipv6.conf.vunl14_16.disable_ipv6=1
+Sep 24 06:17:32 INFO: sudo ip link set dev vunl14_16 mtu 9000
+Sep 24 06:17:32 INFO: sudo tunctl -u unl14 -g root -t vunl14_32 2>&1
+Sep 24 06:17:32 INFO: sudo sysctl -w net.ipv6.conf.vunl14_32.disable_ipv6=1
+Sep 24 06:17:32 INFO: sudo ip link set dev vunl14_32 mtu 9000
+Sep 24 06:17:32 INFO: sudo tunctl -u unl14 -g root -t vunl14_48 2>&1
+Sep 24 06:17:32 INFO: sudo sysctl -w net.ipv6.conf.vunl14_48.disable_ipv6=1
+Sep 24 06:17:32 INFO: sudo ip link set dev vunl14_48 mtu 9000
+Sep 24 06:17:32 INFO: CWD is /opt/unetlab/tmp/1/14
+Sep 24 06:17:32 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 14 -S 14 -P 30014 -t "Acc-SW06" -F /opt/unetlab/tmp/1/14/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/14/wrapper.txt 2>&1 &
+Sep 24 06:17:33 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=15" -d /opt/unetlab/users/15 -g unl -M -s /bin/bash -u 32783 unl15 2>&1
+Sep 24 06:17:33 INFO: sudo tunctl -u unl15 -g root -t vunl15_0 2>&1
+Sep 24 06:17:33 INFO: sudo sysctl -w net.ipv6.conf.vunl15_0.disable_ipv6=1
+Sep 24 06:17:33 INFO: sudo ip link set dev vunl15_0 mtu 9000
+Sep 24 06:17:33 brctl addif vnet1_14 vunl15_0 2>&1
+Sep 24 06:17:33 INFO: sudo tunctl -u unl15 -g root -t vunl15_16 2>&1
+Sep 24 06:17:33 INFO: sudo sysctl -w net.ipv6.conf.vunl15_16.disable_ipv6=1
+Sep 24 06:17:33 INFO: sudo ip link set dev vunl15_16 mtu 9000
+Sep 24 06:17:33 INFO: sudo tunctl -u unl15 -g root -t vunl15_32 2>&1
+Sep 24 06:17:33 INFO: sudo sysctl -w net.ipv6.conf.vunl15_32.disable_ipv6=1
+Sep 24 06:17:33 INFO: sudo ip link set dev vunl15_32 mtu 9000
+Sep 24 06:17:33 INFO: sudo tunctl -u unl15 -g root -t vunl15_48 2>&1
+Sep 24 06:17:33 INFO: sudo sysctl -w net.ipv6.conf.vunl15_48.disable_ipv6=1
+Sep 24 06:17:33 INFO: sudo ip link set dev vunl15_48 mtu 9000
+Sep 24 06:17:33 INFO: CWD is /opt/unetlab/tmp/1/15
+Sep 24 06:17:33 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 15 -S 15 -P 30015 -t "Acc-SW07" -F /opt/unetlab/tmp/1/15/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/15/wrapper.txt 2>&1 &
+Sep 24 06:17:33 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=16" -d /opt/unetlab/users/16 -g unl -M -s /bin/bash -u 32784 unl16 2>&1
+Sep 24 06:17:33 INFO: sudo tunctl -u unl16 -g root -t vunl16_0 2>&1
+Sep 24 06:17:33 INFO: sudo sysctl -w net.ipv6.conf.vunl16_0.disable_ipv6=1
+Sep 24 06:17:33 INFO: sudo ip link set dev vunl16_0 mtu 9000
+Sep 24 06:17:33 brctl addif vnet1_15 vunl16_0 2>&1
+Sep 24 06:17:33 INFO: sudo tunctl -u unl16 -g root -t vunl16_16 2>&1
+Sep 24 06:17:33 INFO: sudo sysctl -w net.ipv6.conf.vunl16_16.disable_ipv6=1
+Sep 24 06:17:33 INFO: sudo ip link set dev vunl16_16 mtu 9000
+Sep 24 06:17:33 INFO: sudo tunctl -u unl16 -g root -t vunl16_32 2>&1
+Sep 24 06:17:33 INFO: sudo sysctl -w net.ipv6.conf.vunl16_32.disable_ipv6=1
+Sep 24 06:17:33 INFO: sudo ip link set dev vunl16_32 mtu 9000
+Sep 24 06:17:33 INFO: sudo tunctl -u unl16 -g root -t vunl16_48 2>&1
+Sep 24 06:17:33 INFO: sudo sysctl -w net.ipv6.conf.vunl16_48.disable_ipv6=1
+Sep 24 06:17:33 INFO: sudo ip link set dev vunl16_48 mtu 9000
+Sep 24 06:17:33 INFO: CWD is /opt/unetlab/tmp/1/16
+Sep 24 06:17:33 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 16 -S 16 -P 30016 -t "Acc-SW08" -F /opt/unetlab/tmp/1/16/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/16/wrapper.txt 2>&1 &
+Sep 24 06:17:34 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=17" -d /opt/unetlab/users/17 -g unl -M -s /bin/bash -u 32785 unl17 2>&1
+Sep 24 06:17:34 INFO: sudo tunctl -u unl17 -g root -t vunl17_0 2>&1
+Sep 24 06:17:34 INFO: sudo sysctl -w net.ipv6.conf.vunl17_0.disable_ipv6=1
+Sep 24 06:17:34 INFO: sudo ip link set dev vunl17_0 mtu 9000
+Sep 24 06:17:34 brctl addif vnet1_16 vunl17_0 2>&1
+Sep 24 06:17:34 INFO: sudo tunctl -u unl17 -g root -t vunl17_16 2>&1
+Sep 24 06:17:34 INFO: sudo sysctl -w net.ipv6.conf.vunl17_16.disable_ipv6=1
+Sep 24 06:17:34 INFO: sudo ip link set dev vunl17_16 mtu 9000
+Sep 24 06:17:34 INFO: sudo tunctl -u unl17 -g root -t vunl17_32 2>&1
+Sep 24 06:17:34 INFO: sudo sysctl -w net.ipv6.conf.vunl17_32.disable_ipv6=1
+Sep 24 06:17:34 INFO: sudo ip link set dev vunl17_32 mtu 9000
+Sep 24 06:17:34 INFO: sudo tunctl -u unl17 -g root -t vunl17_48 2>&1
+Sep 24 06:17:34 INFO: sudo sysctl -w net.ipv6.conf.vunl17_48.disable_ipv6=1
+Sep 24 06:17:34 INFO: sudo ip link set dev vunl17_48 mtu 9000
+Sep 24 06:17:34 INFO: CWD is /opt/unetlab/tmp/1/17
+Sep 24 06:17:34 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 17 -S 17 -P 30017 -t "Acc-SW09" -F /opt/unetlab/tmp/1/17/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/17/wrapper.txt 2>&1 &
+Sep 24 06:17:34 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=18" -d /opt/unetlab/users/18 -g unl -M -s /bin/bash -u 32786 unl18 2>&1
+Sep 24 06:17:34 INFO: sudo tunctl -u unl18 -g root -t vunl18_0 2>&1
+Sep 24 06:17:34 INFO: sudo sysctl -w net.ipv6.conf.vunl18_0.disable_ipv6=1
+Sep 24 06:17:34 INFO: sudo ip link set dev vunl18_0 mtu 9000
+Sep 24 06:17:34 brctl addif vnet1_17 vunl18_0 2>&1
+Sep 24 06:17:34 INFO: sudo tunctl -u unl18 -g root -t vunl18_16 2>&1
+Sep 24 06:17:34 INFO: sudo sysctl -w net.ipv6.conf.vunl18_16.disable_ipv6=1
+Sep 24 06:17:34 INFO: sudo ip link set dev vunl18_16 mtu 9000
+Sep 24 06:17:34 INFO: sudo tunctl -u unl18 -g root -t vunl18_32 2>&1
+Sep 24 06:17:34 INFO: sudo sysctl -w net.ipv6.conf.vunl18_32.disable_ipv6=1
+Sep 24 06:17:34 INFO: sudo ip link set dev vunl18_32 mtu 9000
+Sep 24 06:17:34 INFO: sudo tunctl -u unl18 -g root -t vunl18_48 2>&1
+Sep 24 06:17:34 INFO: sudo sysctl -w net.ipv6.conf.vunl18_48.disable_ipv6=1
+Sep 24 06:17:34 INFO: sudo ip link set dev vunl18_48 mtu 9000
+Sep 24 06:17:34 INFO: CWD is /opt/unetlab/tmp/1/18
+Sep 24 06:17:34 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 18 -S 18 -P 30018 -t "Acc-SW10" -F /opt/unetlab/tmp/1/18/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/18/wrapper.txt 2>&1 &
+Sep 24 06:17:35 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=19" -d /opt/unetlab/users/19 -g unl -M -s /bin/bash -u 32787 unl19 2>&1
+Sep 24 06:17:35 INFO: sudo tunctl -u unl19 -g root -t vunl19_0 2>&1
+Sep 24 06:17:35 INFO: sudo sysctl -w net.ipv6.conf.vunl19_0.disable_ipv6=1
+Sep 24 06:17:35 INFO: sudo ip link set dev vunl19_0 mtu 9000
+Sep 24 06:17:35 brctl addif vnet1_18 vunl19_0 2>&1
+Sep 24 06:17:35 INFO: sudo tunctl -u unl19 -g root -t vunl19_16 2>&1
+Sep 24 06:17:35 INFO: sudo sysctl -w net.ipv6.conf.vunl19_16.disable_ipv6=1
+Sep 24 06:17:35 INFO: sudo ip link set dev vunl19_16 mtu 9000
+Sep 24 06:17:35 INFO: sudo tunctl -u unl19 -g root -t vunl19_32 2>&1
+Sep 24 06:17:35 INFO: sudo sysctl -w net.ipv6.conf.vunl19_32.disable_ipv6=1
+Sep 24 06:17:35 INFO: sudo ip link set dev vunl19_32 mtu 9000
+Sep 24 06:17:35 INFO: sudo tunctl -u unl19 -g root -t vunl19_48 2>&1
+Sep 24 06:17:35 INFO: sudo sysctl -w net.ipv6.conf.vunl19_48.disable_ipv6=1
+Sep 24 06:17:35 INFO: sudo ip link set dev vunl19_48 mtu 9000
+Sep 24 06:17:35 INFO: CWD is /opt/unetlab/tmp/1/19
+Sep 24 06:17:35 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 19 -S 19 -P 30019 -t "Acc-SW11" -F /opt/unetlab/tmp/1/19/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/19/wrapper.txt 2>&1 &
+Sep 24 06:17:35 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=20" -d /opt/unetlab/users/20 -g unl -M -s /bin/bash -u 32788 unl20 2>&1
+Sep 24 06:17:35 INFO: sudo tunctl -u unl20 -g root -t vunl20_0 2>&1
+Sep 24 06:17:35 INFO: sudo sysctl -w net.ipv6.conf.vunl20_0.disable_ipv6=1
+Sep 24 06:17:35 INFO: sudo ip link set dev vunl20_0 mtu 9000
+Sep 24 06:17:35 brctl addif vnet1_19 vunl20_0 2>&1
+Sep 24 06:17:35 INFO: sudo tunctl -u unl20 -g root -t vunl20_16 2>&1
+Sep 24 06:17:35 INFO: sudo sysctl -w net.ipv6.conf.vunl20_16.disable_ipv6=1
+Sep 24 06:17:35 INFO: sudo ip link set dev vunl20_16 mtu 9000
+Sep 24 06:17:35 INFO: sudo tunctl -u unl20 -g root -t vunl20_32 2>&1
+Sep 24 06:17:35 INFO: sudo sysctl -w net.ipv6.conf.vunl20_32.disable_ipv6=1
+Sep 24 06:17:35 INFO: sudo ip link set dev vunl20_32 mtu 9000
+Sep 24 06:17:35 INFO: sudo tunctl -u unl20 -g root -t vunl20_48 2>&1
+Sep 24 06:17:35 INFO: sudo sysctl -w net.ipv6.conf.vunl20_48.disable_ipv6=1
+Sep 24 06:17:35 INFO: sudo ip link set dev vunl20_48 mtu 9000
+Sep 24 06:17:35 INFO: CWD is /opt/unetlab/tmp/1/20
+Sep 24 06:17:35 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 20 -S 20 -P 30020 -t "Acc-SW12" -F /opt/unetlab/tmp/1/20/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/20/wrapper.txt 2>&1 &
+Sep 24 06:17:36 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=21" -d /opt/unetlab/users/21 -g unl -M -s /bin/bash -u 32789 unl21 2>&1
+Sep 24 06:17:36 INFO: sudo tunctl -u unl21 -g root -t vunl21_0 2>&1
+Sep 24 06:17:36 INFO: sudo sysctl -w net.ipv6.conf.vunl21_0.disable_ipv6=1
+Sep 24 06:17:36 INFO: sudo ip link set dev vunl21_0 mtu 9000
+Sep 24 06:17:36 brctl addif vnet1_20 vunl21_0 2>&1
+Sep 24 06:17:36 INFO: sudo tunctl -u unl21 -g root -t vunl21_16 2>&1
+Sep 24 06:17:36 INFO: sudo sysctl -w net.ipv6.conf.vunl21_16.disable_ipv6=1
+Sep 24 06:17:36 INFO: sudo ip link set dev vunl21_16 mtu 9000
+Sep 24 06:17:36 INFO: sudo tunctl -u unl21 -g root -t vunl21_32 2>&1
+Sep 24 06:17:36 INFO: sudo sysctl -w net.ipv6.conf.vunl21_32.disable_ipv6=1
+Sep 24 06:17:36 INFO: sudo ip link set dev vunl21_32 mtu 9000
+Sep 24 06:17:36 INFO: sudo tunctl -u unl21 -g root -t vunl21_48 2>&1
+Sep 24 06:17:36 INFO: sudo sysctl -w net.ipv6.conf.vunl21_48.disable_ipv6=1
+Sep 24 06:17:36 INFO: sudo ip link set dev vunl21_48 mtu 9000
+Sep 24 06:17:36 INFO: CWD is /opt/unetlab/tmp/1/21
+Sep 24 06:17:36 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 21 -S 21 -P 30021 -t "Acc-SW13" -F /opt/unetlab/tmp/1/21/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/21/wrapper.txt 2>&1 &
+Sep 24 06:17:36 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=22" -d /opt/unetlab/users/22 -g unl -M -s /bin/bash -u 32790 unl22 2>&1
+Sep 24 06:17:36 INFO: sudo tunctl -u unl22 -g root -t vunl22_0 2>&1
+Sep 24 06:17:36 INFO: sudo sysctl -w net.ipv6.conf.vunl22_0.disable_ipv6=1
+Sep 24 06:17:36 INFO: sudo ip link set dev vunl22_0 mtu 9000
+Sep 24 06:17:36 brctl addif vnet1_21 vunl22_0 2>&1
+Sep 24 06:17:36 INFO: sudo tunctl -u unl22 -g root -t vunl22_16 2>&1
+Sep 24 06:17:36 INFO: sudo sysctl -w net.ipv6.conf.vunl22_16.disable_ipv6=1
+Sep 24 06:17:36 INFO: sudo ip link set dev vunl22_16 mtu 9000
+Sep 24 06:17:36 INFO: sudo tunctl -u unl22 -g root -t vunl22_32 2>&1
+Sep 24 06:17:36 INFO: sudo sysctl -w net.ipv6.conf.vunl22_32.disable_ipv6=1
+Sep 24 06:17:36 INFO: sudo ip link set dev vunl22_32 mtu 9000
+Sep 24 06:17:36 INFO: sudo tunctl -u unl22 -g root -t vunl22_48 2>&1
+Sep 24 06:17:36 INFO: sudo sysctl -w net.ipv6.conf.vunl22_48.disable_ipv6=1
+Sep 24 06:17:36 INFO: sudo ip link set dev vunl22_48 mtu 9000
+Sep 24 06:17:36 INFO: CWD is /opt/unetlab/tmp/1/22
+Sep 24 06:17:36 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 22 -S 22 -P 30022 -t "Acc-SW14" -F /opt/unetlab/tmp/1/22/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/22/wrapper.txt 2>&1 &
+Sep 24 06:17:37 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=23" -d /opt/unetlab/users/23 -g unl -M -s /bin/bash -u 32791 unl23 2>&1
+Sep 24 06:17:37 INFO: sudo tunctl -u unl23 -g root -t vunl23_0 2>&1
+Sep 24 06:17:37 INFO: sudo sysctl -w net.ipv6.conf.vunl23_0.disable_ipv6=1
+Sep 24 06:17:37 INFO: sudo ip link set dev vunl23_0 mtu 9000
+Sep 24 06:17:37 brctl addif vnet1_22 vunl23_0 2>&1
+Sep 24 06:17:37 INFO: sudo tunctl -u unl23 -g root -t vunl23_16 2>&1
+Sep 24 06:17:37 INFO: sudo sysctl -w net.ipv6.conf.vunl23_16.disable_ipv6=1
+Sep 24 06:17:37 INFO: sudo ip link set dev vunl23_16 mtu 9000
+Sep 24 06:17:37 INFO: sudo tunctl -u unl23 -g root -t vunl23_32 2>&1
+Sep 24 06:17:37 INFO: sudo sysctl -w net.ipv6.conf.vunl23_32.disable_ipv6=1
+Sep 24 06:17:37 INFO: sudo ip link set dev vunl23_32 mtu 9000
+Sep 24 06:17:37 INFO: sudo tunctl -u unl23 -g root -t vunl23_48 2>&1
+Sep 24 06:17:37 INFO: sudo sysctl -w net.ipv6.conf.vunl23_48.disable_ipv6=1
+Sep 24 06:17:37 INFO: sudo ip link set dev vunl23_48 mtu 9000
+Sep 24 06:17:37 INFO: CWD is /opt/unetlab/tmp/1/23
+Sep 24 06:17:37 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 23 -S 23 -P 30023 -t "Acc-SW15" -F /opt/unetlab/tmp/1/23/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/23/wrapper.txt 2>&1 &
+Sep 24 06:17:37 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=24" -d /opt/unetlab/users/24 -g unl -M -s /bin/bash -u 32792 unl24 2>&1
+Sep 24 06:17:37 INFO: sudo tunctl -u unl24 -g root -t vunl24_0 2>&1
+Sep 24 06:17:37 INFO: sudo sysctl -w net.ipv6.conf.vunl24_0.disable_ipv6=1
+Sep 24 06:17:37 INFO: sudo ip link set dev vunl24_0 mtu 9000
+Sep 24 06:17:37 brctl addif vnet1_23 vunl24_0 2>&1
+Sep 24 06:17:37 INFO: sudo tunctl -u unl24 -g root -t vunl24_16 2>&1
+Sep 24 06:17:37 INFO: sudo sysctl -w net.ipv6.conf.vunl24_16.disable_ipv6=1
+Sep 24 06:17:37 INFO: sudo ip link set dev vunl24_16 mtu 9000
+Sep 24 06:17:37 INFO: sudo tunctl -u unl24 -g root -t vunl24_32 2>&1
+Sep 24 06:17:37 INFO: sudo sysctl -w net.ipv6.conf.vunl24_32.disable_ipv6=1
+Sep 24 06:17:37 INFO: sudo ip link set dev vunl24_32 mtu 9000
+Sep 24 06:17:37 INFO: sudo tunctl -u unl24 -g root -t vunl24_48 2>&1
+Sep 24 06:17:37 INFO: sudo sysctl -w net.ipv6.conf.vunl24_48.disable_ipv6=1
+Sep 24 06:17:37 INFO: sudo ip link set dev vunl24_48 mtu 9000
+Sep 24 06:17:38 INFO: CWD is /opt/unetlab/tmp/1/24
+Sep 24 06:17:38 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 24 -S 24 -P 30024 -t "Acc-SW16" -F /opt/unetlab/tmp/1/24/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/24/wrapper.txt 2>&1 &
+Sep 24 06:17:38 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=25" -d /opt/unetlab/users/25 -g unl -M -s /bin/bash -u 32793 unl25 2>&1
+Sep 24 06:17:38 INFO: sudo tunctl -u unl25 -g root -t vunl25_0 2>&1
+Sep 24 06:17:38 INFO: sudo sysctl -w net.ipv6.conf.vunl25_0.disable_ipv6=1
+Sep 24 06:17:38 INFO: sudo ip link set dev vunl25_0 mtu 9000
+Sep 24 06:17:38 brctl addif vnet1_24 vunl25_0 2>&1
+Sep 24 06:17:38 INFO: sudo tunctl -u unl25 -g root -t vunl25_16 2>&1
+Sep 24 06:17:38 INFO: sudo sysctl -w net.ipv6.conf.vunl25_16.disable_ipv6=1
+Sep 24 06:17:38 INFO: sudo ip link set dev vunl25_16 mtu 9000
+Sep 24 06:17:38 INFO: sudo tunctl -u unl25 -g root -t vunl25_32 2>&1
+Sep 24 06:17:38 INFO: sudo sysctl -w net.ipv6.conf.vunl25_32.disable_ipv6=1
+Sep 24 06:17:38 INFO: sudo ip link set dev vunl25_32 mtu 9000
+Sep 24 06:17:38 INFO: sudo tunctl -u unl25 -g root -t vunl25_48 2>&1
+Sep 24 06:17:38 INFO: sudo sysctl -w net.ipv6.conf.vunl25_48.disable_ipv6=1
+Sep 24 06:17:38 INFO: sudo ip link set dev vunl25_48 mtu 9000
+Sep 24 06:17:38 INFO: CWD is /opt/unetlab/tmp/1/25
+Sep 24 06:17:38 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 25 -S 25 -P 30025 -t "Acc-SW17" -F /opt/unetlab/tmp/1/25/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/25/wrapper.txt 2>&1 &
+Sep 24 06:17:38 ERROR: sudo /usr/sbin/useradd -c "Unified Networking Lab TID=26" -d /opt/unetlab/users/26 -g unl -M -s /bin/bash -u 32794 unl26 2>&1
+Sep 24 06:17:38 INFO: sudo tunctl -u unl26 -g root -t vunl26_0 2>&1
+Sep 24 06:17:38 INFO: sudo sysctl -w net.ipv6.conf.vunl26_0.disable_ipv6=1
+Sep 24 06:17:38 INFO: sudo ip link set dev vunl26_0 mtu 9000
+Sep 24 06:17:38 brctl addif vnet1_25 vunl26_0 2>&1
+Sep 24 06:17:38 INFO: sudo tunctl -u unl26 -g root -t vunl26_16 2>&1
+Sep 24 06:17:38 INFO: sudo sysctl -w net.ipv6.conf.vunl26_16.disable_ipv6=1
+Sep 24 06:17:38 INFO: sudo ip link set dev vunl26_16 mtu 9000
+Sep 24 06:17:38 INFO: sudo tunctl -u unl26 -g root -t vunl26_32 2>&1
+Sep 24 06:17:38 INFO: sudo sysctl -w net.ipv6.conf.vunl26_32.disable_ipv6=1
+Sep 24 06:17:38 INFO: sudo ip link set dev vunl26_32 mtu 9000
+Sep 24 06:17:39 INFO: sudo tunctl -u unl26 -g root -t vunl26_48 2>&1
+Sep 24 06:17:39 INFO: sudo sysctl -w net.ipv6.conf.vunl26_48.disable_ipv6=1
+Sep 24 06:17:39 INFO: sudo ip link set dev vunl26_48 mtu 9000
+Sep 24 06:17:39 INFO: CWD is /opt/unetlab/tmp/1/26
+Sep 24 06:17:39 INFO: starting /opt/unetlab/wrappers/iol_wrapper -D 26 -S 26 -P 30026 -t "Acc-SW18" -F /opt/unetlab/tmp/1/26/L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin -d 0 -e 1 -s 0 -- -n 1024 -q -m 1024 -c startup-config > /opt/unetlab/tmp/1/26/wrapper.txt 2>&1 &
+sudo kill -9 (iol_wrapper/running-path match) 5046
+sudo kill -9 (iol_wrapper/running-path match) 5047
+sudo kill -9 (iol_wrapper/running-path match) 5048
+sudo kill -9 (iol_wrapper/running-path match) 5049
+sudo kill -9 (iol_wrapper/running-path match) 6204
+sudo kill -9 (iol_wrapper/running-path match) 6205
+sudo kill -9 (iol_wrapper/running-path match) 6206
+sudo kill -9 (iol_wrapper/running-path match) 6207
+sudo kill -9 (iol_wrapper/running-path match) 4859
+sudo kill -9 (iol_wrapper/running-path match) 4860
+sudo kill -9 (iol_wrapper/running-path match) 4861
+sudo kill -9 (iol_wrapper/running-path match) 4862
+sudo kill -9 (iol_wrapper/running-path match) 5605
+sudo kill -9 (iol_wrapper/running-path match) 5606
+sudo kill -9 (iol_wrapper/running-path match) 5607
+sudo kill -9 (iol_wrapper/running-path match) 5608
+sudo kill -9 (iol_wrapper/running-path match) 6329
+sudo kill -9 (iol_wrapper/running-path match) 6330
+sudo kill -9 (iol_wrapper/running-path match) 6331
+sudo kill -9 (iol_wrapper/running-path match) 6332
+sudo kill -9 (iol_wrapper/running-path match) 5423
+sudo kill -9 (iol_wrapper/running-path match) 5424
+sudo kill -9 (iol_wrapper/running-path match) 5425
+sudo kill -9 (iol_wrapper/running-path match) 5426
+sudo kill -9 (iol_wrapper/running-path match) 6491
+sudo kill -9 (iol_wrapper/running-path match) 6492
+sudo kill -9 (iol_wrapper/running-path match) 6493
+sudo kill -9 (iol_wrapper/running-path match) 6494
+sudo kill -9 (iol_wrapper/running-path match) 7846
+sudo kill -9 (iol_wrapper/running-path match) 7847
+sudo kill -9 (iol_wrapper/running-path match) 7848
+sudo kill -9 (iol_wrapper/running-path match) 7849
+sudo kill -9 (iol_wrapper/running-path match) 5228
+sudo kill -9 (iol_wrapper/running-path match) 5229
+sudo kill -9 (iol_wrapper/running-path match) 5230
+sudo kill -9 (iol_wrapper/running-path match) 5231
+sudo kill -9 (iol_wrapper/running-path match) 8830
+sudo kill -9 (iol_wrapper/running-path match) 8831
+sudo kill -9 (iol_wrapper/running-path match) 8832
+sudo kill -9 (iol_wrapper/running-path match) 8833
+sudo kill -9 (iol_wrapper/running-path match) 6911
+sudo kill -9 (iol_wrapper/running-path match) 6912
+sudo kill -9 (iol_wrapper/running-path match) 6913
+sudo kill -9 (iol_wrapper/running-path match) 6914
+sudo kill -9 (iol_wrapper/running-path match) 5992
+sudo kill -9 (iol_wrapper/running-path match) 5993
+sudo kill -9 (iol_wrapper/running-path match) 5994
+sudo kill -9 (iol_wrapper/running-path match) 5995
+sudo kill -9 (iol_wrapper/running-path match) 9287
+sudo kill -9 (iol_wrapper/running-path match) 9288
+sudo kill -9 (iol_wrapper/running-path match) 9289
+sudo kill -9 (iol_wrapper/running-path match) 9290
+sudo kill -9 (iol_wrapper/running-path match) 7527
+sudo kill -9 (iol_wrapper/running-path match) 7528
+sudo kill -9 (iol_wrapper/running-path match) 7529
+sudo kill -9 (iol_wrapper/running-path match) 7530
+sudo kill -9 (iol_wrapper/running-path match) 7402
+sudo kill -9 (iol_wrapper/running-path match) 7403
+sudo kill -9 (iol_wrapper/running-path match) 7404
+sudo kill -9 (iol_wrapper/running-path match) 7405
+sudo kill -9 (iol_wrapper/running-path match) 8048
+sudo kill -9 (iol_wrapper/running-path match) 8049
+sudo kill -9 (iol_wrapper/running-path match) 8050
+sudo kill -9 (iol_wrapper/running-path match) 8051
+sudo kill -9 (iol_wrapper/running-path match) 6616
+sudo kill -9 (iol_wrapper/running-path match) 6617
+sudo kill -9 (iol_wrapper/running-path match) 6618
+sudo kill -9 (iol_wrapper/running-path match) 6619
+sudo kill -9 (iol_wrapper/running-path match) 7721
+sudo kill -9 (iol_wrapper/running-path match) 7722
+sudo kill -9 (iol_wrapper/running-path match) 7723
+sudo kill -9 (iol_wrapper/running-path match) 7724
+sudo kill -9 (iol_wrapper/running-path match) 7089
+sudo kill -9 (iol_wrapper/running-path match) 7090
+sudo kill -9 (iol_wrapper/running-path match) 7091
+sudo kill -9 (iol_wrapper/running-path match) 7092
+sudo kill -9 (iol_wrapper/running-path match) 8508
+sudo kill -9 (iol_wrapper/running-path match) 8509
+sudo kill -9 (iol_wrapper/running-path match) 8510
+sudo kill -9 (iol_wrapper/running-path match) 8511
+sudo kill -9 (iol_wrapper/running-path match) 8173
+sudo kill -9 (iol_wrapper/running-path match) 8174
+sudo kill -9 (iol_wrapper/running-path match) 8175
+sudo kill -9 (iol_wrapper/running-path match) 8176
+sudo kill -9 (iol_wrapper/running-path match) 5810
+sudo kill -9 (iol_wrapper/running-path match) 5811
+sudo kill -9 (iol_wrapper/running-path match) 5812
+sudo kill -9 (iol_wrapper/running-path match) 5813
+sudo kill -9 (iol_wrapper/running-path match) 7214
+sudo kill -9 (iol_wrapper/running-path match) 7215
+sudo kill -9 (iol_wrapper/running-path match) 7216
+sudo kill -9 (iol_wrapper/running-path match) 7217
+sudo kill -9 (iol_wrapper/running-path match) 8383
+sudo kill -9 (iol_wrapper/running-path match) 8384
+sudo kill -9 (iol_wrapper/running-path match) 8385
+sudo kill -9 (iol_wrapper/running-path match) 8386
+sudo kill -9 (iol_wrapper/running-path match) 6786
+sudo kill -9 (iol_wrapper/running-path match) 6787
+sudo kill -9 (iol_wrapper/running-path match) 6788
+sudo kill -9 (iol_wrapper/running-path match) 6789
+sudo kill -9 (iol_wrapper/running-path match) 8955
+sudo kill -9 (iol_wrapper/running-path match) 8956
+sudo kill -9 (iol_wrapper/running-path match) 8957
+sudo kill -9 (iol_wrapper/running-path match) 8958
