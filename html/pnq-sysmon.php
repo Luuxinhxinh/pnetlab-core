@@ -51,7 +51,7 @@ function pnq_mem_info()
 {
     $data = @file_get_contents('/proc/meminfo');
     if ($data === false) {
-        return array('pct' => -1, 'total_mb' => 0, 'avail_mb' => 0, 'used_mb' => 0);
+        return array('pct' => -1, 'total_mb' => 0, 'avail_mb' => 0, 'used_mb' => 0, 'cached_mb' => 0, 'reclaimable_mb' => 0);
     }
     $m = array();
     foreach (explode("\n", $data) as $l) {
@@ -60,7 +60,7 @@ function pnq_mem_info()
         }
     }
     if (empty($m['MemTotal'])) {
-        return array('pct' => -1, 'total_mb' => 0, 'avail_mb' => 0, 'used_mb' => 0);
+        return array('pct' => -1, 'total_mb' => 0, 'avail_mb' => 0, 'used_mb' => 0, 'cached_mb' => 0, 'reclaimable_mb' => 0);
     }
     $avail = isset($m['MemAvailable'])
         ? $m['MemAvailable']
@@ -68,8 +68,17 @@ function pnq_mem_info()
     $total_mb = (int) round($m['MemTotal'] / 1024);
     $avail_mb = (int) round($avail / 1024);
     $used_mb = max(0, $total_mb - $avail_mb);
+    $cached_mb = (int) round((isset($m['Cached']) ? $m['Cached'] : 0) / 1024);
+    $reclaimable_mb = (int) round((isset($m['SReclaimable']) ? $m['SReclaimable'] : 0) / 1024);
     $pct = max(0, min(100, (int) round(100 - ($avail / $m['MemTotal'] * 100))));
-    return array('pct' => $pct, 'total_mb' => $total_mb, 'avail_mb' => $avail_mb, 'used_mb' => $used_mb);
+    return array(
+        'pct' => $pct,
+        'total_mb' => $total_mb,
+        'avail_mb' => $avail_mb,
+        'used_mb' => $used_mb,
+        'cached_mb' => $cached_mb,
+        'reclaimable_mb' => $reclaimable_mb,
+    );
 }
 
 function pnq_disk_pct()
@@ -95,6 +104,10 @@ if (is_file('/proc/cpuinfo')) {
     $cpuCores = max(1, (int) substr_count(@file_get_contents('/proc/cpuinfo'), 'processor'));
 }
 
+$ksmRun = @trim((string) @file_get_contents('/sys/kernel/mm/ksm/run'));
+$ksmSharing = (int) @trim((string) @file_get_contents('/sys/kernel/mm/ksm/pages_sharing'));
+$ksmShared = (int) @trim((string) @file_get_contents('/sys/kernel/mm/ksm/pages_shared'));
+
 echo json_encode(array(
     'cpu' => pnq_cpu_pct(),
     'mem' => $memInfo['pct'],
@@ -102,5 +115,10 @@ echo json_encode(array(
     'mem_total_mb' => $memInfo['total_mb'],
     'mem_avail_mb' => $memInfo['avail_mb'],
     'mem_used_mb' => $memInfo['used_mb'],
+    'mem_cached_mb' => $memInfo['cached_mb'],
+    'mem_reclaimable_mb' => $memInfo['reclaimable_mb'],
     'cpu_cores' => $cpuCores,
+    'ksm_enabled' => $ksmRun === '1',
+    'ksm_sharing_pages' => $ksmSharing,
+    'ksm_shared_pages' => $ksmShared,
 ));
