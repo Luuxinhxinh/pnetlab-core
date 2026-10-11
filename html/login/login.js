@@ -490,11 +490,7 @@
 				return;
 			}
 			setBusy(false);
-			var errMsg = (res.body && res.body.message);
-			if (!errMsg) {
-				errMsg = (res.status >= 500) ? dict.err_unreachable : dict.err_fail;
-			}
-			showError(errMsg);
+			showError((res.body && res.body.message) || dict.err_fail);
 			passEl.value = '';
 			passEl.focus();
 		}).catch(function () {
