@@ -1,0 +1,11 @@
+{
+  "user": "root",
+  "password": "pnetlab",
+  "databases": [
+    "pnetlab_db",
+    "guacdb"
+  ],
+  "host": "localhost",
+  "port": 3306,
+  "socket": "/run/mysqld/mysqld.sock"
+}
