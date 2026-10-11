@@ -1,0 +1,6 @@
+asset	sha256	size	path
+qemu-compat-libs.tgz	7289e81a2cdec4399d4e8b71fd77b367f2b4c0ca2bf712d59862fb5d61e56e1c	1547260	deps/qemu-compat-libs.tgz
+qemu-zoo-2.12.0-net.tgz	f40f598a74eeb8a363fa5abcd272d5a98c25df05e8a7d79b0b869f565e649555	15010881	qemu-zoo/qemu-zoo-2.12.0-net.tgz
+qemu-zoo-2.4.0-net.tgz	b82c810a72b2983af0e71760f9a899d6e2f86031dbcd0b5aefb85a1d4d7129c8	10776860	qemu-zoo/qemu-zoo-2.4.0-net.tgz
+qemu-zoo-4.1.0-net.tgz	e4d60228b91e28d2f8d753f2342efa4f4bfecebd8b55a6d05198579424d76a09	24280941	qemu-zoo/qemu-zoo-4.1.0-net.tgz
+qemu-zoo-5.2.0-net.tgz	af9762a74e4ae35fa7fd7955e7014f643c8635e7ae95cb8df2ade823dc25d6f0	25460051	qemu-zoo/qemu-zoo-5.2.0-net.tgz
