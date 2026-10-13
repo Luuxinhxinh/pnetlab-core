@@ -1,0 +1,60 @@
+/**
+ * pnetlab-canvas-perf.css
+ * Native GPU Hardware Acceleration & Zero-Overhead Viewport Optimization
+ *
+ * 1. CSS Containment & Layout Decoupling:
+ *    Isolates each node and edge from page reflows via `contain: layout style`.
+ * 2. GPU Hardware Compositing:
+ *    Promotes node layers to GPU textures (translateZ, will-change, backface-visibility).
+ * 3. Smooth Pan & Zoom:
+ *    Eliminates rasterization spikes during drag and scale.
+ * 4. SVG Edge & Label Performance:
+ *    Optimizes shape rendering and pointer event bubbling on connection paths.
+ */
+
+/* Isolate node layout recalculations from the parent DOM tree */
+.svelte-flow__node,
+.node_frame {
+  contain: layout style;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Ensure smooth hardware acceleration on Svelte Flow viewport */
+.svelte-flow__viewport {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Edge & SVG connector render optimization */
+.svelte-flow__edges,
+.svelte-flow__edge-path {
+  shape-rendering: geometricPrecision;
+  pointer-events: stroke;
+}
+
+/* Interface labels optimization */
+.svelte-flow__edge-textwrapper,
+.jtk-overlay,
+.ep_label {
+  contain: layout style paint;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Dragging state: highest priority GPU layer */
+.svelte-flow__node.dragging,
+.node_frame.ui-draggable-dragging {
+  will-change: transform;
+  z-index: 1000 !important;
+  cursor: grabbing !important;
+}
+
+/* Canvas container: Prevent document bounce and scroll chaining */
+#pnq-island-canvas-flow,
+#lab-viewport,
+.svelte-flow {
+  overscroll-behavior: none;
+  touch-action: none;
+}
