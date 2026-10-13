@@ -104,6 +104,11 @@ class PluginManager:
                 except Exception as exc:
                     logger.warning("Invalid manifest in %s: %s", entry, exc)
 
+            # Kiểm tra trạng thái kích hoạt (enabled toggle)
+            if not metadata.get("enabled", True):
+                logger.info("Plugin '%s' is disabled (enabled=false in manifest), skipping load.", entry)
+                continue
+
             try:
                 module_name = f"pnetlab_plugin_{entry}"
                 spec = importlib.util.spec_from_file_location(module_name, entrypoint_path)
@@ -136,7 +141,32 @@ class PluginManager:
 
         return len(loaded_names), loaded_names
 
+    def set_plugin_enabled(self, plugin_id: str, enabled: bool) -> Tuple[bool, str]:
+        """Bật hoặc tắt plugin qua manifest.json mà không cần xóa file hay thư mục."""
+        plugin_path = os.path.join(self.plugins_dir, plugin_id)
+        if not os.path.isdir(plugin_path):
+            return False, f"Plugin '{plugin_id}' not found"
+
+        manifest_path = os.path.join(plugin_path, "manifest.json")
+        manifest_data: Dict[str, Any] = {}
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, "r", encoding="utf-8") as f:
+                    manifest_data = json.load(f)
+            except Exception as exc:
+                return False, f"Error reading manifest: {exc}"
+
+        manifest_data["enabled"] = bool(enabled)
+        try:
+            with open(manifest_path, "w", encoding="utf-8") as f:
+                json.dump(manifest_data, f, indent=2)
+            action_text = "enabled" if enabled else "disabled"
+            return True, f"Plugin '{plugin_id}' successfully {action_text}"
+        except Exception as exc:
+            return False, f"Failed to save manifest: {exc}"
+
 
 # Global singleton instance for runtime
 bus = EventHooksBus()
 plugin_manager = PluginManager(PLUGINS_DIR, bus)
+
