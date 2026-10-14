@@ -137,6 +137,7 @@
             text-align: center;
         }
 
+        #tab-wf0:checked ~ .blueprint-nav label[for="tab-wf0"],
         #tab-wf1:checked ~ .blueprint-nav label[for="tab-wf1"],
         #tab-wf2:checked ~ .blueprint-nav label[for="tab-wf2"] {
             background: var(--btn-neutral);
@@ -145,8 +146,123 @@
         }
 
         .wf-view { display: none; }
+        #tab-wf0:checked ~ .window-frame #view-wf0 { display: block; }
         #tab-wf1:checked ~ .window-frame #view-wf1 { display: block; }
         #tab-wf2:checked ~ .window-frame #view-wf2 { display: block; }
+
+        /* WF0: MODE SELECTION & AUTH PORTAL */
+        .wf0-container {
+            padding: 50px 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 580px;
+            background: radial-gradient(circle at 50% 20%, rgba(255,255,255,0.03) 0%, transparent 70%);
+        }
+        .wf0-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        .wf0-subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 580px;
+        }
+        .mode-cards-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            max-width: 860px;
+            width: 100%;
+        }
+        .mode-card {
+            background: var(--surface-elevated);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .mode-card:hover {
+            border-color: var(--border-focus);
+            transform: translateY(-2px);
+        }
+        .mode-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-md);
+            background: var(--surface-sunken);
+            border: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        .mode-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .mode-badge {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-family: var(--font-code);
+            border: 1px solid var(--border-light);
+            color: var(--text-muted);
+        }
+        .mode-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-heading);
+        }
+        .mode-desc {
+            font-size: 13px;
+            color: var(--text-body);
+            line-height: 1.6;
+        }
+        .mode-features {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin: 8px 0;
+        }
+        .mode-features li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .mode-auth-box {
+            background: var(--surface-sunken);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .mode-auth-lbl {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .mode-auth-val {
+            font-family: var(--font-code);
+            color: var(--text-heading);
+        }
 
         .wf1-layout {
             display: grid;
@@ -552,7 +668,8 @@
 </head>
 <body>
 
-    <input type="radio" name="blueprint-tab" id="tab-wf1" checked>
+    <input type="radio" name="blueprint-tab" id="tab-wf0" checked>
+    <input type="radio" name="blueprint-tab" id="tab-wf1">
     <input type="radio" name="blueprint-tab" id="tab-wf2">
 
     <input type="radio" name="modal-radio" id="modal-none" checked>
@@ -574,6 +691,10 @@
     </div>
 
     <div class="blueprint-nav">
+        <label for="tab-wf0" class="nav-btn">
+            <span>🌐</span>
+            <span>WF0: Cổng Chọn Chế Độ (Offline vs Online)</span>
+        </label>
         <label for="tab-wf1" class="nav-btn">
             <span>👤</span>
             <span>WF1: Hồ sơ cá nhân & Danh sách Lab Repo</span>
@@ -591,8 +712,76 @@
                 <div class="dot"></div>
                 <div class="dot"></div>
             </div>
-            <div class="window-url-bar">https://pnetlab.local/@nam_teacher</div>
-            <div style="font-size: 12px; color: var(--text-muted); font-family: var(--font-code);">TENANT_ID: #44</div>
+            <div class="window-url-bar">https://pnetlab.local/gateway/select-mode</div>
+            <div style="font-size: 12px; color: var(--text-muted); font-family: var(--font-code);">PNETLAB_GATEWAY // DUAL_SESSION</div>
+        </div>
+
+        <!-- ==========================================================================
+             VIEW 0: WF0 - CỔNG CHỌN CHẾ ĐỘ ĐĂNG NHẬP (OFFLINE VS ONLINE)
+             ========================================================================== -->
+        <div id="view-wf0" class="wf-view">
+            <div class="wf0-container">
+                <div class="wf0-title">CHỌN PHƯƠNG THỨC LÀM VIỆC (PNETLAB V8)</div>
+                <div class="wf0-subtitle">Hệ thống hỗ trợ 2 môi trường hoàn toàn độc lập với cơ chế tài khoản và lưu trữ riêng biệt. Vui lòng chọn chế độ phù hợp:</div>
+
+                <div class="mode-cards-grid">
+                    <!-- MODE 1: OFFLINE LAB -->
+                    <div class="mode-card">
+                        <div class="mode-header">
+                            <div class="mode-icon">💻</div>
+                            <span class="mode-badge">LOCAL APPLIANCE</span>
+                        </div>
+                        <div>
+                            <div class="mode-name">1. Chế Độ Offline (Local Lab)</div>
+                            <div class="mode-desc">Thực hành trên máy chủ nội bộ. Dành cho admin hạ tầng, giảng viên biên soạn giáo trình và cấu hình node mạng độc lập không cần Internet.</div>
+                        </div>
+
+                        <ul class="mode-features">
+                            <li><span>🔒</span> Xác thực: Tài khoản Local Server (Admin / Root)</li>
+                            <li><span>📁</span> Lưu trữ: Hệ thống tệp <code>/opt/unetlab/labs/</code></li>
+                            <li><span>⚡</span> Hiệu năng: Trực tiếp qua Kernel KVM & Docker nội bộ</li>
+                            <li><span>🚫</span> Không yêu cầu kết nối mạng ra Internet</li>
+                        </ul>
+
+                        <div class="mode-auth-box">
+                            <span class="mode-auth-lbl">Thông tin tài khoản:</span>
+                            <span class="mode-auth-val">Local User: admin / pnet (Session ID DB)</span>
+                        </div>
+
+                        <button class="btn-ui btn-ui-primary" style="margin-top: auto; padding: 10px;">
+                            ➡️ Đăng nhập Chế độ Offline
+                        </button>
+                    </div>
+
+                    <!-- MODE 2: ONLINE REPO HUB -->
+                    <div class="mode-card" style="border-color: var(--border-focus);">
+                        <div class="mode-header">
+                            <div class="mode-icon">☁️</div>
+                            <span class="mode-badge" style="color: var(--text-heading); border-color: var(--border-focus);">MULTI-TENANT HUB</span>
+                        </div>
+                        <div>
+                            <div class="mode-name">2. Chế Độ Online (Git Repo Hub)</div>
+                            <div class="mode-desc">Môi trường đám mây phân tán kiểu GitHub. Dành cho học viên tham gia lớp học, trao đổi bài lab, clone/fork và thi đấu Cyber Range.</div>
+                        </div>
+
+                        <ul class="mode-features">
+                            <li><span>👤</span> Xác thực: Tài khoản Cộng đồng (Online Profile / Token)</li>
+                            <li><span>🍴</span> Mini-Git: Snapshot versioning, Fork bài lab đồng nghiệp</li>
+                            <li><span>🛡️</span> Cgroups v2: Giới hạn RAM/CPU theo từng Tenant ID</li>
+                            <li><span>📦</span> Tự động đồng bộ Catalog qua GitHub CDN công khai</li>
+                        </ul>
+
+                        <div class="mode-auth-box">
+                            <span class="mode-auth-lbl">Thông tin tài khoản:</span>
+                            <span class="mode-auth-val">Online Hub Token (Multi-tenant Pod ID)</span>
+                        </div>
+
+                        <label for="tab-wf1" class="btn-ui btn-ui-primary" style="margin-top: auto; padding: 10px; cursor: pointer;">
+                            🚀 Vào Cổng Online & Kho Cá Nhân
+                        </label>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- WF1: USER PROFILE & LAB REPOSITORY LIST -->
