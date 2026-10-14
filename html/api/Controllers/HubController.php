@@ -202,6 +202,90 @@ PYTHON;
         ]);
     }
 
+    /**
+     * POST /api/v4/hub/fork
+     * Clone/Fork a lab from another user or hub catalog to current user's personal repository.
+     */
+    public function fork(Request $request, Response $response): Response
+    {
+        $username = (string) $request->getAttribute('username', 'admin');
+        $body = (array) ($request->getParsedBody() ?? []);
+        
+        $sourcePath = trim((string) ($body['source_path'] ?? ''));
+        $destName = trim((string) ($body['dest_name'] ?? ''));
+
+        if ($sourcePath === '') {
+            return $this->json($response, 400, [
+                'code' => 400,
+                'status' => 'fail',
+                'message' => 'Missing source_path parameter'
+            ]);
+        }
+
+        // Clean source path and security check (prevent directory traversal)
+        $cleanSource = ltrim($sourcePath, '/');
+        if (str_contains($cleanSource, '..')) {
+            return $this->json($response, 400, [
+                'code' => 400,
+                'status' => 'fail',
+                'message' => 'Invalid path'
+            ]);
+        }
+
+        $fullSourcePath = '/opt/unetlab/labs/' . $cleanSource;
+        if (!file_exists($fullSourcePath)) {
+            return $this->json($response, 404, [
+                'code' => 404,
+                'status' => 'fail',
+                'message' => 'Source lab not found'
+            ]);
+        }
+
+        // Determine destination lab name
+        if ($destName === '') {
+            $destName = basename($cleanSource);
+        }
+        if (!str_ends_with($destName, '.unl')) {
+            $destName .= '.unl';
+        }
+
+        // User destination directory: /opt/unetlab/labs/<username>/
+        $userDir = '/opt/unetlab/labs/' . $username;
+        if (!is_dir($userDir)) {
+            mkdir($userDir, 0777, true);
+        }
+
+        $fullDestPath = $userDir . '/' . $destName;
+
+        // If file exists, append timestamp suffix
+        if (file_exists($fullDestPath)) {
+            $base = substr($destName, 0, -4);
+            $destName = $base . '_forked_' . time() . '.unl';
+            $fullDestPath = $userDir . '/' . $destName;
+        }
+
+        if (!copy($fullSourcePath, $fullDestPath)) {
+            return $this->json($response, 500, [
+                'code' => 500,
+                'status' => 'error',
+                'message' => 'Failed to copy lab file'
+            ]);
+        }
+
+        chmod($fullDestPath, 0777);
+
+        return $this->json($response, 201, [
+            'code' => 201,
+            'status' => 'success',
+            'data' => [
+                'forked_from' => $cleanSource,
+                'forked_to' => $username . '/' . $destName,
+                'absolute_path' => $fullDestPath,
+                'message' => "Successfully forked to {$username}/{$destName}"
+            ]
+        ]);
+    }
+
     private function execPython(string $code): string
     {
         $descriptors = [

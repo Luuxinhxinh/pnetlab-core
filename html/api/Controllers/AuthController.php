@@ -58,7 +58,7 @@ final class AuthController
         $updateStmt = $this->db->prepare('UPDATE users SET cookie = :c, session = :s WHERE username = :u');
         $updateStmt->execute([
             ':c' => $token,
-            ':s' => session_id() ?: $token,
+            ':s' => time(),
             ':u' => $username,
         ]);
 
@@ -99,7 +99,9 @@ final class AuthController
      */
     public function getProfile(Request $request, Response $response): Response
     {
-        $username = (string) $request->getAttribute('username', 'admin');
+        $queryParams = $request->getQueryParams();
+        $targetUsername = trim((string) ($queryParams['username'] ?? ''));
+        $username = $targetUsername !== '' ? $targetUsername : (string) $request->getAttribute('username', 'admin');
 
         $stmt = $this->db->prepare('SELECT pod, username, email, name, role, note, user_workspace FROM users WHERE username = :u LIMIT 1');
         $stmt->execute([':u' => $username]);

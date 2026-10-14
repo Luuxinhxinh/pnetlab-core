@@ -91,5 +91,6 @@ $app->post('/hub/publish', [HubController::class, 'publish']);
 $app->post('/hub/snapshot', [HubController::class, 'createSnapshot']);
 $app->get('/hub/history', [HubController::class, 'history']);
 $app->post('/hub/rollback', [HubController::class, 'rollback']);
+$app->post('/hub/fork', [HubController::class, 'fork']);
 
 $app->run();
