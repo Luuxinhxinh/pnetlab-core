@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<lab name="Resource-Optimizer-Demo" id="e94c8b21-4d1a-4c92-b81e-7f62d109a45b" version="1" scripttimeout="300" password="" countdown="" darkmode="1" mode3d="1" nogrid="0" joinable="2" joinable_emails="44" openable="2" openable_emails="44" editable="2" editable_emails="44" multi_config_active="">
+  <topology>
+    <nodes>
+      <node id="1" type="iol" template="iol" config="0" config_data="" multi_config="W10=" delay="0" icon="Router.png" console="telnet" image="L3-ADVENTERPRISEK9-M-15.4-2T.bin" left="220" name="Core_IOL_L3" top="140" width="" size="0" ethernet="4" ram="1024" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="1" vid="1" vlanmode="access" vlans="" style="solid" linkstyle="Straight" color="#3182ce" label="Core-Trunk" linkcfg="" labelpos="" srcpos="" dstpos="" width="2" fontsize="12" curviness="10" round="30"/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="2" vid="1" vlanmode="access" vlans="" style="solid" linkstyle="Straight" color="#e2e8f0" label="Branch-WAN" linkcfg="" labelpos="" srcpos="" dstpos="" width="2" fontsize="12" curviness="10" round="30"/>
+      </node>
+      <node id="2" type="iol" template="iol" config="0" config_data="" multi_config="W10=" delay="0" icon="Switch.png" console="telnet" image="L2-ADVENTERPRISEK9-M-15.2-20150703.bin" left="620" name="Core_IOL_L2" top="140" width="" size="0" ethernet="4" ram="1024" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="1" vid="1" vlanmode="access" vlans="" style="solid" linkstyle="Straight" color="#3182ce" label="Core-Trunk" linkcfg="" labelpos="" srcpos="" dstpos="" width="2" fontsize="12" curviness="10" round="30"/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="3" vid="1" vlanmode="access" vlans="" style="solid" linkstyle="Straight" color="#ed8936" label="VLAN 10" linkcfg="" labelpos="" srcpos="" dstpos="" width="2" fontsize="12" curviness="10" round="30"/>
+        <interface id="32" name="e0/2" type="ethernet" network_id="4" vid="1" vlanmode="access" vlans="" style="solid" linkstyle="Straight" color="#48bb78" label="VLAN 20" linkcfg="" labelpos="" srcpos="" dstpos="" width="2" fontsize="12" curviness="10" round="30"/>
+      </node>
+      <node id="3" type="iol" template="iol" config="0" config_data="" multi_config="W10=" delay="0" icon="/images/icons/Router.png" console="telnet" image="L3-ADVENTERPRISEK9-M-15.4-2T.bin" left="220" name="Branch_Router" top="420" width="" size="0" ethernet="4" ram="1024" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="0" Initial_startup_config="0" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="2" vid="1" vlanmode="access" vlans="" style="solid" linkstyle="Straight" color="#e2e8f0" label="Branch-WAN" linkcfg="" labelpos="" srcpos="" dstpos="" width="2" fontsize="12" curviness="10" round="30"/>
+      </node>
+      <node id="4" type="vpcs" template="vpcs" config="0" config_data="" multi_config="W10=" delay="0" icon="Desktop.png" console="telnet" image="" left="528" name="Host_VPCS" top="405" width="" size="0" ethernet="1" ram="128" mtu="9000" backspace="127" terminaltype="linux" lock="0">
+        <interface id="0" name="eth0" type="ethernet" network_id="3" vid="1" vlanmode="access" vlans="" style="solid" linkstyle="Straight" color="#ed8936" label="VLAN 10" linkcfg="" labelpos="" srcpos="" dstpos="" width="2" fontsize="12" curviness="10" round="30"/>
+      </node>
+      <node id="5" type="vpcs" template="vpcs" config="0" config_data="" multi_config="W10=" delay="0" icon="Desktop.png" console="telnet" image="" left="705" name="PC_Test" top="417" width="" size="0" ethernet="1" ram="128" mtu="9000" backspace="127" terminaltype="linux" lock="0">
+        <interface id="0" name="eth0" type="ethernet" network_id="4" vid="1" vlanmode="access" vlans="" style="solid" linkstyle="Straight" color="#48bb78" label="VLAN 20" linkcfg="" labelpos="" srcpos="" dstpos="" width="2" fontsize="12" curviness="10" round="30"/>
+      </node>
+    </nodes>
+    <networks>
+      <network id="1" type="bridge" name="Net_CoreTrunk" left="420" top="100" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="2" type="bridge" name="Net_BranchWAN" left="220" top="280" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="3" type="bridge" name="Net_VLAN10" left="570" top="280" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="4" type="bridge" name="Net_VLAN20" left="680" top="280" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+    </networks>
+  </topology>
+</lab>
