@@ -274,6 +274,29 @@ def main() -> None:
     execs = fix_executables()
     print(f"  {C_GREEN}[✔]{C_RESET} Đã cấp quyền thực thi cho {execs} script hệ thống.")
 
+    # 8. Chuẩn hóa vùng runtime node /opt/unetlab/tmp/ và /tmp/netio (chống lỗi start node NETMAP access)
+    print(f"[*] Đang chuẩn hóa vùng runtime node (/opt/unetlab/tmp và /tmp/netio)...")
+    try:
+        os.makedirs("/opt/unetlab/tmp", exist_ok=True)
+        uid_root, gid_unl = get_user_group_ids("root", "unl")
+        os.chown("/opt/unetlab/tmp", uid_root, gid_unl)
+        os.chmod("/opt/unetlab/tmp", 0o1777)
+        for root_t, dirs_t, files_t in os.walk("/opt/unetlab/tmp"):
+            for d in dirs_t:
+                dp = os.path.join(root_t, d)
+                os.chown(dp, uid_root, gid_unl)
+                os.chmod(dp, 0o777)
+            for f in files_t:
+                fp = os.path.join(root_t, f)
+                os.chown(fp, uid_root, gid_unl)
+                os.chmod(fp, 0o777)
+
+        os.makedirs("/tmp/netio", exist_ok=True)
+        os.chmod("/tmp/netio", 0o1777)
+        print(f"  {C_GREEN}[✔]{C_RESET} Vùng runtime node /opt/unetlab/tmp (root:unl 0777) và /tmp/netio đã sẵn sàng.")
+    except Exception as exc:
+        print(f"  {C_RED}[✘]{C_RESET} Lỗi chuẩn hóa tmp: {exc}")
+
     print(f"{C_CYAN}========================================================================{C_RESET}")
     print(f"  {C_GREEN}{C_BOLD}🎉 HOÀN TẤT CHUẨN HÓA! Môi trường PNetLab đã sẵn sàng và sạch lỗi 500.{C_RESET}")
     print(f"{C_CYAN}========================================================================{C_RESET}")
