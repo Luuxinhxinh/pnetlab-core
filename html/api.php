@@ -1963,6 +1963,9 @@ $app->post("/api/labs/session/(:object)/(:action)", function (
     updateOnlineTime($tenant);
     $variables = json_decode($app->request()->getBody(), true);
     if (!is_array($variables)) $variables = array();
+    if (empty($variables) && !empty($_POST)) {
+        $variables = $_POST;
+    }
     $labFile = "";
     $session = get($user["lab"], "");
 
@@ -2392,6 +2395,10 @@ $app->post("/api/labs/session/(:object)/(:action)", function (
                             "detail" => ["node_id" => $node_id],
                         ]);
                     }
+                } elseif ($action == "swap") {
+                    checkLabPermission($lab, USER_PER_EDIT_LAB);
+                    checkLockLab($lab);
+                    $output = apiSwapLabNode($lab, $variables, $tenant);
                 } elseif ($action == "export") {
                     checkLabPermission($lab, USER_PER_EDIT_LAB);
                     if (isset($variables["id"])) {
