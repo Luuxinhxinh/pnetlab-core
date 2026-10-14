@@ -4,6 +4,7 @@ declare(strict_types=1);
 use DI\ContainerBuilder;
 use PNetLab\Controllers\AuthController;
 use PNetLab\Controllers\FolderController;
+use PNetLab\Controllers\HubController;
 use PNetLab\Controllers\LabController;
 use PNetLab\Controllers\NodeController;
 use PNetLab\Controllers\SystemController;
@@ -20,8 +21,8 @@ $containerBuilder->addDefinitions([
     PDO::class => function () {
         $host = '127.0.0.1';
         $db   = 'pnetlab_db';
-        $user = 'root';
-        $pass = '';
+        $user = 'pnetlab';
+        $pass = 'pnetlab';
         $charset = 'utf8mb4';
         $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
         $opt = [
@@ -34,6 +35,7 @@ $containerBuilder->addDefinitions([
     BrokerClient::class => fn() => new BrokerClient('/run/pnetlab/broker.sock'),
     AuthController::class => fn($c) => new AuthController($c->get(PDO::class)),
     FolderController::class => fn() => new FolderController('/opt/unetlab/labs'),
+    HubController::class => fn() => new HubController('/usr/bin/python3', '/opt/unetlab/plugins/lab_hub'),
     LabController::class => fn($c) => new LabController($c->get(PDO::class), $c->get(BrokerClient::class), '/opt/unetlab/labs'),
     NodeController::class => fn($c) => new NodeController($c->get(BrokerClient::class)),
     SystemController::class => fn($c) => new SystemController($c->get(BrokerClient::class)),
@@ -62,15 +64,17 @@ $app->get('/system/status', [SystemController::class, 'status']);
 $app->post('/system/fixpermissions', [SystemController::class, 'fixPermissions']);
 $app->post('/system/cleanup-network', [SystemController::class, 'cleanupNetwork']);
 
-// 6. Authentication Routes (Migrated from api.php)
+// 6. Authentication & User Profile Routes
 $app->post('/auth/login', [AuthController::class, 'login']);
 $app->get('/auth/status', [AuthController::class, 'status']);
 $app->post('/auth/logout', [AuthController::class, 'logout']);
+$app->get('/user/profile', [AuthController::class, 'getProfile']);
+$app->put('/user/profile', [AuthController::class, 'updateProfile']);
 
-// 7. Folder Management Routes (Migrated from api.php)
+// 7. Folder Management Routes
 $app->get('/folders', [FolderController::class, 'list']);
 
-// 8. Lab Topology & Batch Routes (Migrated from api.php)
+// 8. Lab Topology & Batch Routes
 $app->get('/labs/{path:.+}', [LabController::class, 'get']);
 $app->post('/labs/start-all', [LabController::class, 'startAll']);
 $app->post('/labs/stop-all', [LabController::class, 'stopAll']);
@@ -80,4 +84,13 @@ $app->post('/labs/nodes/{id}/start', [NodeController::class, 'start']);
 $app->post('/labs/nodes/{id}/stop', [NodeController::class, 'stop']);
 $app->post('/labs/nodes/{id}/wipe', [NodeController::class, 'wipe']);
 
-return $app;
+// 10. Online Hub & Mini-Git Routes
+$app->get('/hub/catalog', [HubController::class, 'catalog']);
+$app->post('/hub/export', [HubController::class, 'export']);
+$app->post('/hub/publish', [HubController::class, 'publish']);
+$app->post('/hub/snapshot', [HubController::class, 'createSnapshot']);
+$app->get('/hub/history', [HubController::class, 'history']);
+$app->post('/hub/rollback', [HubController::class, 'rollback']);
+$app->post('/hub/fork', [HubController::class, 'fork']);
+
+$app->run();

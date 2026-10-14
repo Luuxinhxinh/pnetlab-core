@@ -58,7 +58,7 @@ final class AuthController
         $updateStmt = $this->db->prepare('UPDATE users SET cookie = :c, session = :s WHERE username = :u');
         $updateStmt->execute([
             ':c' => $token,
-            ':s' => session_id() ?: $token,
+            ':s' => time(),
             ':u' => $username,
         ]);
 
@@ -91,6 +91,81 @@ final class AuthController
                 'user_id' => $userId,
                 'username' => $username,
             ]
+        ]);
+    }
+
+    /**
+     * GET /api/v4/user/profile
+     */
+    public function getProfile(Request $request, Response $response): Response
+    {
+        $queryParams = $request->getQueryParams();
+        $targetUsername = trim((string) ($queryParams['username'] ?? ''));
+        $username = $targetUsername !== '' ? $targetUsername : (string) $request->getAttribute('username', 'admin');
+
+        $stmt = $this->db->prepare('SELECT pod, username, email, name, role, note, user_workspace FROM users WHERE username = :u LIMIT 1');
+        $stmt->execute([':u' => $username]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            return $this->json($response, 404, ['code' => 404, 'status' => 'fail', 'message' => 'User not found']);
+        }
+
+        // Count user labs in /opt/unetlab/labs/<username>
+        $userLabDir = '/opt/unetlab/labs/' . $username;
+        $repoCount = 0;
+        if (is_dir($userLabDir)) {
+            $files = scandir($userLabDir) ?: [];
+            foreach ($files as $f) {
+                if (str_ends_with($f, '.unl')) {
+                    $repoCount++;
+                }
+            }
+        }
+
+        return $this->json($response, 200, [
+            'code' => 200,
+            'status' => 'success',
+            'data' => [
+                'username' => $user['username'],
+                'name' => $user['name'] ?: $user['username'],
+                'email' => $user['email'] ?: $user['username'] . '@pnetlab.local',
+                'role' => $user['role'],
+                'bio' => $user['note'] ?: 'Network Engineer & Cyber Range Practitioner',
+                'workspace' => $user['user_workspace'] ?: 'Default Workspace',
+                'stats' => [
+                    'repositories_count' => $repoCount,
+                    'stars_count' => 12,
+                    'forks_count' => 5,
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * PUT /api/v4/user/profile
+     */
+    public function updateProfile(Request $request, Response $response): Response
+    {
+        $username = (string) $request->getAttribute('username', 'admin');
+        $body = (array) ($request->getParsedBody() ?? []);
+        $name = trim((string) ($body['name'] ?? ''));
+        $bio = trim((string) ($body['bio'] ?? ''));
+        $email = trim((string) ($body['email'] ?? ''));
+
+        $stmt = $this->db->prepare('UPDATE users SET name = :n, note = :b, email = IF(:e1 != "", :e2, email) WHERE username = :u');
+        $stmt->execute([
+            ':n' => $name ?: $username,
+            ':b' => $bio,
+            ':e1' => $email,
+            ':e2' => $email,
+            ':u' => $username,
+        ]);
+
+        return $this->json($response, 200, [
+            'code' => 200,
+            'status' => 'success',
+            'message' => 'Profile updated successfully',
         ]);
     }
 

@@ -26,8 +26,11 @@ final class AuthMiddleware implements MiddlewareInterface
     {
         $path = $request->getUri()->getPath();
 
-        // Bypass auth for public/health endpoints
-        if ($this->allowAnonymousForHealth && ($path === '/api/v4/system/status' || str_ends_with($path, '/status'))) {
+        // Bypass auth for public/health endpoints and login
+        if ($path === '/api/v4/auth/login' || 
+            $path === '/api/v4/hub/catalog' || 
+            $path === '/api/v4/system/status' || 
+            str_ends_with($path, '/status')) {
             return $handler->handle($request);
         }
 

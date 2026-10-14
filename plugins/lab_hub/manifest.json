@@ -1,0 +1,8 @@
+{
+  "name": "lab_hub",
+  "version": "1.0.0",
+  "description": "PNetLab Online Community Hub and Mini-Git Lab Exchange Engine",
+  "author": "BE2 Architecture Team",
+  "enabled": true,
+  "main": "backend/packager.py"
+}

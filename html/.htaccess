@@ -31,6 +31,10 @@ php_value upload_max_filesize 1024M
 	#RewriteCond %{HTTPS} off
 	#RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301] 
 	
+	# If starts with /api/v4, call Slim 4 API router
+	RewriteCond %{REQUEST_URI} ^/api/v4/
+	RewriteRule ^(.*)$ /api/index.php [B,L,QSA]
+
 	# If starts with /api, call API router
 	RewriteCond %{REQUEST_URI} ^/api/
 	RewriteRule ^(.*)$ /api.php [B,L,QSA]
