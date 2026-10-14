@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wireframe - PNetLab Online Hub & Mini-Git Profile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #090614;
+            --surface: rgba(22, 16, 43, 0.75);
+            --surface-hover: rgba(30, 22, 60, 0.85);
+            --border: rgba(168, 85, 247, 0.25);
+            --border-glow: rgba(168, 85, 247, 0.55);
+            --primary: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --font: 'Inter', -apple-system, sans-serif;
+            --mono: 'JetBrains Mono', monospace;
+            --radius: 12px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            padding: 30px;
+            line-height: 1.5;
+        }
+        .header {
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+        }
+        .header h1 { font-size: 24px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+        .header p { color: var(--text-muted); font-size: 14px; }
+        
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+            background: rgba(255,255,255,0.03);
+            padding: 8px;
+            border-radius: var(--radius);
+            width: fit-content;
+            border: 1px solid var(--border);
+        }
+        .btn-tab {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-tab.active {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .wireframe-container {
+            display: none;
+        }
+        .wireframe-container.active {
+            display: block;
+        }
+
+        /* FRAME COMMONS */
+        .mockup-window {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            backdrop-filter: blur(16px);
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+        .window-top {
+            background: rgba(0,0,0,0.4);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+        }
+        .win-dots { display: flex; gap: 6px; }
+        .win-dot { width: 10px; height: 10px; border-radius: 50%; background: #475569; }
+        .win-dot.red { background: #ef4444; }
+        .win-dot.yellow { background: #eab308; }
+        .win-dot.green { background: #22c55e; }
+        .nav-search {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            padding: 6px 14px;
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 13px;
+            width: 320px;
+        }
+
+        /* OPTION A: GITHUB 2-COLUMN PROFILE */
+        .layout-a {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: 600px;
+        }
+        .sidebar-profile {
+            border-right: 1px solid var(--border);
+            padding: 28px 20px;
+            background: rgba(0,0,0,0.2);
+        }
+        .avatar-box {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            border: 2px solid var(--primary);
+            margin-bottom: 16px;
+            background: #1e1b4b url('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&q=80') center/cover;
+        }
+        .profile-name { font-size: 20px; font-weight: 700; }
+        .profile-user { color: var(--text-muted); font-size: 14px; margin-bottom: 12px; }
+        .profile-bio { font-size: 13px; color: #cbd5e1; margin-bottom: 16px; }
+        .stat-badge {
+            display: inline-flex;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+        .stat-badge span strong { color: var(--text); }
+        .content-main {
+            padding: 24px 30px;
+        }
+        .nav-tabs-line {
+            display: flex;
+            gap: 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            margin-bottom: 24px;
+        }
+        .tab-item {
+            padding-bottom: 12px;
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            position: relative;
+        }
+        .tab-item.active {
+            color: var(--text);
+            font-weight: 600;
+        }
+        .tab-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0; right: 0;
+            height: 2px;
+            background: var(--primary);
+        }
+        .repo-card {
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .repo-title { font-size: 16px; font-weight: 600; color: #c084fc; margin-bottom: 6px; }
+        .repo-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
+        .repo-meta { display: flex; gap: 16px; font-size: 12px; color: #64748b; }
+        .btn-action {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-action:hover { background: var(--primary); }
+
+        /* OPTION B: REPO DETAIL WITH SNAPSHOT TIMELINE */
+        .layout-b {
+            padding: 24px 30px;
+        }
+        .repo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+        }
+        .repo-breadcrumb { font-size: 18px; font-weight: 600; color: var(--text); }
+        .repo-breadcrumb span { color: #c084fc; }
+        .repo-files {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.25);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .file-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 16px;
+            font-size: 13px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-family: var(--mono);
+        }
+        .file-row:last-child { border-bottom: none; }
+        .file-name { color: #cbd5e1; }
+        .file-msg { color: var(--text-muted); }
+        .file-time { color: #64748b; }
+
+        .timeline-box {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 18px;
+            background: rgba(255,255,255,0.02);
+        }
+        .timeline-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+        .timeline-item {
+            display: flex;
+            gap: 14px;
+            margin-bottom: 12px;
+            position: relative;
+            padding-left: 20px;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 4px; top: 6px;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--primary);
+        }
+        .commit-hash { font-family: var(--mono); color: #c084fc; font-size: 12px; }
+        .commit-msg { font-size: 13px; color: var(--text); }
+        .commit-rollback {
+            margin-left: auto;
+            color: #f43f5e;
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        /* OPTION C: STORE GRID HUB */
+        .layout-c {
+            padding: 24px 30px;
+        }
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+        .hub-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        /* PURE CSS TABS (NO JAVASCRIPT NEEDED - 100% CSP SAFE) */
+        input[name="tab-radio"] { display: none; }
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+            background: rgba(255,255,255,0.03);
+            padding: 8px;
+            border-radius: var(--radius);
+            width: fit-content;
+            border: 1px solid var(--border);
+        }
+        .btn-tab-label {
+            background: transparent;
+            color: var(--text-muted);
+            padding: 8px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-block;
+            user-select: none;
+        }
+        .btn-tab-label:hover {
+            color: var(--text);
+            background: rgba(255,255,255,0.05);
+        }
+        #radio-a:checked ~ .toolbar label[for="radio-a"],
+        #radio-b:checked ~ .toolbar label[for="radio-b"],
+        #radio-c:checked ~ .toolbar label[for="radio-c"] {
+            background: var(--primary);
+            color: #ffffff;
+            box-shadow: 0 4px 12px var(--border-glow);
+        }
+
+        .wireframe-container {
+            display: none;
+        }
+        #radio-a:checked ~ #tab-a,
+        #radio-b:checked ~ #tab-b,
+        #radio-c:checked ~ #tab-c {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <input type="radio" name="tab-radio" id="radio-a" checked>
+    <input type="radio" name="tab-radio" id="radio-b">
+    <input type="radio" name="tab-radio" id="radio-c">
+
+    <div class="header">
+        <h1>🎨 WIREFRAME ĐẶC TẢ GIAO DIỆN: ONLINE MODE & MINI-GIT REPO (PNETLAB V8)</h1>
+        <p>Thiết kế theo chuẩn Evondev Kit: Layout Flat, Border 1px Glass, Typography Inter, Màu sắc Dreamy Violet.</p>
+    </div>
+
+    <div class="toolbar">
+        <label for="radio-a" class="btn-tab-label">Phương án A: Profile cá nhân kiểu GitHub (Khuyên dùng)</label>
+        <label for="radio-b" class="btn-tab-label">Phương án B: Chi tiết 1 Lab Repo & Snapshot Rollback</label>
+        <label for="radio-c" class="btn-tab-label">Phương án C: Chợ Lab Store dạng Grid Card</label>
+    </div>
+
+    <!-- TAB A -->
+    <div id="tab-a" class="wireframe-container">
+        <div class="mockup-window">
+            <div class="window-top">
+                <div class="win-dots">
+                    <div class="win-dot red"></div>
+                    <div class="win-dot yellow"></div>
+                    <div class="win-dot green"></div>
+                </div>
+                <input class="nav-search" placeholder="🔍 Search or jump to lab..." value="https://pnetlab.local/@nam_teacher">
+                <div style="font-size: 13px; color: var(--text-muted);">👤 @nam_teacher</div>
+            </div>
+            <div class="layout-a">
+                <div class="sidebar-profile">
+                    <div class="avatar-box"></div>
+                    <div class="profile-name">Nguyễn Văn Nam</div>
+                    <div class="profile-user">@nam_teacher</div>
+                    <div class="profile-bio">Giảng viên An toàn thông tin & Mạng máy tính. Chia sẻ các bài lab CCNA/CCNP và CTF thực hành.</div>
+                    <div class="stat-badge">
+                        <span><strong>8</strong> Labs</span>
+                        <span><strong>142</strong> Stars</span>
+                        <span><strong>65</strong> Forks</span>
+                    </div>
+                    <button class="btn-action" style="width: 100%; padding: 8px; background: var(--primary); border: none; margin-bottom: 12px;">+ Tạo Lab Repo Mới</button>
+                    <button class="btn-action" style="width: 100%;">⚙️ Chỉnh sửa Profile</button>
+                </div>
+                <div class="content-main">
+                    <div class="nav-tabs-line">
+                        <div class="tab-item active">📦 Repositories (8)</div>
+                        <div class="tab-item">⭐ Starred Labs (12)</div>
+                        <div class="tab-item">🕒 Hoạt động gần đây</div>
+                    </div>
+                    
+                    <div class="repo-card">
+                        <div>
+                            <div class="repo-title">📘 ccna-enterprise-ospf-multi-area <span style="font-size: 11px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 12px; color: #22c55e;">Public</span></div>
+                            <div class="repo-desc">Mô phỏng định tuyến động 4 Router Cisco IOL đa vùng (Area 0 & Area 1). Đã kèm đề bài PDF.</div>
+                            <div class="repo-meta">
+                                <span>Cisco IOL</span>
+                                <span>⭐ 24</span>
+                                <span>🍴 12 forks</span>
+                                <span>Updated 2 hours ago</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-action">🍴 Fork</button>
+                            <button class="btn-action" style="background: var(--primary); border: none;">🚀 Mở Lab</button>
+                        </div>
+                    </div>
+
+                    <div class="repo-card">
+                        <div>
+                            <div class="repo-title">🛡️ pfsense-firewall-dmz-hardening <span style="font-size: 11px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 12px; color: #22c55e;">Public</span></div>
+                            <div class="repo-desc">Hạ tầng bảo vệ cụm Web DMZ qua pfSense Firewall, cấu hình NAT Port Forwarding và Snort IPS.</div>
+                            <div class="repo-meta">
+                                <span>pfSense + Linux</span>
+                                <span>⭐ 45</span>
+                                <span>🍴 18 forks</span>
+                                <span>Updated yesterday</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-action">🍴 Fork</button>
+                            <button class="btn-action" style="background: var(--primary); border: none;">🚀 Mở Lab</button>
+                        </div>
+                    </div>
+
+                    <div class="repo-card">
+                        <div>
+                            <div class="repo-title">🔒 ctf-final-exam-cyber-range-2026 <span style="font-size: 11px; padding: 2px 6px; border: 1px solid #ef4444; border-radius: 12px; color: #ef4444;">Private</span></div>
+                            <div class="repo-desc">Đề thi thực hành CTF cuối kỳ: Pivoting, Lateral Movement qua 3 lớp mạng.</div>
+                            <div class="repo-meta">
+                                <span>QEMU KVM</span>
+                                <span>⭐ 0</span>
+                                <span>Updated 3 days ago</span>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn-action">Quản lý đề thi</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB B -->
+    <div id="tab-b" class="wireframe-container">
+        <div class="mockup-window">
+            <div class="window-top">
+                <div class="win-dots">
+                    <div class="win-dot red"></div>
+                    <div class="win-dot yellow"></div>
+                    <div class="win-dot green"></div>
+                </div>
+                <div style="font-size: 13px; color: var(--text);">nam_teacher / ccna-enterprise-ospf-multi-area</div>
+                <button class="btn-action" style="background: var(--primary); border: none;">🚀 Bật phòng Lab</button>
+            </div>
+            <div class="layout-b">
+                <div class="repo-header">
+                    <div class="repo-breadcrumb">
+                        <span>nam_teacher</span> / <strong>ccna-enterprise-ospf-multi-area</strong>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-action">⭐ Star (24)</button>
+                        <button class="btn-action">🍴 Fork (12)</button>
+                        <button class="btn-action" style="background: var(--primary); border: none;">📥 Tải .pnetlabz</button>
+                    </div>
+                </div>
+
+                <div class="repo-files">
+                    <div class="file-row" style="background: rgba(255,255,255,0.05); font-weight: 600;">
+                        <span>Cấu trúc gói bài Lab (.pnetlabz package)</span>
+                        <span>Commit message mới nhất: "Hoàn tất cấu hình Area 0"</span>
+                        <span>2h ago</span>
+                    </div>
+                    <div class="file-row">
+                        <span class="file-name">📄 topology.unl</span>
+                        <span class="file-msg">Sơ đồ mạng 4 router Cisco IOL</span>
+                        <span class="file-time">2h ago</span>
+                    </div>
+                    <div class="file-row">
+                        <span class="file-name">📁 configs/R1-startup.cfg</span>
+                        <span class="file-msg">IP 10.1.1.1, OSPF router-id 1.1.1.1</span>
+                        <span class="file-time">2h ago</span>
+                    </div>
+                    <div class="file-row">
+                        <span class="file-name">📁 configs/R2-startup.cfg</span>
+                        <span class="file-msg">IP 10.1.1.2, OSPF area 0</span>
+                        <span class="file-time">2h ago</span>
+                    </div>
+                    <div class="file-row">
+                        <span class="file-name">📖 README.md</span>
+                        <span class="file-msg">Đề bài và hướng dẫn chấm điểm lab</span>
+                        <span class="file-time">Yesterday</span>
+                    </div>
+                </div>
+
+                <div class="timeline-box">
+                    <div class="timeline-title">🕒 LỊCH SỬ MINI-GIT SNAPSHOTS (QUAY NGƯỢC THỜI GIAN CẤU HÌNH)</div>
+                    <div class="timeline-item">
+                        <div>
+                            <span class="commit-hash">20261013_180045_46684be3</span>
+                            <div class="commit-msg">Cột mốc 2: Hoàn tất cấu hình Area 0 và định tuyến loopback</div>
+                        </div>
+                        <span class="commit-rollback" onclick="alert('Đã gọi API rollback!')">⏪ Khôi phục bản này (Rollback)</span>
+                    </div>
+                    <div class="timeline-item">
+                        <div>
+                            <span class="commit-hash">20261013_173012_7b8a1c22</span>
+                            <div class="commit-msg">Cột mốc 1: Đặt xong IP cho cổng Serial và GigabitEthernet</div>
+                        </div>
+                        <span class="commit-rollback" onclick="alert('Đã gọi API rollback!')">⏪ Khôi phục bản này (Rollback)</span>
+                    </div>
+                    <div class="timeline-item">
+                        <div>
+                            <span class="commit-hash">20261013_170000_1a2b3c4d</span>
+                            <div class="commit-msg">Khởi tạo bài lab trắng từ template CCNA</div>
+                        </div>
+                        <span class="commit-rollback" onclick="alert('Đã gọi API rollback!')">⏪ Khôi phục bản này (Rollback)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB C -->
+    <div id="tab-c" class="wireframe-container">
+        <div class="mockup-window">
+            <div class="window-top">
+                <div class="win-dots">
+                    <div class="win-dot red"></div>
+                    <div class="win-dot yellow"></div>
+                    <div class="win-dot green"></div>
+                </div>
+                <div style="font-size: 13px; color: var(--text);">PNETLAB COMMUNITY LAB STORE (ONLINE 24/7)</div>
+                <div style="font-size: 13px; color: var(--text-muted);">Sync qua GitHub CDN</div>
+            </div>
+            <div class="layout-c">
+                <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="font-size: 18px;">🌐 Khám phá bài lab của Cộng đồng</h2>
+                    <input class="nav-search" placeholder="🔍 Lọc theo tên hoặc tag...">
+                </div>
+                <div class="grid-cards">
+                    <div class="hub-card">
+                        <span class="hub-tag">CCNA • OSPF</span>
+                        <h3 style="font-size: 16px;">CCNA Enterprise - OSPF Multi-Area</h3>
+                        <p style="font-size: 13px; color: var(--text-muted);">Tác giả: PNetLab Academy • 4 Nodes</p>
+                        <p style="font-size: 12px; color: #94a3b8;">Lab thực hành cấu hình định tuyến động OSPF đa vùng với 4 Router Cisco.</p>
+                        <button class="btn-action" style="background: var(--primary); border: none; margin-top: auto;">📥 Tải về kho cá nhân</button>
+                    </div>
+                    <div class="hub-card">
+                        <span class="hub-tag">Security • pfSense</span>
+                        <h3 style="font-size: 16px;">Network Security - pfSense DMZ Firewall</h3>
+                        <p style="font-size: 13px; color: var(--text-muted);">Tác giả: Cyber Range Team • 3 Nodes</p>
+                        <p style="font-size: 12px; color: #94a3b8;">Mô phỏng hạ tầng mạng doanh nghiệp bảo vệ vùng DMZ qua pfSense.</p>
+                        <button class="btn-action" style="background: var(--primary); border: none; margin-top: auto;">📥 Tải về kho cá nhân</button>
+                    </div>
+                    <div class="hub-card">
+                        <span class="hub-tag">BGP • ISP</span>
+                        <h3 style="font-size: 16px;">BGP Multi-Homing Service Provider</h3>
+                        <p style="font-size: 13px; color: var(--text-muted);">Tác giả: Thầy Nam • 6 Nodes</p>
+                        <p style="font-size: 12px; color: #94a3b8;">Định tuyến eBGP giữa các Autonomous System (AS) độc lập.</p>
+                        <button class="btn-action" style="background: var(--primary); border: none; margin-top: auto;">📥 Tải về kho cá nhân</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

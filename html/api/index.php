@@ -21,8 +21,8 @@ $containerBuilder->addDefinitions([
     PDO::class => function () {
         $host = '127.0.0.1';
         $db   = 'pnetlab_db';
-        $user = 'root';
-        $pass = '';
+        $user = 'pnetlab';
+        $pass = 'pnetlab';
         $charset = 'utf8mb4';
         $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
         $opt = [
@@ -64,10 +64,12 @@ $app->get('/system/status', [SystemController::class, 'status']);
 $app->post('/system/fixpermissions', [SystemController::class, 'fixPermissions']);
 $app->post('/system/cleanup-network', [SystemController::class, 'cleanupNetwork']);
 
-// 6. Authentication Routes
+// 6. Authentication & User Profile Routes
 $app->post('/auth/login', [AuthController::class, 'login']);
 $app->get('/auth/status', [AuthController::class, 'status']);
 $app->post('/auth/logout', [AuthController::class, 'logout']);
+$app->get('/user/profile', [AuthController::class, 'getProfile']);
+$app->put('/user/profile', [AuthController::class, 'updateProfile']);
 
 // 7. Folder Management Routes
 $app->get('/folders', [FolderController::class, 'list']);
