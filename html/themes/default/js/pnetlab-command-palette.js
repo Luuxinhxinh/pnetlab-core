@@ -29,6 +29,14 @@
 (function () {
   'use strict';
 
+  // Ensure pnetlab-toast-manager.js is always loaded and active
+  if (!window.PNQToast && !document.querySelector('script[src*="pnetlab-toast-manager.js"]')) {
+    var _tmScript = document.createElement('script');
+    _tmScript.src = '/themes/default/js/pnetlab-toast-manager.js';
+    _tmScript.defer = true;
+    document.head.appendChild(_tmScript);
+  }
+
   var MODAL_ID = 'pnq-command-palette';
   var STYLE_ID = 'pnq-command-palette-styles';
 
