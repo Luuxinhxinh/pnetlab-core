@@ -953,7 +953,7 @@ class Node
 
 			$qualityResult = $ethernets[$i]->unApplyQuality();
 			if ($qualityResult !== 0) {
-				throw new RuntimeException((string) $qualityResult);
+				error_log(date('M d H:i:s ') . 'WARNING: unApplyQuality failed on interface ' . $i . ': ' . (string) $qualityResult);
 			}
 			$ethernets[$i]->removeQuality();
 			$ethernets[$i]->removeSuspendStatus();

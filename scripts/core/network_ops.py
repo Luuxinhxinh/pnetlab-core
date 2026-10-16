@@ -19,12 +19,26 @@ import time
 import shutil
 import socket
 import struct
+import threading
 import ipaddress
 import subprocess
 from typing import Any, Dict, List, Tuple
 
 BASE = '/opt/unetlab'
 RUN_DIR = '/run/pnetlab'
+
+# Traffic-control ownership and netem constants
+TC_LOCK = threading.RLock()
+PNET_NETEM_HANDLE = "50ab:"
+CAPTURE_FILTERS = {
+    "ingress": (49150, "0x504e0001"),
+    "egress": (49151, "0x504e0002"),
+}
+
+RE_TAP = re.compile(r"^(ser|vunl)\d+_\d+$")
+RE_NET = re.compile(r"^[A-Za-z0-9_.-]{1,15}$")
+RE_MON = re.compile(r"^/opt/unetlab/tmp/\d+/\d+/monitor\.sock$")
+RE_RUNPATH = re.compile(r"^/opt/unetlab/tmp/\d+/\d+$")
 
 def log(msg: str) -> None:
     print(msg, file=sys.stderr, flush=True)
@@ -68,6 +82,91 @@ def v_list(args, key, minlen=0):
     if not isinstance(v, list) or len(v) < minlen:
         raise Reject('bad arg %s' % key)
     return v
+
+def v_re(args, key, rx):
+    v = args.get(key)
+    if not isinstance(v, str) or not rx.match(v):
+        raise Reject('bad arg %s' % key)
+    return v
+
+def v_bool(args, key):
+    """Loose truthy coercion for checkbox-origin flags -> 0/1."""
+    return 1 if args.get(key) in (1, '1', True, 'true', 'yes', 'on') else 0
+
+def v_cidr(args, key):
+    """IPv4 interface address WITH prefix, e.g. '10.0.0.1/24'."""
+    v = args.get(key)
+    if not isinstance(v, str) or '/' not in v:
+        raise Reject('bad arg %s' % key)
+    try:
+        iface = ipaddress.IPv4Interface(v)
+    except Exception:
+        raise Reject('bad arg %s' % key)
+    return '%s/%d' % (iface.ip, iface.network.prefixlen)
+
+def v_vlan_list(args, key):
+    """dot1q trunk allowed-VLAN list."""
+    v = args.get(key)
+    if v is None or v == '':
+        return []
+    if not isinstance(v, str):
+        raise Reject('bad arg %s' % key)
+    vids = set()
+    for tok in v.split(','):
+        tok = tok.strip()
+        if not tok:
+            continue
+        if '-' in tok:
+            lo, _, hi = tok.partition('-')
+            if not (lo.isdigit() and hi.isdigit()):
+                raise Reject('bad arg %s' % key)
+            lo, hi = int(lo), int(hi)
+            if lo < 1 or hi > 4094 or lo > hi or hi - lo > 4094:
+                raise Reject('arg %s out of range' % key)
+            vids.update(range(lo, hi + 1))
+        else:
+            if not tok.isdigit():
+                raise Reject('bad arg %s' % key)
+            n = int(tok)
+            if n < 1 or n > 4094:
+                raise Reject('arg %s out of range' % key)
+            vids.add(n)
+        if len(vids) > 256:
+            raise Reject('arg %s too many vlans' % key)
+    return sorted(vids)
+
+def v_route_list(args, key, maxlen=64):
+    """Soft-router static routes: a list of {"dst": "<cidr>|default", "gw": "<ipv4>"}.
+    Returns [(dst, gw)] with dst normalized to "net/prefix" ("0.0.0.0/0" for default)."""
+    v = args.get(key)
+    if v is None or v == '':
+        return []
+    if not isinstance(v, list) or len(v) > maxlen:
+        raise Reject('bad arg %s' % key)
+    out = []
+    for item in v:
+        if not isinstance(item, dict):
+            raise Reject('bad route entry in %s' % key)
+        dst_raw = item.get('dst')
+        gw_raw = item.get('gw')
+        if not isinstance(dst_raw, str) or not isinstance(gw_raw, str):
+            raise Reject('bad route fields in %s' % key)
+        if dst_raw.strip().lower() == 'default':
+            dst_norm = '0.0.0.0/0'
+        else:
+            try:
+                net = ipaddress.IPv4Network(dst_raw.strip(), strict=False)
+                dst_norm = '%s/%d' % (net.network_address, net.prefixlen)
+            except Exception:
+                raise Reject('bad route dst %r' % dst_raw)
+        try:
+            gw_ip = ipaddress.IPv4Address(gw_raw.strip())
+            gw_norm = str(gw_ip)
+        except Exception:
+            raise Reject('bad route gw %r' % gw_raw)
+        out.append((dst_norm, gw_norm))
+    return out
+
 
 def run(argv, timeout=60, stderr=None, check_rc=True):
     p = subprocess.run(argv, stdout=subprocess.PIPE,
