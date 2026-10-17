@@ -103,6 +103,7 @@
 		var bar = el('div', 'toolbar'); bar.style.marginBottom = '12px';
 		bar.appendChild(el('div', 'card-title', users.length + ' user' + (users.length === 1 ? '' : 's')));
 		bar.appendChild(el('span', 'spacer'));
+		bar.appendChild(btn('fa-upload', 'Import CSV', 'btn btn-ghost', function () { importCsvModal(); }));
 		bar.appendChild(btn('fa-user-plus', 'Add user', 'btn btn-primary', function () { userModal(null); }));
 		card.appendChild(bar);
 		var t = el('table', 'fm-table'); var thead = el('thead'); var hr = el('tr');
@@ -282,6 +283,351 @@
 					reload();
 				}
 				else App.toast((res.body && res.body.error) || 'Operation failed', 'error');
+			});
+		}
+	}
+
+	function importCsvModal() {
+		var roleOpts = [{ label: 'Admin', value: '0' }].concat(roles.map(function (r) { return { label: r.name, value: String(r.id) }; }));
+		var form = el('div');
+		form.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+
+		// Help text / Instructions
+		var helpBox = el('div');
+		helpBox.style.cssText = 'padding:10px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:6px;font-size:12px;line-height:1.6;';
+		var helpP1 = el('p', null, 'Tải lên file CSV chứa danh sách tài khoản cần tạo. Định dạng tiêu đề cột chuẩn:');
+		helpP1.style.margin = '0 0 4px';
+		var codeBlock = el('code', null, 'username,password,email,role,workspace,note');
+		codeBlock.style.cssText = 'display:block;padding:4px 8px;background:rgba(0,0,0,0.25);border-radius:4px;font-family:monospace;font-size:11px;color:#38bdf8;';
+		helpBox.appendChild(helpP1);
+		helpBox.appendChild(codeBlock);
+		var helpNote = el('div', 'muted', '* Bắt buộc: username và password. Các cột email, role, workspace, note có thể để trống.');
+		helpNote.style.fontSize = '11px';
+		helpNote.style.marginTop = '4px';
+		helpBox.appendChild(helpNote);
+		form.appendChild(helpBox);
+
+		// File selector & sample download bar
+		var fileRow = el('div');
+		fileRow.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+
+		var fileInp = el('input');
+		fileInp.type = 'file';
+		fileInp.accept = '.csv,text/csv,text/plain';
+		fileInp.style.display = 'none';
+
+		var selectFileBtn = btn('fa-folder-open-o', 'Chọn file CSV', 'btn btn-secondary', function () {
+			fileInp.click();
+		});
+
+		var fileNameLabel = el('span', 'muted', 'Chưa chọn file');
+		fileNameLabel.style.fontSize = '12px';
+
+		var sampleBtn = btn('fa-download', 'Tải file CSV mẫu', 'btn btn-sm btn-ghost', function () {
+			var sampleContent = 'username,password,email,role,workspace,note\nstudent01,P@ssw0rd123,student01@example.com,0,/student01,Nhom 1\nstudent02,P@ssw0rd123,student02@example.com,0,/student02,Nhom 1\nstudent03,P@ssw0rd123,student03@example.com,0,/student03,Nhom 2\n';
+			var blob = new Blob([sampleContent], { type: 'text/csv;charset=utf-8;' });
+			var url = URL.createObjectURL(blob);
+			var a = document.createElement('a');
+			a.href = url;
+			a.download = 'pnetlab_users_sample.csv';
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		});
+
+		fileRow.appendChild(selectFileBtn);
+		fileRow.appendChild(sampleBtn);
+		fileRow.appendChild(fileNameLabel);
+		fileRow.appendChild(fileInp);
+		form.appendChild(fileRow);
+
+		// Defaults configuration
+		var grid = el('div', 'form-grid');
+		var defRoleS = selEl(roleOpts, roles.length ? String(roles[0].id) : '0');
+		var defWsI = el('input', 'input');
+		defWsI.placeholder = '/ (tùy chọn)';
+		grid.appendChild(field('Role mặc định (nếu trong CSV để trống)', defRoleS));
+		grid.appendChild(field('Workspace mặc định (nếu trong CSV để trống)', defWsI));
+		form.appendChild(grid);
+
+		// Status alert box (notifies about format errors or readiness)
+		var statusBox = el('div');
+		statusBox.style.cssText = 'display:none;padding:10px 14px;border-radius:6px;font-size:12px;line-height:1.5;';
+		form.appendChild(statusBox);
+
+		// Live preview container
+		var previewCard = el('div');
+		previewCard.style.cssText = 'max-height:220px;overflow-y:auto;border:1px solid rgba(255,255,255,0.08);border-radius:4px;display:none;';
+		form.appendChild(previewCard);
+
+		var parsedRows = [];
+		var lastParseResult = null;
+		var importBtnRef = null;
+
+		function parseCsvText(txt) {
+			if (!txt || !txt.trim()) {
+				return { error: 'File CSV rỗng! Không tìm thấy dữ liệu nào trong file.', rows: [] };
+			}
+			var lines = txt.split(/\r\n|\r|\n/);
+			var res = [];
+			var headers = null;
+
+			for (var i = 0; i < lines.length; i++) {
+				var line = lines[i].trim();
+				if (!line) continue;
+				var cells = parseCsvLine(line);
+				if (!headers) {
+					var low = cells.map(function (c) { return c.trim().toLowerCase(); });
+					// Header must contain username/user
+					if (low.indexOf('username') !== -1 || low.indexOf('user') !== -1) {
+						headers = low;
+						continue;
+					} else {
+						return {
+							error: "File CSV sai định dạng! Dòng đầu tiên (tiêu đề cột) bắt buộc phải có cột 'username' và 'password'.",
+							rows: []
+						};
+					}
+				}
+				var r = {};
+				for (var h = 0; h < headers.length; h++) {
+					r[headers[h]] = (cells[h] !== undefined) ? cells[h].trim() : '';
+				}
+				res.push(r);
+			}
+
+			if (!headers) {
+				return { error: "Không tìm thấy dòng tiêu đề hợp lệ trong file CSV.", rows: [] };
+			}
+			if (res.length === 0) {
+				return { error: "File CSV có dòng tiêu đề nhưng không chứa dòng dữ liệu nào.", rows: [] };
+			}
+
+			return { error: null, rows: res, headers: headers };
+		}
+
+		function parseCsvLine(line) {
+			var arr = [];
+			var cur = '';
+			var inQuotes = false;
+			for (var i = 0; i < line.length; i++) {
+				var c = line[i];
+				if (c === '"') {
+					if (inQuotes && line[i + 1] === '"') {
+						cur += '"';
+						i++;
+					} else {
+						inQuotes = !inQuotes;
+					}
+				} else if (c === ',' && !inQuotes) {
+					arr.push(cur);
+					cur = '';
+				} else {
+					cur += c;
+				}
+			}
+			arr.push(cur);
+			return arr;
+		}
+
+		function validateRow(r, seenUsernames) {
+			var u = (r.username || r.user || '').trim();
+			var p = (r.password || r.pass || '').trim();
+			var e = (r.email || '').trim();
+
+			if (!u) return { valid: false, error: 'Thiếu username' };
+			if (!/^[a-zA-Z0-9_.-]+$/.test(u)) return { valid: false, error: 'Ký tự username không hợp lệ' };
+			var lowU = u.toLowerCase();
+			if (seenUsernames[lowU]) return { valid: false, error: 'Trùng username trong file' };
+			seenUsernames[lowU] = true;
+
+			if (!p) return { valid: false, error: 'Thiếu password' };
+			if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+				return { valid: false, error: 'Email sai định dạng' };
+			}
+			return { valid: true, error: null };
+		}
+
+		function updatePreview(parseResult) {
+			previewCard.innerHTML = '';
+			if (!parseResult) {
+				previewCard.style.display = 'none';
+				statusBox.style.display = 'none';
+				if (importBtnRef) importBtnRef.disabled = true;
+				return;
+			}
+
+			if (parseResult.error) {
+				previewCard.style.display = 'none';
+				statusBox.style.display = 'block';
+				statusBox.style.background = 'rgba(231,76,60,0.15)';
+				statusBox.style.border = '1px solid rgba(231,76,60,0.4)';
+				statusBox.style.color = '#ff6b6b';
+				statusBox.innerHTML = '<i class="fa fa-times-circle"></i> <strong>Lỗi định dạng file:</strong> ' + parseResult.error;
+				App.toast(parseResult.error, 'error');
+				if (importBtnRef) importBtnRef.disabled = true;
+				return;
+			}
+
+			var rows = parseResult.rows || [];
+			var seen = {};
+			var invalidCount = 0;
+			var rowValidations = [];
+
+			rows.forEach(function (r) {
+				var v = validateRow(r, seen);
+				rowValidations.push(v);
+				if (!v.valid) invalidCount++;
+			});
+
+			previewCard.style.display = 'block';
+			statusBox.style.display = 'block';
+
+			if (invalidCount > 0) {
+				statusBox.style.background = 'rgba(243,156,18,0.15)';
+				statusBox.style.border = '1px solid rgba(243,156,18,0.4)';
+				statusBox.style.color = '#f39c12';
+				statusBox.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <strong>Cảnh báo dữ liệu:</strong> Phát hiện <strong>' + invalidCount + ' / ' + rows.length + ' dòng sai định dạng</strong> (xem đánh dấu đỏ bên dưới). Các dòng lỗi sẽ không được tạo.';
+				App.toast('Phát hiện ' + invalidCount + ' dòng không đúng định dạng!', 'error');
+			} else {
+				statusBox.style.background = 'rgba(46,204,113,0.15)';
+				statusBox.style.border = '1px solid rgba(46,204,113,0.4)';
+				statusBox.style.color = '#2ecc71';
+				statusBox.innerHTML = '<i class="fa fa-check-circle"></i> <strong>Định dạng hoàn toàn hợp lệ:</strong> Tìm thấy ' + rows.length + ' tài khoản hợp lệ, sẵn sàng tạo.';
+			}
+
+			var pt = el('table', 'fm-table');
+			pt.style.margin = '0';
+			var pth = el('thead');
+			var pthr = el('tr');
+			['#', 'Trạng thái', 'Username', 'Password', 'Email', 'Role', 'Workspace'].forEach(function (h) {
+				pthr.appendChild(el('th', null, h));
+			});
+			pth.appendChild(pthr);
+			pt.appendChild(pth);
+
+			var ptb = el('tbody');
+			rows.forEach(function (r, idx) {
+				var tr = el('tr');
+				var v = rowValidations[idx];
+				if (!v.valid) tr.style.backgroundColor = 'rgba(231,76,60,0.15)';
+
+				tr.appendChild(el('td', 'muted', String(idx + 1)));
+
+				var stTd = el('td');
+				if (v.valid) {
+					stTd.appendChild(el('span', 'badge badge-ok', 'Hợp lệ'));
+				} else {
+					var badg = el('span', 'badge badge-warn', v.error);
+					badg.style.backgroundColor = '#e74c3c';
+					badg.style.color = '#fff';
+					stTd.appendChild(badg);
+				}
+				tr.appendChild(stTd);
+
+				tr.appendChild(el('td', v.valid ? null : 'invalid', r.username || '(trống)'));
+				tr.appendChild(el('td', v.valid ? 'muted' : 'invalid', r.password ? '••••••' : '(trống)'));
+				tr.appendChild(el('td', 'muted', r.email || '—'));
+				tr.appendChild(el('td', 'muted', r.role || defRoleS.options[defRoleS.selectedIndex].text));
+				tr.appendChild(el('td', 'muted', r.workspace || (defWsI.value || '/')));
+				ptb.appendChild(tr);
+			});
+			pt.appendChild(ptb);
+			previewCard.appendChild(pt);
+
+			if (importBtnRef) {
+				importBtnRef.disabled = (rows.length === 0 || invalidCount === rows.length);
+			}
+		}
+
+		fileInp.addEventListener('change', function () {
+			if (!fileInp.files || !fileInp.files[0]) return;
+			var f = fileInp.files[0];
+			var ext = f.name.split('.').pop().toLowerCase();
+			if (ext !== 'csv' && ext !== 'txt') {
+				fileInp.value = '';
+				fileNameLabel.textContent = 'File không hợp lệ';
+				parsedRows = [];
+				updatePreview({ error: 'Tập tin "' + f.name + '" không đúng định dạng! Vui lòng chọn file có đuôi .csv hoặc .txt.' });
+				return;
+			}
+
+			fileNameLabel.textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
+			var reader = new FileReader();
+			reader.onload = function (e) {
+				try {
+					var parseResult = parseCsvText(e.target.result || '');
+					parsedRows = parseResult.rows || [];
+					lastParseResult = parseResult;
+					updatePreview(parseResult);
+				} catch (err) {
+					parsedRows = [];
+					updatePreview({ error: 'Lỗi đọc file: ' + err.message });
+				}
+			};
+			reader.readAsText(f);
+		});
+
+		defRoleS.addEventListener('change', function () {
+			if (lastParseResult) updatePreview(lastParseResult);
+		});
+		defWsI.addEventListener('input', function () {
+			if (lastParseResult) updatePreview(lastParseResult);
+		});
+
+		var dlg = App.modal({
+			title: 'Import tài khoản từ file CSV', wide: true, body: form, dismissable: true, buttons: [
+				{ label: 'Hủy', kind: 'ghost', onClick: function (c) { c(); } },
+				{
+					label: 'Tiến hành Import', kind: 'primary', onClick: function () {
+						if (!parsedRows.length) {
+							App.toast('Vui lòng chọn file CSV hợp lệ trước khi import', 'error');
+							return;
+						}
+						submitImport();
+					}
+				}
+			],
+			onOpen: function (root) {
+				var btns = root.querySelectorAll('.modal-foot button');
+				if (btns.length >= 2) {
+					importBtnRef = btns[1];
+					importBtnRef.disabled = true;
+				}
+			}
+		});
+
+		function submitImport() {
+			App.loading(true);
+			var payload = {
+				rows: parsedRows,
+				default_role: defRoleS.value,
+				default_workspace: defWsI.value.trim()
+			};
+			App.api('/users/api.php?action=user_import_csv', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
+			}).then(function (res) {
+				App.loading(false);
+				if (res.status === 200 && res.body && res.body.ok) {
+					dlg.close();
+					var b = res.body;
+					if (b.imported > 0) {
+						App.toast('Đã tạo thành công ' + b.imported + ' / ' + b.total + ' tài khoản.', 'ok');
+					}
+					if (b.failed > 0 && b.results) {
+						App.batchReport('Kết quả Import CSV (' + b.imported + ' thành công, ' + b.failed + ' lỗi)', b.results);
+					}
+					reload();
+				} else {
+					var err = (res.body && res.body.error) || 'Import tài khoản thất bại';
+					App.toast(err, 'error');
+				}
+			}).catch(function (err) {
+				App.loading(false);
+				App.toast('Lỗi kết nối: ' + (err.message || err), 'error');
 			});
 		}
 	}
