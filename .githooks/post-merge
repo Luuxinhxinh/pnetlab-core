@@ -1,0 +1,15 @@
+#!/bin/bash
+# ==============================================================================
+# PNetLab v8 Git Hook: post-merge
+# Tự động chuẩn hóa phân quyền & môi trường runtime sau khi git pull / git merge.
+# ==============================================================================
+
+if [ -f "/opt/unetlab/scripts/tools/pnet-fix-permissions.py" ]; then
+    echo "[Hook] Đang tự động chuẩn hóa phân quyền hệ thống sau khi pull code..."
+    python3 /opt/unetlab/scripts/tools/pnet-fix-permissions.py || true
+fi
+
+# Khởi động lại broker daemon nếu có thay đổi backend
+if systemctl is-active --quiet pnetlab-brokerd; then
+    systemctl restart pnetlab-brokerd >/dev/null 2>&1 || true
+fi
