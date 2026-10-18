@@ -241,7 +241,19 @@ def main() -> None:
     )
     print(f"  {C_GREEN}[✔]{C_RESET} Đã chuẩn hóa {h_dirs} thư mục, {h_files} tệp trong /opt/unetlab/html/")
 
-    # 3. Chuẩn hóa /opt/unetlab/plugins/ (Kiến trúc Plugin SPI của BE2)
+    # 3. Chuẩn hóa /opt/unetlab/labs/ (Nơi lưu trữ file lab UNL và swap file cho www-data)
+    if os.path.exists("/opt/unetlab/labs"):
+        print(f"[*] Đang chuẩn hóa thư mục Labs /opt/unetlab/labs/...")
+        l_dirs, l_files = fix_tree_permissions(
+            "/opt/unetlab/labs",
+            user="www-data",
+            group="www-data",
+            dir_mode=0o775,
+            file_mode=0o664
+        )
+        print(f"  {C_GREEN}[✔]{C_RESET} Đã chuẩn hóa {l_dirs} thư mục, {l_files} tệp trong /opt/unetlab/labs/")
+
+    # 4. Chuẩn hóa /opt/unetlab/plugins/ (Kiến trúc Plugin SPI của BE2)
     if os.path.exists("/opt/unetlab/plugins"):
         print(f"[*] Đang chuẩn hóa thư mục Plugin SPI /opt/unetlab/plugins/...")
         p_dirs, p_files = fix_tree_permissions(
