@@ -8,6 +8,7 @@
  *
  *   GET  ?action=users        → [{pod,username,email,role,role_name,user_status,note}]
  *   POST ?action=user_add     {username,password,email,role,note,user_status}
+ *   POST ?action=user_import_csv {rows:[...]|csv:"...",default_role,default_workspace}
  *   POST ?action=user_edit    {pod,email,role,note,user_status,password?}
  *   POST ?action=user_delete  {pod}
  *   GET  ?action=roles        → [{id,name,workspace,cpu,ram,hdd,perms[],users}]
@@ -338,6 +339,139 @@ try {
             if (!$sent) $response['email_error'] = $mailError;
         }
         out($response);
+    }
+
+    if ($action === 'user_import_csv') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') fail(405, 'POST required');
+        $b = body();
+        $defaultRole = (string) ($b['default_role'] ?? '0');
+        $defaultWs = san_workspace($b['default_workspace'] ?? '');
+
+        // Preload valid roles map (id => id, lowercase name => id)
+        $roleMap = ['admin' => '0', '0' => '0'];
+        foreach ($db->query('SELECT user_role_id, user_role_name FROM user_roles')->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $roleMap[strtolower(trim($r['user_role_name']))] = (string) $r['user_role_id'];
+            $roleMap[(string) $r['user_role_id']] = (string) $r['user_role_id'];
+        }
+
+        // Preload existing usernames to detect duplicates
+        $existing = [];
+        foreach ($db->query('SELECT username FROM users')->fetchAll(PDO::FETCH_COLUMN) as $u) {
+            $existing[strtolower($u)] = true;
+        }
+
+        // Parse rows from array or raw CSV string
+        $rows = [];
+        if (!empty($b['rows']) && is_array($b['rows'])) {
+            $rows = $b['rows'];
+        } elseif (!empty($b['csv']) && is_string($b['csv'])) {
+            $lines = preg_split('/\r\n|\r|\n/', trim($b['csv']));
+            $headers = [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '') continue;
+                $cells = str_getcsv($line);
+                if (empty($headers)) {
+                    $lowCells = array_map('trim', array_map('strtolower', $cells));
+                    if (in_array('username', $lowCells) || in_array('user', $lowCells)) {
+                        $headers = $lowCells;
+                        continue;
+                    } else {
+                        $headers = ['username', 'password', 'email', 'role', 'workspace', 'note'];
+                    }
+                }
+                $row = [];
+                foreach ($headers as $hIdx => $hKey) {
+                    $row[$hKey] = isset($cells[$hIdx]) ? trim($cells[$hIdx]) : '';
+                }
+                $rows[] = $row;
+            }
+        }
+
+        if (empty($rows)) {
+            fail(400, 'No user accounts found in CSV.');
+        }
+
+        $results = [];
+        $successCount = 0;
+        $failCount = 0;
+
+        $ins = $db->prepare('INSERT INTO users (username,password,email,role,note,user_status,offline,folder,html5,user_max_cpu,user_max_ram,access_days,active_time,expired_time,user_workspace,ext_auth) VALUES (:u,:p,:e,:r,:n,1,1,:fo,0,NULL,NULL,NULL,NULL,NULL,:uw,NULL)');
+
+        foreach ($rows as $idx => $r) {
+            $rowNum = $idx + 1;
+            $username = trim($r['username'] ?? ($r['user'] ?? ''));
+            $pass = (string) ($r['password'] ?? ($r['pass'] ?? ''));
+            $email = trim($r['email'] ?? '');
+            $note = trim($r['note'] ?? '');
+            $rawRole = trim((string) ($r['role'] ?? ''));
+            $rawWs = trim((string) ($r['workspace'] ?? ($r['folder'] ?? '')));
+
+            $displayName = $username !== '' ? $username : "Row #$rowNum";
+
+            if ($username === '') {
+                $results[] = ['name' => $displayName, 'ok' => false, 'error' => 'Username is missing'];
+                $failCount++;
+                continue;
+            }
+
+            if (!preg_match('/^[a-zA-Z0-9_.-]+$/', $username)) {
+                $results[] = ['name' => $displayName, 'ok' => false, 'error' => 'Invalid username (letters, digits, _, -, . only)'];
+                $failCount++;
+                continue;
+            }
+
+            if (isset($existing[strtolower($username)])) {
+                $results[] = ['name' => $displayName, 'ok' => false, 'error' => "Username '$username' already exists"];
+                $failCount++;
+                continue;
+            }
+
+            if ($pass === '') {
+                $results[] = ['name' => $displayName, 'ok' => false, 'error' => 'Password is required'];
+                $failCount++;
+                continue;
+            }
+
+            // Map role
+            $roleVal = $defaultRole;
+            if ($rawRole !== '') {
+                $lowRole = strtolower($rawRole);
+                if (isset($roleMap[$lowRole])) {
+                    $roleVal = $roleMap[$lowRole];
+                }
+            }
+
+            // Map workspace
+            $ws = $rawWs !== '' ? san_workspace($rawWs) : $defaultWs;
+            $folder = effective_workspace($db, $ws, $roleVal);
+
+            try {
+                $ins->execute([
+                    'u' => $username,
+                    'p' => hash('sha256', $pass),
+                    'e' => $email,
+                    'r' => $roleVal,
+                    'n' => $note,
+                    'fo' => $folder,
+                    'uw' => $ws,
+                ]);
+                $existing[strtolower($username)] = true;
+                $results[] = ['name' => $displayName, 'ok' => true, 'error' => null];
+                $successCount++;
+            } catch (Throwable $e) {
+                $results[] = ['name' => $displayName, 'ok' => false, 'error' => 'Database error: ' . $e->getMessage()];
+                $failCount++;
+            }
+        }
+
+        out([
+            'ok' => true,
+            'imported' => $successCount,
+            'failed' => $failCount,
+            'total' => count($rows),
+            'results' => $results
+        ]);
     }
 
     if ($action === 'user_edit') {
