@@ -1,0 +1,11 @@
+#!/bin/bash
+# ==============================================================================
+# PNetLab v8 Git Hook: post-checkout
+# Tự động chuẩn hóa phân quyền & môi trường runtime sau khi git checkout / git switch.
+# ==============================================================================
+
+# Chỉ chạy khi chuyển nhánh hoặc pull commit (flag $3 = 1)
+if [ "$3" = "1" ] && [ -f "/opt/unetlab/scripts/tools/pnet-fix-permissions.py" ]; then
+    echo "[Hook] Đang tự động chuẩn hóa phân quyền sau khi chuyển nhánh..."
+    python3 /opt/unetlab/scripts/tools/pnet-fix-permissions.py || true
+fi
