@@ -197,7 +197,8 @@ def fix_executables() -> int:
         "/opt/unetlab/scripts/tools/*.py",
         "/opt/unetlab/scripts/tools/*.sh",
         "/opt/unetlab/scripts/pnet-doctor",
-        "/opt/unetlab/wrappers/*"
+        "/opt/unetlab/wrappers/*",
+        "/opt/unetlab/.githooks/*"
     ]
     for pattern in patterns:
         for fpath in glob.glob(pattern):
@@ -209,6 +210,26 @@ def fix_executables() -> int:
                 except OSError:
                     pass
     return exec_count
+
+
+def configure_git_hooks() -> str:
+    """Tự động cấu hình core.hooksPath cho Git nếu đây là Git repository."""
+    git_dir = "/opt/unetlab/.git"
+    githooks_dir = "/opt/unetlab/.githooks"
+    if os.path.exists(git_dir) and os.path.exists(githooks_dir):
+        try:
+            import subprocess
+            subprocess.run(
+                ["git", "config", "core.hooksPath", ".githooks"],
+                cwd="/opt/unetlab",
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            return "Đã tự động đồng bộ Git Hooks (core.hooksPath = .githooks)"
+        except Exception as exc:
+            return f"Không thể set git hooks: {exc}"
+    return "Bỏ qua cấu hình Git hooks (không phải thư mục git)"
 
 
 def main() -> None:
@@ -308,6 +329,11 @@ def main() -> None:
         print(f"  {C_GREEN}[✔]{C_RESET} Vùng runtime node /opt/unetlab/tmp (root:unl 0777) và /tmp/netio đã sẵn sàng.")
     except Exception as exc:
         print(f"  {C_RED}[✘]{C_RESET} Lỗi chuẩn hóa tmp: {exc}")
+
+    # 9. Tự động liên kết Git Hooks (.githooks -> core.hooksPath)
+    print(f"[*] Đang kiểm tra cấu hình tự động cho Git Hooks...")
+    git_msg = configure_git_hooks()
+    print(f"  {C_GREEN}[✔]{C_RESET} {git_msg}")
 
     print(f"{C_CYAN}========================================================================{C_RESET}")
     print(f"  {C_GREEN}{C_BOLD}🎉 HOÀN TẤT CHUẨN HÓA! Môi trường PNetLab đã sẵn sàng và sạch lỗi 500.{C_RESET}")
