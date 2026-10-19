@@ -276,7 +276,7 @@ try {
                 'access_from' => (!empty($u['active_time']) && (int) $u['active_time'] > 0) ? date('Y-m-d\TH:i', (int) $u['active_time']) : '',
                 'access_to' => (!empty($u['expired_time']) && (int) $u['expired_time'] > 0) ? date('Y-m-d\TH:i', (int) $u['expired_time']) : ''];
         }, $rows);
-        out(['data' => $data]);
+        out(['data' => $data, 'current_pod' => (int) ($user['pod'] ?? 0)]);
     }
 
     if ($action === 'user_add') {
@@ -523,6 +523,82 @@ try {
         }
         $db->prepare('DELETE FROM users WHERE pod=:pod')->execute(['pod' => $pod]);
         out(['ok' => true]);
+    }
+
+    if ($action === 'user_batch_delete') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') fail(405, 'POST required');
+        $b = body();
+        $pods = $b['pods'] ?? [];
+        if (!is_array($pods) || empty($pods)) fail(400, 'pods array is required');
+
+        $currentPod = isset($user['pod']) ? (int) $user['pod'] : -1;
+        $sanPods = [];
+        foreach ($pods as $p) {
+            $ip = (int) $p;
+            if ($ip > 0 && !in_array($ip, $sanPods, true)) {
+                $sanPods[] = $ip;
+            }
+        }
+        if (empty($sanPods)) fail(400, 'No valid pods provided');
+
+        $placeholders = implode(',', array_fill(0, count($sanPods), '?'));
+        $stmt = $db->prepare("SELECT pod, username, role FROM users WHERE pod IN ($placeholders)");
+        $stmt->execute($sanPods);
+        $targetRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $rowMap = [];
+        foreach ($targetRows as $row) {
+            $rowMap[(int) $row['pod']] = $row;
+        }
+
+        $adminCount = (int) $db->query('SELECT COUNT(*) FROM users WHERE role="0"')->fetchColumn();
+        $delStmt = $db->prepare('DELETE FROM users WHERE pod = :pod');
+
+        $results = [];
+        $deletedCount = 0;
+        $failedCount = 0;
+
+        foreach ($sanPods as $pod) {
+            if (!isset($rowMap[$pod])) {
+                $results[] = ['name' => "Pod #$pod", 'ok' => false, 'error' => 'User not found'];
+                $failedCount++;
+                continue;
+            }
+            $target = $rowMap[$pod];
+            $uName = $target['username'];
+
+            if ($pod === $currentPod) {
+                $results[] = ['name' => $uName, 'ok' => false, 'error' => 'Cannot delete your own account'];
+                $failedCount++;
+                continue;
+            }
+
+            if ((string) $target['role'] === '0') {
+                if ($adminCount <= 1) {
+                    $results[] = ['name' => $uName, 'ok' => false, 'error' => 'Cannot delete the last administrator'];
+                    $failedCount++;
+                    continue;
+                }
+                $adminCount--;
+            }
+
+            try {
+                $delStmt->execute(['pod' => $pod]);
+                $results[] = ['name' => $uName, 'ok' => true, 'error' => null];
+                $deletedCount++;
+            } catch (Throwable $e) {
+                $results[] = ['name' => $uName, 'ok' => false, 'error' => $e->getMessage()];
+                $failedCount++;
+            }
+        }
+
+        out([
+            'ok' => true,
+            'deleted' => $deletedCount,
+            'failed' => $failedCount,
+            'total' => count($sanPods),
+            'results' => $results
+        ]);
     }
 
     if ($action === 'roles') {

@@ -93,40 +93,286 @@
 			roles = (r2.body && r2.body.data) || [];
 			App.api('/users/api.php?action=users').then(function (res) {
 				if (res.status !== 200) { card.innerHTML = ''; card.appendChild(el('p', 'muted', (res.body && res.body.error) || 'Failed to load users.')); return; }
-				renderUsers(card, (res.body && res.body.data) || []);
+				renderUsers(card, (res.body && res.body.data) || [], (res.body && res.body.current_pod) || 0);
 			});
 		});
 	}
 
-	function renderUsers(card, users) {
+	function renderUsers(card, users, currentPod) {
 		card.innerHTML = '';
+		currentPod = currentPod || 0;
+		var selectedUsers = {};
+		var searchQuery = '';
+
 		var bar = el('div', 'toolbar'); bar.style.marginBottom = '12px';
-		bar.appendChild(el('div', 'card-title', users.length + ' user' + (users.length === 1 ? '' : 's')));
+		var titleEl = el('div', 'card-title', users.length + ' user' + (users.length === 1 ? '' : 's'));
+		bar.appendChild(titleEl);
+
+		// Search input
+		var searchWrap = el('div');
+		searchWrap.style.cssText = 'position:relative;display:inline-flex;align-items:center;margin-left:14px;';
+		var searchIcon = el('i', 'fa fa-search');
+		searchIcon.style.cssText = 'position:absolute;left:10px;color:var(--pnq-text-muted);pointer-events:none;font-size:12px;';
+		var searchInp = el('input', 'input');
+		searchInp.type = 'search';
+		searchInp.placeholder = 'Search users...';
+		searchInp.style.cssText = 'padding-left:28px;width:240px;height:32px;font-size:12px;';
+		searchWrap.appendChild(searchIcon);
+		searchWrap.appendChild(searchInp);
+		bar.appendChild(searchWrap);
+
 		bar.appendChild(el('span', 'spacer'));
 		bar.appendChild(btn('fa-upload', 'Import CSV', 'btn btn-ghost', function () { importCsvModal(); }));
 		bar.appendChild(btn('fa-user-plus', 'Add user', 'btn btn-primary', function () { userModal(null); }));
 		card.appendChild(bar);
-		var t = el('table', 'fm-table'); var thead = el('thead'); var hr = el('tr');
-		['Username', 'Email', 'Role', 'Auth', 'Status', 'Limits', 'Lab schedule', ''].forEach(function (h) { hr.appendChild(el('th', null, h)); });
-		thead.appendChild(hr); t.appendChild(thead);
-		var tb = el('tbody');
-		users.forEach(function (u) {
-			var tr = el('tr');
-			tr.appendChild(el('td', null, u.username));
-			tr.appendChild(el('td', 'muted', u.email || '—'));
-			var rc = el('td'); rc.appendChild(el('span', 'badge' + (u.role === '0' ? '' : ' badge-off'), u.role_name)); tr.appendChild(rc);
-			tr.appendChild(el('td', (u.ext_auth ? null : 'muted'), u.ext_auth === 'radius' ? 'RADIUS' : (u.ext_auth === 'ldap' ? 'LDAP' : 'Local')));
-			var sc = el('td'); sc.appendChild(el('span', 'badge ' + (u.user_status ? 'badge-ok' : 'badge-warn'), u.user_status ? 'active' : 'blocked')); tr.appendChild(sc);
-			tr.appendChild(el('td', (u.role === '0' ? 'muted' : null), u.role === '0' ? '—' : fmtLimits(u)));
-			tr.appendChild(el('td', (u.role === '0' ? 'muted' : null), u.role === '0' ? '—' : fmtSchedule(u)));
-			var ac = el('td', 'fm-actions');
-			ac.appendChild(actBtn('fa-pencil', 'Edit', function () { userModal(u); }));
-			if (!u.ext_auth) ac.appendChild(actBtn('fa-key', 'Reset password', function () { resetUserPassword(u); }));
-			ac.appendChild(actBtn('fa-trash-o', 'Delete', function () { delUser(u); }, 'danger'));
-			tr.appendChild(ac);
-			tb.appendChild(tr);
+
+		// Bulk action bar container
+		var bulkHost = el('div');
+		card.appendChild(bulkHost);
+
+		var t = el('table', 'fm-table');
+		var thead = el('thead');
+		var hr = el('tr');
+
+		// Header select-all checkbox
+		var thCbWrap = el('th');
+		thCbWrap.style.cssText = 'width:36px;text-align:center;padding-left:10px;padding-right:10px;';
+		var thCb = el('input');
+		thCb.type = 'checkbox';
+		thCb.title = 'Select all visible';
+		thCbWrap.appendChild(thCb);
+		hr.appendChild(thCbWrap);
+
+		['Username', 'Email', 'Role', 'Auth', 'Status', 'Limits', 'Lab schedule', ''].forEach(function (h) {
+			hr.appendChild(el('th', null, h));
 		});
-		t.appendChild(tb); card.appendChild(t);
+		thead.appendChild(hr);
+		t.appendChild(thead);
+
+		var tb = el('tbody');
+		t.appendChild(tb);
+		card.appendChild(t);
+
+		function getVisibleUsers() {
+			if (!searchQuery) return users;
+			return users.filter(function (u) {
+				var q = searchQuery;
+				return (u.username && u.username.toLowerCase().indexOf(q) !== -1) ||
+					(u.email && u.email.toLowerCase().indexOf(q) !== -1) ||
+					(u.role_name && u.role_name.toLowerCase().indexOf(q) !== -1) ||
+					(u.note && u.note.toLowerCase().indexOf(q) !== -1);
+			});
+		}
+
+		function refreshBulk() {
+			bulkHost.innerHTML = '';
+			var items = Object.keys(selectedUsers).map(function (k) { return selectedUsers[k]; });
+			if (!items.length) return;
+			var bbar = el('div', 'bulkbar');
+			bbar.appendChild(el('span', 'count', items.length + ' user' + (items.length === 1 ? '' : 's') + ' selected'));
+			bbar.appendChild(el('span', 'spacer'));
+			bbar.appendChild(btn('fa-trash-o', 'Delete selected (' + items.length + ')', 'btn btn-sm btn-danger', function () {
+				batchDeleteUsers(items);
+			}));
+			bbar.appendChild(btn('fa-times', 'Clear selection', 'btn btn-sm btn-ghost', function () {
+				selectedUsers = {};
+				updateSelection();
+			}));
+			bulkHost.appendChild(bbar);
+		}
+
+		function updateSelection() {
+			var visible = getVisibleUsers();
+			var deletableVisible = visible.filter(function (u) { return u.pod !== currentPod; });
+			var selectedCount = 0;
+			deletableVisible.forEach(function (u) {
+				if (selectedUsers[u.pod]) selectedCount++;
+			});
+
+			if (deletableVisible.length > 0 && selectedCount === deletableVisible.length) {
+				thCb.checked = true;
+				thCb.indeterminate = false;
+			} else if (selectedCount > 0) {
+				thCb.checked = false;
+				thCb.indeterminate = true;
+			} else {
+				thCb.checked = false;
+				thCb.indeterminate = false;
+			}
+
+			var cbs = tb.querySelectorAll('input.user-row-cb');
+			cbs.forEach(function (cb) {
+				var pod = parseInt(cb.dataset.pod, 10);
+				cb.checked = !!selectedUsers[pod];
+			});
+
+			refreshBulk();
+		}
+
+		thCb.addEventListener('change', function () {
+			var visible = getVisibleUsers();
+			var deletableVisible = visible.filter(function (u) { return u.pod !== currentPod; });
+			if (thCb.checked) {
+				deletableVisible.forEach(function (u) { selectedUsers[u.pod] = u; });
+			} else {
+				deletableVisible.forEach(function (u) { delete selectedUsers[u.pod]; });
+			}
+			updateSelection();
+		});
+
+		function renderRows() {
+			tb.innerHTML = '';
+			var visible = getVisibleUsers();
+
+			if (searchQuery) {
+				titleEl.textContent = visible.length + ' of ' + users.length + ' users';
+			} else {
+				titleEl.textContent = users.length + ' user' + (users.length === 1 ? '' : 's');
+			}
+
+			if (visible.length === 0) {
+				var emptyTr = el('tr');
+				var emptyTd = el('td', 'muted', searchQuery ? 'No users matching "' + searchQuery + '"' : 'No users found.');
+				emptyTd.colSpan = 9;
+				emptyTd.style.textAlign = 'center';
+				emptyTd.style.padding = '24px';
+				emptyTr.appendChild(emptyTd);
+				tb.appendChild(emptyTr);
+				updateSelection();
+				return;
+			}
+
+			visible.forEach(function (u) {
+				var tr = el('tr');
+				var isMe = (u.pod === currentPod);
+
+				// Checkbox cell
+				var tdCb = el('td');
+				tdCb.style.cssText = 'text-align:center;padding-left:10px;padding-right:10px;';
+				var cb = el('input', 'user-row-cb');
+				cb.type = 'checkbox';
+				cb.dataset.pod = u.pod;
+				if (isMe) {
+					cb.disabled = true;
+					cb.title = 'Cannot delete your own account';
+				} else {
+					cb.checked = !!selectedUsers[u.pod];
+					cb.addEventListener('change', function () {
+						if (cb.checked) {
+							selectedUsers[u.pod] = u;
+						} else {
+							delete selectedUsers[u.pod];
+						}
+						updateSelection();
+					});
+				}
+				tdCb.appendChild(cb);
+				tr.appendChild(tdCb);
+
+				// Username cell
+				var tdUser = el('td');
+				tdUser.appendChild(document.createTextNode(u.username));
+				if (isMe) {
+					var youBadge = el('span', 'badge badge-off', 'you');
+					youBadge.style.cssText = 'margin-left:6px;font-size:10px;vertical-align:middle;';
+					tdUser.appendChild(youBadge);
+				}
+				tr.appendChild(tdUser);
+
+				tr.appendChild(el('td', 'muted', u.email || '—'));
+				var rc = el('td'); rc.appendChild(el('span', 'badge' + (u.role === '0' ? '' : ' badge-off'), u.role_name)); tr.appendChild(rc);
+				tr.appendChild(el('td', (u.ext_auth ? null : 'muted'), u.ext_auth === 'radius' ? 'RADIUS' : (u.ext_auth === 'ldap' ? 'LDAP' : 'Local')));
+				var sc = el('td'); sc.appendChild(el('span', 'badge ' + (u.user_status ? 'badge-ok' : 'badge-warn'), u.user_status ? 'active' : 'blocked')); tr.appendChild(sc);
+				tr.appendChild(el('td', (u.role === '0' ? 'muted' : null), u.role === '0' ? '—' : fmtLimits(u)));
+				tr.appendChild(el('td', (u.role === '0' ? 'muted' : null), u.role === '0' ? '—' : fmtSchedule(u)));
+
+				var ac = el('td', 'fm-actions');
+				ac.appendChild(actBtn('fa-pencil', 'Edit', function () { userModal(u); }));
+				if (!u.ext_auth) ac.appendChild(actBtn('fa-key', 'Reset password', function () { resetUserPassword(u); }));
+				if (!isMe) {
+					ac.appendChild(actBtn('fa-trash-o', 'Delete', function () { delUser(u); }, 'danger'));
+				}
+				tr.appendChild(ac);
+				tb.appendChild(tr);
+			});
+
+			updateSelection();
+		}
+
+		searchInp.addEventListener('input', function () {
+			searchQuery = searchInp.value.trim().toLowerCase();
+			renderRows();
+		});
+
+		renderRows();
+	}
+
+	function batchDeleteUsers(items) {
+		if (!items || !items.length) return;
+		App.loading(true);
+		App.api('/status/api.php?action=sessions').then(function (res) {
+			App.loading(false);
+			var sessions = (res.status === 200 && res.body && res.body.data) || [];
+			var podSet = {};
+			var userSet = {};
+			items.forEach(function (u) {
+				podSet[String(u.pod)] = true;
+				if (u.username) userSet[u.username] = true;
+			});
+
+			var matchedSessions = sessions.filter(function (r) {
+				return podSet[String(r.pod)] || (r.owner && userSet[r.owner]);
+			});
+			var runningNodes = matchedSessions.reduce(function (a, r) { return a + (r.nodes_running || 0); }, 0);
+
+			var body = el('div');
+			var p1 = el('p', null, 'Delete ' + items.length + ' selected user account' + (items.length === 1 ? '' : 's') + '? The accounts and their sign-ins are removed permanently.');
+			p1.style.margin = '0 0 8px';
+			body.appendChild(p1);
+
+			if (matchedSessions.length) {
+				var warn = el('p');
+				warn.style.cssText = 'margin:0;color:var(--pnq-danger);font-weight:600;';
+				warn.textContent = 'Selected user(s) have ' + matchedSessions.length + ' open lab session' + (matchedSessions.length === 1 ? '' : 's') +
+					(runningNodes ? ' with ' + runningNodes + ' running node' + (runningNodes === 1 ? '' : 's') : '') + '.';
+				body.appendChild(warn);
+			} else {
+				body.appendChild(el('p', 'muted', 'No open lab sessions for the selected users.')).style.margin = '0';
+			}
+
+			var opts = { danger: true, okLabel: 'Delete ' + items.length + ' user' + (items.length === 1 ? '' : 's'), title: 'Delete users' };
+			if (runningNodes > 0) opts.requireType = 'DELETE';
+			return App.confirm(body, opts);
+		}).catch(function () {
+			App.loading(false);
+			return App.confirm('Delete ' + items.length + ' selected user account' + (items.length === 1 ? '' : 's') + '? The accounts and their sign-ins are removed permanently.', { danger: true, okLabel: 'Delete ' + items.length, title: 'Delete users' });
+		}).then(function (yes) {
+			if (!yes) return;
+			App.loading(true);
+			var pods = items.map(function (u) { return u.pod; });
+			App.api('/users/api.php?action=user_batch_delete', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ pods: pods })
+			}).then(function (res) {
+				App.loading(false);
+				if (res.status === 200 && res.body && res.body.ok) {
+					var b = res.body;
+					if (b.deleted > 0) {
+						App.toast('Successfully deleted ' + b.deleted + ' user' + (b.deleted === 1 ? '' : 's') + '.', 'ok');
+					}
+					if (b.failed > 0 && b.results) {
+						App.batchReport(b.failed + ' of ' + b.total + ' users could not be deleted', b.results);
+					}
+					reload();
+				} else {
+					App.toast((res.body && res.body.error) || 'Failed to delete selected users', 'error');
+				}
+			}).catch(function (err) {
+				App.loading(false);
+				App.toast('Network error: ' + (err.message || err), 'error');
+			});
+		});
 	}
 
 	function userModal(u) {
@@ -295,13 +541,13 @@
 		// Help text / Instructions
 		var helpBox = el('div');
 		helpBox.style.cssText = 'padding:10px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:6px;font-size:12px;line-height:1.6;';
-		var helpP1 = el('p', null, 'Tải lên file CSV chứa danh sách tài khoản cần tạo. Định dạng tiêu đề cột chuẩn:');
+		var helpP1 = el('p', null, 'Upload a CSV file containing user accounts to create. Standard column header format:');
 		helpP1.style.margin = '0 0 4px';
 		var codeBlock = el('code', null, 'username,password,email,role,workspace,note');
 		codeBlock.style.cssText = 'display:block;padding:4px 8px;background:rgba(0,0,0,0.25);border-radius:4px;font-family:monospace;font-size:11px;color:#38bdf8;';
 		helpBox.appendChild(helpP1);
 		helpBox.appendChild(codeBlock);
-		var helpNote = el('div', 'muted', '* Bắt buộc: username và password. Các cột email, role, workspace, note có thể để trống.');
+		var helpNote = el('div', 'muted', '* Required: username and password. Optional columns: email, role, workspace, note.');
 		helpNote.style.fontSize = '11px';
 		helpNote.style.marginTop = '4px';
 		helpBox.appendChild(helpNote);
@@ -316,15 +562,15 @@
 		fileInp.accept = '.csv,text/csv,text/plain';
 		fileInp.style.display = 'none';
 
-		var selectFileBtn = btn('fa-folder-open-o', 'Chọn file CSV', 'btn btn-secondary', function () {
+		var selectFileBtn = btn('fa-folder-open-o', 'Choose CSV file', 'btn btn-secondary', function () {
 			fileInp.click();
 		});
 
-		var fileNameLabel = el('span', 'muted', 'Chưa chọn file');
+		var fileNameLabel = el('span', 'muted', 'No file chosen');
 		fileNameLabel.style.fontSize = '12px';
 
-		var sampleBtn = btn('fa-download', 'Tải file CSV mẫu', 'btn btn-sm btn-ghost', function () {
-			var sampleContent = 'username,password,email,role,workspace,note\nstudent01,P@ssw0rd123,student01@example.com,0,/student01,Nhom 1\nstudent02,P@ssw0rd123,student02@example.com,0,/student02,Nhom 1\nstudent03,P@ssw0rd123,student03@example.com,0,/student03,Nhom 2\n';
+		var sampleBtn = btn('fa-download', 'Download sample CSV', 'btn btn-sm btn-ghost', function () {
+			var sampleContent = 'username,password,email,role,workspace,note\nstudent01,P@ssw0rd123,student01@example.com,0,/student01,Lab 1\nstudent02,P@ssw0rd123,student02@example.com,0,/student02,Lab 1\nstudent03,P@ssw0rd123,student03@example.com,0,/student03,Lab 2\n';
 			var blob = new Blob([sampleContent], { type: 'text/csv;charset=utf-8;' });
 			var url = URL.createObjectURL(blob);
 			var a = document.createElement('a');
@@ -346,9 +592,9 @@
 		var grid = el('div', 'form-grid');
 		var defRoleS = selEl(roleOpts, roles.length ? String(roles[0].id) : '0');
 		var defWsI = el('input', 'input');
-		defWsI.placeholder = '/ (tùy chọn)';
-		grid.appendChild(field('Role mặc định (nếu trong CSV để trống)', defRoleS));
-		grid.appendChild(field('Workspace mặc định (nếu trong CSV để trống)', defWsI));
+		defWsI.placeholder = '/ (optional)';
+		grid.appendChild(field('Default role (if blank in CSV)', defRoleS));
+		grid.appendChild(field('Default workspace (if blank in CSV)', defWsI));
 		form.appendChild(grid);
 
 		// Status alert box (notifies about format errors or readiness)
@@ -367,7 +613,7 @@
 
 		function parseCsvText(txt) {
 			if (!txt || !txt.trim()) {
-				return { error: 'File CSV rỗng! Không tìm thấy dữ liệu nào trong file.', rows: [] };
+				return { error: 'CSV file is empty! No user data found.', rows: [] };
 			}
 			var lines = txt.split(/\r\n|\r|\n/);
 			var res = [];
@@ -385,7 +631,7 @@
 						continue;
 					} else {
 						return {
-							error: "File CSV sai định dạng! Dòng đầu tiên (tiêu đề cột) bắt buộc phải có cột 'username' và 'password'.",
+							error: "Invalid CSV header format. The first row must include at least 'username' and 'password' columns.",
 							rows: []
 						};
 					}
@@ -398,10 +644,10 @@
 			}
 
 			if (!headers) {
-				return { error: "Không tìm thấy dòng tiêu đề hợp lệ trong file CSV.", rows: [] };
+				return { error: "No valid header row found in CSV file.", rows: [] };
 			}
 			if (res.length === 0) {
-				return { error: "File CSV có dòng tiêu đề nhưng không chứa dòng dữ liệu nào.", rows: [] };
+				return { error: "CSV file contains a header row but no data rows.", rows: [] };
 			}
 
 			return { error: null, rows: res, headers: headers };
@@ -436,15 +682,15 @@
 			var p = (r.password || r.pass || '').trim();
 			var e = (r.email || '').trim();
 
-			if (!u) return { valid: false, error: 'Thiếu username' };
-			if (!/^[a-zA-Z0-9_.-]+$/.test(u)) return { valid: false, error: 'Ký tự username không hợp lệ' };
+			if (!u) return { valid: false, error: 'Missing username' };
+			if (!/^[a-zA-Z0-9_.-]+$/.test(u)) return { valid: false, error: 'Invalid username characters' };
 			var lowU = u.toLowerCase();
-			if (seenUsernames[lowU]) return { valid: false, error: 'Trùng username trong file' };
+			if (seenUsernames[lowU]) return { valid: false, error: 'Duplicate username in file' };
 			seenUsernames[lowU] = true;
 
-			if (!p) return { valid: false, error: 'Thiếu password' };
+			if (!p) return { valid: false, error: 'Missing password' };
 			if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
-				return { valid: false, error: 'Email sai định dạng' };
+				return { valid: false, error: 'Invalid email format' };
 			}
 			return { valid: true, error: null };
 		}
@@ -464,7 +710,7 @@
 				statusBox.style.background = 'rgba(231,76,60,0.15)';
 				statusBox.style.border = '1px solid rgba(231,76,60,0.4)';
 				statusBox.style.color = '#ff6b6b';
-				statusBox.innerHTML = '<i class="fa fa-times-circle"></i> <strong>Lỗi định dạng file:</strong> ' + parseResult.error;
+				statusBox.innerHTML = '<i class="fa fa-times-circle"></i> <strong>File format error:</strong> ' + parseResult.error;
 				App.toast(parseResult.error, 'error');
 				if (importBtnRef) importBtnRef.disabled = true;
 				return;
@@ -488,20 +734,20 @@
 				statusBox.style.background = 'rgba(243,156,18,0.15)';
 				statusBox.style.border = '1px solid rgba(243,156,18,0.4)';
 				statusBox.style.color = '#f39c12';
-				statusBox.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <strong>Cảnh báo dữ liệu:</strong> Phát hiện <strong>' + invalidCount + ' / ' + rows.length + ' dòng sai định dạng</strong> (xem đánh dấu đỏ bên dưới). Các dòng lỗi sẽ không được tạo.';
-				App.toast('Phát hiện ' + invalidCount + ' dòng không đúng định dạng!', 'error');
+				statusBox.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <strong>Data warning:</strong> Detected <strong>' + invalidCount + ' / ' + rows.length + ' invalid row(s)</strong> (highlighted in red below). Invalid rows will be skipped during import.';
+				App.toast(invalidCount + ' invalid row(s) detected in CSV!', 'error');
 			} else {
 				statusBox.style.background = 'rgba(46,204,113,0.15)';
 				statusBox.style.border = '1px solid rgba(46,204,113,0.4)';
 				statusBox.style.color = '#2ecc71';
-				statusBox.innerHTML = '<i class="fa fa-check-circle"></i> <strong>Định dạng hoàn toàn hợp lệ:</strong> Tìm thấy ' + rows.length + ' tài khoản hợp lệ, sẵn sàng tạo.';
+				statusBox.innerHTML = '<i class="fa fa-check-circle"></i> <strong>Format valid:</strong> Found ' + rows.length + ' valid user account(s), ready to import.';
 			}
 
 			var pt = el('table', 'fm-table');
 			pt.style.margin = '0';
 			var pth = el('thead');
 			var pthr = el('tr');
-			['#', 'Trạng thái', 'Username', 'Password', 'Email', 'Role', 'Workspace'].forEach(function (h) {
+			['#', 'Status', 'Username', 'Password', 'Email', 'Role', 'Workspace'].forEach(function (h) {
 				pthr.appendChild(el('th', null, h));
 			});
 			pth.appendChild(pthr);
@@ -517,7 +763,7 @@
 
 				var stTd = el('td');
 				if (v.valid) {
-					stTd.appendChild(el('span', 'badge badge-ok', 'Hợp lệ'));
+					stTd.appendChild(el('span', 'badge badge-ok', 'Valid'));
 				} else {
 					var badg = el('span', 'badge badge-warn', v.error);
 					badg.style.backgroundColor = '#e74c3c';
@@ -526,8 +772,8 @@
 				}
 				tr.appendChild(stTd);
 
-				tr.appendChild(el('td', v.valid ? null : 'invalid', r.username || '(trống)'));
-				tr.appendChild(el('td', v.valid ? 'muted' : 'invalid', r.password ? '••••••' : '(trống)'));
+				tr.appendChild(el('td', v.valid ? null : 'invalid', r.username || '(empty)'));
+				tr.appendChild(el('td', v.valid ? 'muted' : 'invalid', r.password ? '••••••' : '(empty)'));
 				tr.appendChild(el('td', 'muted', r.email || '—'));
 				tr.appendChild(el('td', 'muted', r.role || defRoleS.options[defRoleS.selectedIndex].text));
 				tr.appendChild(el('td', 'muted', r.workspace || (defWsI.value || '/')));
@@ -547,9 +793,9 @@
 			var ext = f.name.split('.').pop().toLowerCase();
 			if (ext !== 'csv' && ext !== 'txt') {
 				fileInp.value = '';
-				fileNameLabel.textContent = 'File không hợp lệ';
+				fileNameLabel.textContent = 'Invalid file';
 				parsedRows = [];
-				updatePreview({ error: 'Tập tin "' + f.name + '" không đúng định dạng! Vui lòng chọn file có đuôi .csv hoặc .txt.' });
+				updatePreview({ error: 'File "' + f.name + '" has an invalid format! Please select a .csv or .txt file.' });
 				return;
 			}
 
@@ -563,7 +809,7 @@
 					updatePreview(parseResult);
 				} catch (err) {
 					parsedRows = [];
-					updatePreview({ error: 'Lỗi đọc file: ' + err.message });
+					updatePreview({ error: 'File reading error: ' + err.message });
 				}
 			};
 			reader.readAsText(f);
@@ -577,12 +823,12 @@
 		});
 
 		var dlg = App.modal({
-			title: 'Import tài khoản từ file CSV', wide: true, body: form, dismissable: true, buttons: [
-				{ label: 'Hủy', kind: 'ghost', onClick: function (c) { c(); } },
+			title: 'Import Users from CSV', wide: true, body: form, dismissable: true, buttons: [
+				{ label: 'Cancel', kind: 'ghost', onClick: function (c) { c(); } },
 				{
-					label: 'Tiến hành Import', kind: 'primary', onClick: function () {
+					label: 'Import Users', kind: 'primary', onClick: function () {
 						if (!parsedRows.length) {
-							App.toast('Vui lòng chọn file CSV hợp lệ trước khi import', 'error');
+							App.toast('Please select a valid CSV file before importing', 'error');
 							return;
 						}
 						submitImport();
@@ -615,19 +861,19 @@
 					dlg.close();
 					var b = res.body;
 					if (b.imported > 0) {
-						App.toast('Đã tạo thành công ' + b.imported + ' / ' + b.total + ' tài khoản.', 'ok');
+						App.toast('Successfully imported ' + b.imported + ' / ' + b.total + ' user account' + (b.imported === 1 ? '' : 's') + '.', 'ok');
 					}
 					if (b.failed > 0 && b.results) {
-						App.batchReport('Kết quả Import CSV (' + b.imported + ' thành công, ' + b.failed + ' lỗi)', b.results);
+						App.batchReport('CSV Import Results (' + b.imported + ' succeeded, ' + b.failed + ' failed)', b.results);
 					}
 					reload();
 				} else {
-					var err = (res.body && res.body.error) || 'Import tài khoản thất bại';
+					var err = (res.body && res.body.error) || 'Failed to import user accounts';
 					App.toast(err, 'error');
 				}
 			}).catch(function (err) {
 				App.loading(false);
-				App.toast('Lỗi kết nối: ' + (err.message || err), 'error');
+				App.toast('Connection error: ' + (err.message || err), 'error');
 			});
 		}
 	}
