@@ -33,3 +33,18 @@ __pycache__/
 *.pyc
 html/vendor/
 html/composer.lock
+
+# Runtime logs & locks
+data/Logs/*
+!data/Logs/.gitkeep
+*.lock.flock
+ksm
+
+# Multi-tenant user runtime pods
+users/[0-9]*/
+
+# Test labs
+labs/aaaa*
+labs/test.unl*
+labs/Enterprise-Network-30Node*
+
