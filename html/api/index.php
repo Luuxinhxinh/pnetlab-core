@@ -41,6 +41,8 @@ $containerBuilder->addDefinitions([
     SystemController::class => fn($c) => new SystemController($c->get(BrokerClient::class)),
     AuthMiddleware::class => fn() => new AuthMiddleware(true),
     RateLimitMiddleware::class => fn() => new RateLimitMiddleware(60, 60),
+    \PNetLab\Middleware\OpenApiValidationMiddleware::class => fn() => new \PNetLab\Middleware\OpenApiValidationMiddleware(),
+    \PNetLab\Middleware\Slim2CompatMiddleware::class => fn() => new \PNetLab\Middleware\Slim2CompatMiddleware(),
 ]);
 
 $container = $containerBuilder->build();
@@ -52,6 +54,8 @@ $app->addBodyParsingMiddleware();
 $app->addRoutingMiddleware();
 
 // 3. Register Global Foundation Middlewares (LIFO order in Slim 4)
+$app->add($container->get(\PNetLab\Middleware\Slim2CompatMiddleware::class));
+$app->add($container->get(\PNetLab\Middleware\OpenApiValidationMiddleware::class));
 $app->add($container->get(RateLimitMiddleware::class));
 $app->add($container->get(AuthMiddleware::class));
 $app->addErrorMiddleware(true, true, true);
