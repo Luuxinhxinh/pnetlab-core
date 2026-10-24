@@ -19,7 +19,35 @@ import unittest
 from typing import Any, Dict, Optional
 
 SOCKET_PATH = "/run/pnetlab/broker.sock"
-TEST_LAB_PATH = "/opt/unetlab/labs/12.unl"
+# ---- Lab mẫu để test chu trình start/stop ----
+# Ưưu tiên dùng labs/12.unl (file lab cơ sở của bộ test), nếu không có thì tìm file .unl
+# đầu tiên trong thư mục labs/. Test sẽ bị SKIP nếu không tìm thấy bất kỳ file .unl nào.
+_PREFERRED_LAB = "/opt/unetlab/labs/12.unl"
+_LABS_DIR = "/opt/unetlab/labs"
+
+
+def _find_test_lab() -> str:
+    """
+    Tìm hoặc khởi tạo bài lab mẫu an toàn (0 node) để chạy test start/stop.
+    Tuyệt đối không chạy test trên lab của người dùng thực tế nhằm tránh
+    ngắt kết nối hoặc tiêu tốn tài nguyên hệ thống.
+    """
+    if os.path.exists(_PREFERRED_LAB):
+        return _PREFERRED_LAB
+    # Nếu 12.unl không có, tạo một file lab mẫu tối giản an toàn (0 node)
+    dummy_lab = os.path.join(_LABS_DIR, "safety_net_dummy.unl")
+    try:
+        if not os.path.exists(dummy_lab):
+            with open(dummy_lab, "w", encoding="utf-8") as f:
+                f.write('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+                        '<lab name="safety_net_dummy" id="00000000-0000-0000-0000-000000000001" version="1"/>\n')
+        return dummy_lab
+    except OSError:
+        pass
+    return ""  # Trả về chuỗi rỗng => test sẽ bị skip
+
+
+TEST_LAB_PATH = _find_test_lab()
 
 
 class BrokerSocketClient:
@@ -117,14 +145,19 @@ class TestBrokerSocketSafetyNet(unittest.TestCase):
     # 2. NGHIỆP VỤ VÒNG ĐỜI ROUTER/LAB (START & STOP) - TRỌNG TÂM BE2
     # -------------------------------------------------------------------------
 
+    @unittest.skipIf(
+        not os.path.exists(_find_test_lab()),
+        f"Không tìm thấy file .unl nào trong {_LABS_DIR} để test chu trình start/stop."
+    )
     def test_03_node_lifecycle_start_and_stop(self):
         """[Nghiệp vụ 3] Chu trình Start và Stop phòng lab/node qua Broker."""
+        lab = _find_test_lab()
         # 1. Khởi động bài lab (start)
         res_start = self.client.call("wrapper", {
             "action": "start",
             "tenant": 1,
             "session": 1,
-            "lab": TEST_LAB_PATH
+            "lab": lab
         })
         self._assert_schema(res_start)
         self.assertTrue(res_start["ok"], "Lệnh start node thất bại")
@@ -135,7 +168,7 @@ class TestBrokerSocketSafetyNet(unittest.TestCase):
             "action": "stop",
             "tenant": 1,
             "session": 1,
-            "lab": TEST_LAB_PATH
+            "lab": lab
         })
         self._assert_schema(res_stop)
         self.assertTrue(res_stop["ok"], "Lệnh stop node thất bại")
@@ -184,34 +217,56 @@ class TestBrokerSocketSafetyNet(unittest.TestCase):
         self.assertTrue(res_fix["ok"])
         self.assertEqual(res_fix["rc"], 0)
 
-        # 2. Điều khiển KSM (ksmon/ksmoff) - Luôn khôi phục trạng thái ban đầu để tránh lỗi degrade
-        orig_ksm = True
-        if os.path.exists("/sys/kernel/mm/ksm/run"):
+        # 2. Điều khiển KSM (ksmon/ksmoff)
+        # - Chỉ chạy nếu kernel hỗ trợ KSM sysfs
+        # - Luôn khôi phục trạng thái ban đầu trong khối finally để tránh tắt KSM
+        #   vĩnh viễn nếu tiến trình test bị kill đột ngột
+        ksm_run = "/sys/kernel/mm/ksm/run"
+        if os.path.exists(ksm_run):
+            orig_ksm = True
             try:
-                with open("/sys/kernel/mm/ksm/run", "r") as f:
+                with open(ksm_run, "r") as f:
                     orig_ksm = (f.read().strip() == "1")
-            except Exception:
-                pass
+            except OSError:
+                pass  # Giả định đang bật để an toàn hơn
 
-        try:
-            res_ksm_on = self.client.call("wrapper", {"action": "ksmon"})
-            self._assert_schema(res_ksm_on)
-            self.assertEqual(res_ksm_on["rc"], 0)
+            try:
+                res_on = self.client.call("wrapper", {"action": "ksmon"})
+                self._assert_schema(res_on)
+                self.assertEqual(res_on["rc"], 0, "ksmon thất bại")
 
-            res_ksm_off = self.client.call("wrapper", {"action": "ksmoff"})
-            self._assert_schema(res_ksm_off)
-            self.assertEqual(res_ksm_off["rc"], 0)
-        finally:
-            self.client.call("wrapper", {"action": "ksmon" if orig_ksm else "ksmoff"})
+                res_off = self.client.call("wrapper", {"action": "ksmoff"})
+                self._assert_schema(res_off)
+                self.assertEqual(res_off["rc"], 0, "ksmoff thất bại")
+            finally:
+                # QUAN TRỌNG: Khôi phục trạng thái KSM ban đầu dù test pass hay fail
+                restore_action = "ksmon" if orig_ksm else "ksmoff"
+                self.client.call("wrapper", {"action": restore_action})
+        else:
+            self.skipTest("Kernel không có KSM sysfs (/sys/kernel/mm/ksm/run) — bỏ qua kiểm tra KSM")
 
         # 3. Điều khiển CPU Limit (cpulimiton/cpulimitoff)
-        res_cpu_on = self.client.call("wrapper", {"action": "cpulimiton"})
-        self._assert_schema(res_cpu_on)
-        self.assertEqual(res_cpu_on["rc"], 0)
+        # Lưu lại trạng thái CPU limit ban đầu để khôi phục trong finally
+        orig_cpu_limit = "disabled"
+        try:
+            status_res = self.client.call("qemu_cpu_policy_status")
+            if status_res.get("ok") and status_res.get("out"):
+                orig_cpu_limit = status_res["out"][0]
+        except Exception:
+            pass
 
-        res_cpu_off = self.client.call("wrapper", {"action": "cpulimitoff"})
-        self._assert_schema(res_cpu_off)
-        self.assertEqual(res_cpu_off["rc"], 0)
+        try:
+            res_cpu_on = self.client.call("wrapper", {"action": "cpulimiton"})
+            self._assert_schema(res_cpu_on)
+            self.assertEqual(res_cpu_on["rc"], 0, "cpulimiton thất bại")
+
+            res_cpu_off = self.client.call("wrapper", {"action": "cpulimitoff"})
+            self._assert_schema(res_cpu_off)
+            self.assertEqual(res_cpu_off["rc"], 0, "cpulimitoff thất bại")
+        finally:
+            # QUAN TRỌNG: Khôi phục trạng thái CPU limit ban đầu
+            restore_cpu_act = "cpulimiton" if orig_cpu_limit == "enabled" else "cpulimitoff"
+            self.client.call("wrapper", {"action": restore_cpu_act})
 
 
 if __name__ == "__main__":

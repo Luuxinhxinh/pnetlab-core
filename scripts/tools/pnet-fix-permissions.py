@@ -197,8 +197,7 @@ def fix_executables() -> int:
         "/opt/unetlab/scripts/tools/*.py",
         "/opt/unetlab/scripts/tools/*.sh",
         "/opt/unetlab/scripts/pnet-doctor",
-        "/opt/unetlab/wrappers/*",
-        "/opt/unetlab/.githooks/*"
+        "/opt/unetlab/wrappers/*"
     ]
     for pattern in patterns:
         for fpath in glob.glob(pattern):
@@ -210,26 +209,6 @@ def fix_executables() -> int:
                 except OSError:
                     pass
     return exec_count
-
-
-def configure_git_hooks() -> str:
-    """Tự động cấu hình core.hooksPath cho Git nếu đây là Git repository."""
-    git_dir = "/opt/unetlab/.git"
-    githooks_dir = "/opt/unetlab/.githooks"
-    if os.path.exists(git_dir) and os.path.exists(githooks_dir):
-        try:
-            import subprocess
-            subprocess.run(
-                ["git", "config", "core.hooksPath", ".githooks"],
-                cwd="/opt/unetlab",
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            return "Đã tự động đồng bộ Git Hooks (core.hooksPath = .githooks)"
-        except Exception as exc:
-            return f"Không thể set git hooks: {exc}"
-    return "Bỏ qua cấu hình Git hooks (không phải thư mục git)"
 
 
 def main() -> None:
@@ -262,19 +241,7 @@ def main() -> None:
     )
     print(f"  {C_GREEN}[✔]{C_RESET} Đã chuẩn hóa {h_dirs} thư mục, {h_files} tệp trong /opt/unetlab/html/")
 
-    # 3. Chuẩn hóa /opt/unetlab/labs/ (Nơi lưu trữ file lab UNL và swap file cho www-data)
-    if os.path.exists("/opt/unetlab/labs"):
-        print(f"[*] Đang chuẩn hóa thư mục Labs /opt/unetlab/labs/...")
-        l_dirs, l_files = fix_tree_permissions(
-            "/opt/unetlab/labs",
-            user="www-data",
-            group="www-data",
-            dir_mode=0o775,
-            file_mode=0o664
-        )
-        print(f"  {C_GREEN}[✔]{C_RESET} Đã chuẩn hóa {l_dirs} thư mục, {l_files} tệp trong /opt/unetlab/labs/")
-
-    # 4. Chuẩn hóa /opt/unetlab/plugins/ (Kiến trúc Plugin SPI của BE2)
+    # 3. Chuẩn hóa /opt/unetlab/plugins/ (Kiến trúc Plugin SPI của BE2)
     if os.path.exists("/opt/unetlab/plugins"):
         print(f"[*] Đang chuẩn hóa thư mục Plugin SPI /opt/unetlab/plugins/...")
         p_dirs, p_files = fix_tree_permissions(
@@ -286,54 +253,92 @@ def main() -> None:
         )
         print(f"  {C_GREEN}[✔]{C_RESET} Đã chuẩn hóa {p_dirs} thư mục, {p_files} tệp trong /opt/unetlab/plugins/")
 
-    # 4. Bảo vệ tệp nhạy cảm
+    # 4. Chuẩn hóa /opt/unetlab/labs/ và dọn dẹp lock rác
+    if os.path.exists("/opt/unetlab/labs"):
+        print(f"[*] Đang chuẩn hóa thư mục bài lab /opt/unetlab/labs/...")
+        l_dirs, l_files = fix_tree_permissions(
+            "/opt/unetlab/labs",
+            user="www-data",
+            group="www-data",
+            dir_mode=0o775,
+            file_mode=0o664
+        )
+        # Dọn sạch các file lock rác mồ côi (*.lock, *.lock.flock)
+        cleaned_locks = 0
+        for pattern in ("/opt/unetlab/labs/*.lock", "/opt/unetlab/labs/*.lock.flock"):
+            for lock_f in glob.glob(pattern):
+                try:
+                    os.unlink(lock_f)
+                    cleaned_locks += 1
+                except OSError:
+                    pass
+        print(f"  {C_GREEN}[✔]{C_RESET} Đã chuẩn hóa {l_dirs} thư mục, {l_files} tệp trong /opt/unetlab/labs/ (đã giải phóng {cleaned_locks} lock rác).")
+
+    # 5. Chuẩn hóa /opt/unetlab/addons/ và /opt/unetlab/users/
+    if os.path.exists("/opt/unetlab/addons"):
+        fix_tree_permissions("/opt/unetlab/addons", user="root", group="root", dir_mode=0o755, file_mode=0o644)
+    if os.path.exists("/opt/unetlab/users"):
+        uid_root, gid_unl = get_user_group_ids("root", "unl")
+        fix_tree_permissions("/opt/unetlab/users", user="root", group="unl", dir_mode=0o2775, file_mode=0o664)
+
+    # 6. Bảo vệ tệp nhạy cảm
     print(f"[*] Đang kiểm tra và siết chặt các tệp cấu hình bảo mật...")
     sec_msgs = secure_protected_assets()
     for m in sec_msgs:
         print(f"  {C_GREEN}[✔]{C_RESET} {m}")
 
-    # 5. Khởi tạo runtime dir
+    # 7. Khởi tạo runtime dir
     print(f"[*] Đang kiểm tra thư mục runtime /run/pnetlab/...")
     run_msg = setup_runtime_dir()
     print(f"  {C_GREEN}[✔]{C_RESET} {run_msg}")
 
-    # 6. Dọn sạch cache IP bị chặn
+    # 8. Dọn sạch cache IP bị chặn
     print(f"[*] Đang dọn sạch cache khóa IP đăng nhập...")
     cleaned_auth = clean_auth_fail_cache()
     print(f"  {C_GREEN}[✔]{C_RESET} Đã dọn sạch {cleaned_auth} bản ghi khóa IP tại /dev/shm/pnet-authfail/")
 
-    # 7. Cấp quyền thực thi
-    print(f"[*] Đang cấp quyền thực thi (+x) cho các script quản trị và wrappers...")
+    # 9. Cấp quyền thực thi và bảo đảm Linux Capabilities cho wrappers
+    print(f"[*] Đang cấp quyền thực thi (+x) và Linux capabilities cho wrappers...")
     execs = fix_executables()
     print(f"  {C_GREEN}[✔]{C_RESET} Đã cấp quyền thực thi cho {execs} script hệ thống.")
 
-    # 8. Chuẩn hóa vùng runtime node /opt/unetlab/tmp/ và /tmp/netio (chống lỗi start node NETMAP access)
+    # Bảo đảm capability cap_net_admin=ep cho iol_wrapper (Cisco IOL switch/router bắt buộc)
+    iol_wrapper_path = "/opt/unetlab/wrappers/iol_wrapper"
+    if os.path.exists(iol_wrapper_path):
+        import subprocess
+        try:
+            subprocess.run(["setcap", "cap_net_admin=ep", iol_wrapper_path], check=True, stderr=subprocess.DEVNULL)
+            print(f"  {C_GREEN}[✔]{C_RESET} Đã bảo đảm Linux capability cap_net_admin=ep cho {iol_wrapper_path}")
+        except Exception as exc:
+            print(f"  {C_YELLOW}[⚠]{C_RESET} Cảnh báo: Không thể setcap cho {iol_wrapper_path}: {exc}")
+
+    # 10. Chuẩn hóa vùng runtime node /opt/unetlab/tmp/ và /tmp/netio (chống lỗi start node NETMAP access)
+    # QUAN TRỌNG: phải dùng 0o2777 (SetGID + Sticky) thay vì 0o1777 (chỉ Sticky).
+    # SetGID bit đảm bảo các file/socket được tạo bên trong tmp luôn kế thừa group `unl`,
+    # cho phép các tiến trình QEMU/IOL chạy dưới các UID unl1, unl2,... truy cập socket
+    # NETMAP của nhau. Thiếu SetGID sẽ gây lỗi "NETMAP access denied" khi start node.
     print(f"[*] Đang chuẩn hóa vùng runtime node (/opt/unetlab/tmp và /tmp/netio)...")
     try:
         os.makedirs("/opt/unetlab/tmp", exist_ok=True)
         uid_root, gid_unl = get_user_group_ids("root", "unl")
         os.chown("/opt/unetlab/tmp", uid_root, gid_unl)
-        os.chmod("/opt/unetlab/tmp", 0o1777)
+        # SetGID (2) + rwxrwxrwx (777) = 2777: kế thừa group unl cho node con
+        os.chmod("/opt/unetlab/tmp", 0o2777)
         for root_t, dirs_t, files_t in os.walk("/opt/unetlab/tmp"):
             for d in dirs_t:
                 dp = os.path.join(root_t, d)
                 os.chown(dp, uid_root, gid_unl)
-                os.chmod(dp, 0o777)
+                os.chmod(dp, 0o2777)
             for f in files_t:
                 fp = os.path.join(root_t, f)
                 os.chown(fp, uid_root, gid_unl)
-                os.chmod(fp, 0o777)
+                os.chmod(fp, 0o666)
 
         os.makedirs("/tmp/netio", exist_ok=True)
         os.chmod("/tmp/netio", 0o1777)
-        print(f"  {C_GREEN}[✔]{C_RESET} Vùng runtime node /opt/unetlab/tmp (root:unl 0777) và /tmp/netio đã sẵn sàng.")
+        print(f"  {C_GREEN}[✔]{C_RESET} Vùng runtime node /opt/unetlab/tmp (root:unl, mode 2777-SetGID) và /tmp/netio đã sẵn sàng.")
     except Exception as exc:
         print(f"  {C_RED}[✘]{C_RESET} Lỗi chuẩn hóa tmp: {exc}")
-
-    # 9. Tự động liên kết Git Hooks (.githooks -> core.hooksPath)
-    print(f"[*] Đang kiểm tra cấu hình tự động cho Git Hooks...")
-    git_msg = configure_git_hooks()
-    print(f"  {C_GREEN}[✔]{C_RESET} {git_msg}")
 
     print(f"{C_CYAN}========================================================================{C_RESET}")
     print(f"  {C_GREEN}{C_BOLD}🎉 HOÀN TẤT CHUẨN HÓA! Môi trường PNetLab đã sẵn sàng và sạch lỗi 500.{C_RESET}")

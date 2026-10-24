@@ -97,10 +97,38 @@ def check_ksm() -> HealthCheckResult:
         return HealthCheckResult("Memory Dedup (KSM)", "WARN", f"Lỗi đọc KSM: {exc}")
 
 
+def _detect_phpfpm_unit() -> Optional[str]:
+    """Tự động phát hiện tên service PHP-FPM đang được cài (php8.5-fpm, php8.3-fpm, v.v.)."""
+    # Thử is-active theo thứ tự ưu tiên phiên bản mới nhất
+    candidates = ["php8.5-fpm", "php8.4-fpm", "php8.3-fpm", "php8.2-fpm", "php8.1-fpm", "php-fpm"]
+    for unit in candidates:
+        proc = subprocess.run(
+            ["systemctl", "is-active", unit],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
+        )
+        # "active" = đang chạy; "inactive" = có cài nhưng đang dừng — đều là candidates hợp lệ
+        if proc.stdout.strip() in ("active", "inactive", "failed"):
+            return unit
+    return None
+
+
 def check_systemd_units() -> List[HealthCheckResult]:
-    """Kiểm tra trạng thái các tiến trình dịch vụ cốt lõi."""
-    units = ["apache2", "mysql", "docker", "guacd", "pnetlab-brokerd"]
+    """Kiểm tra trạng thái các tiến trình dịch vụ cốt lõi (bao gồm PHP-FPM)."""
+    base_units = ["apache2", "mysql", "docker", "guacd", "pnetlab-brokerd"]
     results = []
+
+    # Tự động phát hiện và bổ sung php-fpm vào danh sách kiểm tra
+    phpfpm_unit = _detect_phpfpm_unit()
+    if phpfpm_unit:
+        units = base_units + [phpfpm_unit]
+    else:
+        units = base_units
+        results.append(HealthCheckResult(
+            "Dịch vụ PHP-FPM",
+            "WARN",
+            "Không phát hiện được service PHP-FPM trên hệ thống",
+            "apt install php-fpm (hoặc kiểm tra: systemctl list-units | grep fpm)"
+        ))
 
     for u in units:
         proc = subprocess.run(
@@ -165,70 +193,165 @@ def check_broker_socket() -> HealthCheckResult:
         )
 
 
+def _check_dir_owner(path: str, expected_user: str) -> bool:
+    """Kiểm tra thư mục có thuộc sở hữu của user mong đợi không."""
+    try:
+        import pwd
+        st = os.stat(path)
+        owner = pwd.getpwuid(st.st_uid).pw_name
+        return owner == expected_user
+    except Exception:
+        return False
+
+
 def check_permissions() -> List[HealthCheckResult]:
-    """Kiểm tra phân quyền các thư mục quan trọng."""
+    """Kiểm tra phân quyền các thư mục và file quan trọng."""
     results = []
 
-    # Kiểm tra /opt/unetlab/tmp (yêu cầu sticky bit hoặc mode 2777/777)
+    # 1. Kiểm tra /opt/unetlab/tmp (yêu cầu SetGID + Sticky: mode 2777)
     tmp_path = "/opt/unetlab/tmp"
     if os.path.exists(tmp_path):
         mode = oct(os.stat(tmp_path).st_mode)[-4:]
-        if mode in ("2777", "0777", "1777"):
-            results.append(HealthCheckResult("Quyền thư mục /opt/unetlab/tmp", "PASS", f"Mode {mode} (chuẩn)"))
+        if mode == "2777":
+            results.append(HealthCheckResult("Quyền /opt/unetlab/tmp", "PASS", f"Mode {mode} (SetGID+Sticky, chuẩn)"))
+        elif mode in ("0777", "1777"):
+            results.append(HealthCheckResult(
+                "Quyền /opt/unetlab/tmp",
+                "WARN",
+                f"Mode {mode} — thiếu SetGID bit, node có thể lỗi NETMAP",
+                "sudo chmod 2777 /opt/unetlab/tmp"
+            ))
         else:
             results.append(HealthCheckResult(
-                "Quyền thư mục /opt/unetlab/tmp",
-                "WARN",
+                "Quyền /opt/unetlab/tmp",
+                "FAIL",
                 f"Mode {mode} (kỳ vọng 2777)",
                 "sudo chmod 2777 /opt/unetlab/tmp"
             ))
     else:
-        results.append(HealthCheckResult("Quyền thư mục /opt/unetlab/tmp", "FAIL", "Không tồn tại", "sudo mkdir -p /opt/unetlab/tmp"))
+        results.append(HealthCheckResult("Quyền /opt/unetlab/tmp", "FAIL", "Không tồn tại", "sudo mkdir -p /opt/unetlab/tmp && sudo chmod 2777 /opt/unetlab/tmp"))
 
-    # Kiểm tra dbcreds.json
+    # 2. Kiểm tra quyền sở hữu www-data cho các thư mục chính (html, data, labs)
+    for web_dir in ("/opt/unetlab/html", "/opt/unetlab/data", "/opt/unetlab/labs"):
+        if os.path.exists(web_dir):
+            if _check_dir_owner(web_dir, "www-data"):
+                results.append(HealthCheckResult(f"Quyền sở hữu {os.path.basename(web_dir)}/", "PASS", f"Thuộc sở hữu www-data (chuẩn)"))
+            else:
+                try:
+                    import pwd
+                    actual_owner = pwd.getpwuid(os.stat(web_dir).st_uid).pw_name
+                except Exception:
+                    actual_owner = "unknown"
+                results.append(HealthCheckResult(
+                    f"Quyền sở hữu {os.path.basename(web_dir)}/",
+                    "WARN",
+                    f"Owner hiện tại: {actual_owner} (kỳ vọng: www-data)",
+                    f"sudo python3 scripts/tools/pnet-fix-permissions.py"
+                ))
+
+    # 3. Kiểm tra Linux capabilities cho Cisco IOL wrapper (cap_net_admin=ep)
+    iol_wrapper = "/opt/unetlab/wrappers/iol_wrapper"
+    if os.path.exists(iol_wrapper):
+        try:
+            p_cap = subprocess.run(["getcap", iol_wrapper], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+            if "cap_net_admin" in p_cap.stdout:
+                results.append(HealthCheckResult("IOL Wrapper Capability", "PASS", "iol_wrapper có cap_net_admin=ep (Cisco IOL sẵn sàng)"))
+            else:
+                results.append(HealthCheckResult(
+                    "IOL Wrapper Capability",
+                    "WARN",
+                    "iol_wrapper thiếu cap_net_admin=ep (Cisco IOL không tạo được NIC)",
+                    f"sudo setcap cap_net_admin=ep {iol_wrapper}"
+                ))
+        except Exception as exc:
+            results.append(HealthCheckResult("IOL Wrapper Capability", "WARN", f"Không thể kiểm tra getcap: {exc}"))
+
+    # 4. Kiểm tra bảo mật file dbcreds.json
     creds_path = "/opt/unetlab/data/dbcreds.json"
     if os.path.exists(creds_path):
         mode = oct(os.stat(creds_path).st_mode)[-4:]
         if mode == "0600":
-            results.append(HealthCheckResult("Bảo mật DB Credentials", "PASS", "File tồn tại với quyền an toàn 0600"))
+            results.append(HealthCheckResult("Bảo mật DB Credentials", "PASS", "dbcreds.json tồn tại, quyền 0600 (root-only)"))
         else:
             results.append(HealthCheckResult(
                 "Bảo mật DB Credentials",
                 "WARN",
-                f"Mode {mode} (kỳ vọng 0600)",
-                f"sudo chmod 0600 {creds_path}"
+                f"Mode {mode} — file đang hở quyền (kỳ vọng 0600)",
+                f"sudo chmod 0600 {creds_path} && sudo chown root:root {creds_path}"
             ))
     else:
         results.append(HealthCheckResult(
             "Bảo mật DB Credentials",
             "WARN",
-            "Chưa có file dbcreds.json",
-            "Chạy python3 scripts/tools/secure_db_backup.py --action verify"
+            "Chưa có dbcreds.json — cần tạo từ file mẫu",
+            f"sudo cp data/dbcreds.json.example data/dbcreds.json && sudo nano data/dbcreds.json"
         ))
 
     return results
 
 
 def check_database() -> HealthCheckResult:
-    """Kiểm tra kết nối tới MySQL Database."""
+    """Kiểm tra kết nối tới MySQL Database.
+
+    Đọc thông tin xác thực an toàn từ data/dbcreds.json (mode 0600) thay vì
+    hardcode mật khẩu dạng -ppnetlab (lộ qua 'ps aux' và báo lỗi giả khi đổi mật khẩu).
+    """
+    import tempfile
+    creds_path = "/opt/unetlab/data/dbcreds.json"
+    cnf_path: Optional[str] = None
     try:
+        if not os.path.exists(creds_path):
+            return HealthCheckResult(
+                "Database (pnetlab_db)",
+                "WARN",
+                "Không tìm thấy data/dbcreds.json để đọc thông tin xác thực",
+                f"sudo cp data/dbcreds.json.example data/dbcreds.json && sudo nano data/dbcreds.json"
+            )
+
+        with open(creds_path, "r", encoding="utf-8") as f:
+            creds = json.load(f)
+
+        # Tạo file tạm thời chứa thông tin đăng nhập, tránh lộ mật khẩu qua ps aux
+        tmp_f = tempfile.NamedTemporaryFile(
+            mode="w", delete=False, prefix="pnet_dr_", suffix=".cnf", encoding="utf-8"
+        )
+        os.chmod(tmp_f.name, 0o600)
+        tmp_f.write("[client]\n")
+        tmp_f.write(f"user={creds.get('user', 'root')}\n")
+        # Thoát các ký tự đặc biệt trong password phòng trường hợp có dấu ngoặc kép hoặc backslash
+        pwd = str(creds.get('password', '')).replace('\\', '\\\\').replace('"', '\\"')
+        tmp_f.write(f'password="{pwd}"\n')
+        if creds.get("socket") and os.path.exists(str(creds["socket"])):
+            tmp_f.write(f"socket={creds['socket']}\n")
+        elif creds.get("host"):
+            tmp_f.write(f"host={creds['host']}\n")
+            tmp_f.write(f"port={creds.get('port', 3306)}\n")
+        tmp_f.flush()
+        tmp_f.close()
+        cnf_path = tmp_f.name
+
         proc = subprocess.run(
-            ["mysql", "-uroot", "-ppnetlab", "-e", "SELECT 1;"],
+            ["mysql", f"--defaults-extra-file={cnf_path}", "-e", "SELECT 1;"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             stdin=subprocess.DEVNULL
         )
         if proc.returncode == 0:
-            return HealthCheckResult("Database (pnetlab_db)", "PASS", "MySQL phản hồi tốt, kết nối thành công")
+            return HealthCheckResult("Database (pnetlab_db)", "PASS", f"MySQL phản hồi tốt (User: {creds.get('user', 'root')})")
         return HealthCheckResult(
             "Database (pnetlab_db)",
             "FAIL",
-            f"Không thể kết nối CSDL: {proc.stderr.strip()}",
+            f"Không thể kết nối CSDL: {proc.stderr.strip()[:80]}",
             "sudo systemctl restart mysql"
         )
+    except PermissionError:
+        return HealthCheckResult("Database (pnetlab_db)", "WARN", "Cần chạy pnet-doctor bằng sudo để đọc dbcreds.json (0600)", "sudo ./scripts/pnet-doctor")
     except Exception as exc:
         return HealthCheckResult("Database (pnetlab_db)", "FAIL", f"Lỗi thực thi: {exc}")
+    finally:
+        if cnf_path and os.path.exists(cnf_path):
+            os.remove(cnf_path)
 
 
 def check_disk_space() -> HealthCheckResult:
