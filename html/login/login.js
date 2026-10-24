@@ -50,7 +50,33 @@
 			err_fail: "Invalid credentials.",
 			err_unreachable: "Cannot reach the server. Check that the appliance is running.",
 			err_forgot_fill: "Enter your username or email address.",
-			msg_forgot_success: "A password reset link has been dispatched to your email."
+			msg_forgot_success: "A password reset link has been dispatched to your email.",
+			wf0_title: "CHOOSE WORK MODE (PNETLAB V8)",
+			wf0_subtitle: "The platform provides two independent environments with distinct storage and authentication. Please select your mode:",
+			mode_offline_name: "1. Offline Mode (Local Lab)",
+			mode_offline_desc: "Hands-on practice on local appliance. Ideal for infra admins, instructors building curriculum, and isolated topologies without internet.",
+			feat_offline_auth: "Authentication: Local Server Account (Admin / Root)",
+			feat_offline_store: "Storage: Filesystem /opt/unetlab/labs/",
+			feat_offline_perf: "Performance: Direct Kernel KVM & Local Docker",
+			feat_offline_net: "No internet connection required",
+			mode_online_name: "2. Online Mode (Git Repo Hub)",
+			mode_online_desc: "Cloud distributed environment similar to GitHub. Designed for students, lab exchanges, clone/fork and Cyber Range competitions.",
+			feat_online_auth: "Authentication: Community Account (Online Profile / Token)",
+			feat_online_git: "Mini-Git: Snapshot versioning, Fork peer topologies",
+			feat_online_cgroup: "Cgroups v2: Enforce RAM/CPU limits per Tenant ID",
+			feat_online_catalog: "Auto-sync Catalog via public GitHub CDN",
+			label_auth_info: "Account Credentials:",
+			btn_enter_offline: "Sign in to Offline Mode",
+			btn_enter_online: "Enter Online Hub & Profile",
+			tab_offline: "Offline (Local)",
+			tab_online: "Online (Hub)",
+			label_hub_username: "Hub Username",
+			label_hub_password: "Hub Password",
+			btn_signin_online: "Sign in to Online Hub",
+			online_api_info: "Multi-tenant Cloud Pod • API Prefix /api/v4/",
+			modal_online_title: "Online Hub Sign-in",
+			modal_online_subtitle: "Authenticate via Token & access Multi-tenant Pod",
+			err_hub_fail: "Online Hub authentication failed."
 		},
 		vi: {
 			settings_title: "Giao diện & Hiệu ứng",
@@ -87,7 +113,33 @@
 			err_fail: "Tài khoản hoặc mật khẩu không chính xác.",
 			err_unreachable: "Không thể kết nối máy chủ. Vui lòng kiểm tra dịch vụ PNetLab.",
 			err_forgot_fill: "Vui lòng nhập tên đăng nhập hoặc email.",
-			msg_forgot_success: "Liên kết khôi phục mật khẩu đã được gửi đến email của bạn."
+			msg_forgot_success: "Liên kết khôi phục mật khẩu đã được gửi đến email của bạn.",
+			wf0_title: "CHỌN PHƯƠNG THỨC LÀM VIỆC (PNETLAB V8)",
+			wf0_subtitle: "Hệ thống hỗ trợ 2 môi trường hoàn toàn độc lập với cơ chế tài khoản và lưu trữ riêng biệt. Vui lòng chọn chế độ phù hợp:",
+			mode_offline_name: "1. Chế Độ Offline (Local Lab)",
+			mode_offline_desc: "Thực hành trên máy chủ nội bộ. Dành cho admin hạ tầng, giảng viên biên soạn giáo trình và cấu hình node mạng độc lập không cần Internet.",
+			feat_offline_auth: "Xác thực: Tài khoản Local Server (Admin / Root)",
+			feat_offline_store: "Lưu trữ: Hệ thống tệp /opt/unetlab/labs/",
+			feat_offline_perf: "Hiệu năng: Trực tiếp qua Kernel KVM & Docker nội bộ",
+			feat_offline_net: "Không yêu cầu kết nối mạng ra Internet",
+			mode_online_name: "2. Chế Độ Online (Git Repo Hub)",
+			mode_online_desc: "Môi trường đám mây phân tán kiểu GitHub. Dành cho học viên tham gia lớp học, trao đổi bài lab, clone/fork và thi đấu Cyber Range.",
+			feat_online_auth: "Xác thực: Tài khoản Cộng đồng (Online Profile / Token)",
+			feat_online_git: "Mini-Git: Snapshot versioning, Fork bài lab đồng nghiệp",
+			feat_online_cgroup: "Cgroups v2: Giới hạn RAM/CPU theo từng Tenant ID",
+			feat_online_catalog: "Tự động đồng bộ Catalog qua GitHub CDN công khai",
+			label_auth_info: "Thông tin tài khoản:",
+			btn_enter_offline: "Đăng nhập Chế độ Offline",
+			btn_enter_online: "Vào Cổng Online & Kho Cá Nhân",
+			tab_offline: "Offline (Local)",
+			tab_online: "Online (Hub)",
+			label_hub_username: "Tài khoản Hub",
+			label_hub_password: "Mật khẩu Hub",
+			btn_signin_online: "🚀 Đăng nhập Online Hub",
+			online_api_info: "Cụm Pod Đa người dùng • Tiền tố API /api/v4/",
+			modal_online_title: "Đăng nhập Cổng Online Hub",
+			modal_online_subtitle: "Xác thực Token & truy cập Multi-tenant Pod",
+			err_hub_fail: "Đăng nhập Online Hub thất bại."
 		}
 	};
 
@@ -275,23 +327,16 @@
 	var userEl = document.getElementById('username');
 	var passEl = document.getElementById('password');
 
-	function openLoginModal() {
+	function openLoginModal(targetMode) {
 		if (!modalOverlay) return;
-		// Ensure standard sign in form is active, forgot form is hidden
+		var mode = targetMode || 'offline';
+		// Ensure forgot form is hidden
 		if (forgotForm) forgotForm.hidden = true;
-		if (form) form.hidden = false;
 		clearError();
+		clearOnlineError();
 		clearForgotAlerts();
+		switchModalMode(mode);
 		modalOverlay.hidden = false;
-		if (userEl) {
-			// Auto focus
-			setTimeout(function () {
-				userEl.focus();
-				if (userEl.value && passEl) {
-					passEl.focus();
-				}
-			}, 80);
-		}
 	}
 
 	function closeLoginModal() {
@@ -299,8 +344,82 @@
 		modalOverlay.hidden = true;
 	}
 
-	if (ctaSignInBtn) ctaSignInBtn.addEventListener('click', openLoginModal);
-	if (topSignInBtn) topSignInBtn.addEventListener('click', openLoginModal);
+	function switchModalMode(mode) {
+		var modalTitle = document.getElementById('modal-title');
+		var modalSubtitle = document.getElementById('modal-subtitle');
+		var tabOffline = document.getElementById('tab-mode-offline');
+		var tabOnline = document.getElementById('tab-mode-online');
+		var dict = translations[currentLang] || translations.en;
+
+		if (mode === 'online') {
+			if (tabOffline) tabOffline.classList.remove('is-active');
+			if (tabOnline) tabOnline.classList.add('is-active');
+			if (form) form.hidden = true;
+			if (onlineForm) onlineForm.hidden = false;
+			if (modalTitle) modalTitle.textContent = dict.modal_online_title;
+			if (modalSubtitle) modalSubtitle.textContent = dict.modal_online_subtitle;
+			setTimeout(function () {
+				if (onlineUserEl) {
+					onlineUserEl.focus();
+					if (onlineUserEl.value && onlinePassEl) {
+						onlinePassEl.focus();
+					}
+				}
+			}, 80);
+		} else {
+			if (tabOnline) tabOnline.classList.remove('is-active');
+			if (tabOffline) tabOffline.classList.add('is-active');
+			if (onlineForm) onlineForm.hidden = true;
+			if (form) form.hidden = false;
+			if (modalTitle) modalTitle.textContent = dict.modal_title;
+			if (modalSubtitle) modalSubtitle.textContent = dict.modal_subtitle;
+			setTimeout(function () {
+				if (userEl) {
+					userEl.focus();
+					if (userEl.value && passEl) {
+						passEl.focus();
+					}
+				}
+			}, 80);
+		}
+	}
+
+	var tabOfflineBtn = document.getElementById('tab-mode-offline');
+	var tabOnlineBtn = document.getElementById('tab-mode-online');
+	if (tabOfflineBtn) {
+		tabOfflineBtn.addEventListener('click', function () {
+			switchModalMode('offline');
+		});
+	}
+	if (tabOnlineBtn) {
+		tabOnlineBtn.addEventListener('click', function () {
+			switchModalMode('online');
+		});
+	}
+
+	var btnSelectOffline = document.getElementById('btn-select-offline');
+	var btnSelectOnline = document.getElementById('btn-select-online');
+	if (btnSelectOffline) {
+		btnSelectOffline.addEventListener('click', function () {
+			openLoginModal('offline');
+		});
+	}
+	if (btnSelectOnline) {
+		btnSelectOnline.addEventListener('click', function () {
+			openLoginModal('online');
+		});
+	}
+
+	if (ctaSignInBtn) {
+		ctaSignInBtn.addEventListener('click', function () {
+			openLoginModal('offline');
+		});
+	}
+	if (topSignInBtn) {
+		topSignInBtn.addEventListener('click', function () {
+			openLoginModal('offline');
+		});
+	}
 	if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeLoginModal);
 
 	if (modalOverlay) {
@@ -406,7 +525,7 @@
 	}
 
 	/* ==========================================================================
-	   6. Authentication Form Handling
+	   6. Authentication Form Handling (Offline & Online)
 	   ========================================================================== */
 	var form = document.getElementById('login-form');
 	var consolePrefEl = document.getElementById('console-pref');
@@ -414,6 +533,51 @@
 	var alertEl = document.getElementById('alert');
 	var submitEl = document.getElementById('submit');
 	var versionValueEl = document.getElementById('version-value');
+
+	// Online Hub elements
+	var onlineForm = document.getElementById('online-login-form');
+	var onlineUserEl = document.getElementById('online-username');
+	var onlinePassEl = document.getElementById('online-password');
+	var onlineSubmitEl = document.getElementById('online-submit');
+	var onlineAlertEl = document.getElementById('online-alert');
+	var onlinePasswordToggleBtn = document.getElementById('online-password-toggle-btn');
+
+	function showOnlineError(msg) {
+		var dict = translations[currentLang] || translations.en;
+		if (onlineAlertEl) {
+			onlineAlertEl.textContent = msg || dict.err_hub_fail;
+			onlineAlertEl.hidden = false;
+		}
+	}
+
+	function clearOnlineError() {
+		if (onlineAlertEl) {
+			onlineAlertEl.hidden = true;
+			onlineAlertEl.textContent = '';
+		}
+	}
+
+	function setOnlineBusy(on) {
+		if (onlineSubmitEl) {
+			onlineSubmitEl.disabled = on;
+			onlineSubmitEl.classList.toggle('is-busy', on);
+		}
+	}
+
+	if (onlinePasswordToggleBtn && onlinePassEl) {
+		onlinePasswordToggleBtn.addEventListener('click', function () {
+			var isPassword = onlinePassEl.type === 'password';
+			if (isPassword) {
+				onlinePassEl.type = 'text';
+				onlinePasswordToggleBtn.classList.add('is-revealed');
+				onlinePasswordToggleBtn.setAttribute('title', 'Hide password');
+			} else {
+				onlinePassEl.type = 'password';
+				onlinePasswordToggleBtn.classList.remove('is-revealed');
+				onlinePasswordToggleBtn.setAttribute('title', 'Show password');
+			}
+		});
+	}
 
 	// Restore remembered username
 	var savedUsername = localStorage.getItem('pnq_remembered_user');
@@ -500,6 +664,126 @@
 	}
 
 	if (form) form.addEventListener('submit', submit);
+
+	/* ==========================================================================
+	   6b. Online Hub Authentication Handler (POST /api/v4/auth/login)
+	   ========================================================================== */
+	function submitOnline(e) {
+		if (e) e.preventDefault();
+		clearOnlineError();
+		var dict = translations[currentLang] || translations.en;
+		var username = (onlineUserEl ? onlineUserEl.value : '').trim();
+		var password = onlinePassEl ? onlinePassEl.value : '';
+
+		if (!username || !password) {
+			showOnlineError(dict.err_fill_creds);
+			return;
+		}
+
+		setOnlineBusy(true);
+
+		fetch('/api/v4/auth/login', {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: {
+				'Content-Type': 'application/json',
+				'Accept': 'application/json'
+			},
+			body: JSON.stringify({ username: username, password: password })
+		}).then(function (r) {
+			return r.text().then(function (txt) {
+				var body = {};
+				try { body = txt ? JSON.parse(txt) : {}; } catch (err) { body = {}; }
+				return { status: r.status, body: body };
+			});
+		}).then(function (res) {
+			setOnlineBusy(false);
+			var data = res.body && res.body.data ? res.body.data : null;
+			var token = data && data.token ? data.token : null;
+
+			if ((res.status === 200 || (res.body && res.body.code === 200)) && token) {
+				// Store token and user metadata in localStorage
+				localStorage.setItem('pnq_online_token', token);
+				localStorage.setItem('pnq_online_user', data.username || username);
+				if (data.role) localStorage.setItem('pnq_online_role', data.role);
+				if (data.pod) localStorage.setItem('pnq_online_pod', JSON.stringify(data.pod));
+
+				// Set cookie for multi-domain / same-origin fallback
+				document.cookie = 'pnq_online_token=' + encodeURIComponent(token) + '; path=/; max-age=86400; SameSite=Lax';
+
+				// Redirect to WF1: User Profile & Lab Repositories
+				var profileTarget = '/wireframe.html#tab-wf1';
+				try {
+					var urlParams = new URLSearchParams(window.location.search);
+					var link = urlParams.get('link');
+					if (link && link.indexOf('/wireframe.html') !== -1) {
+						profileTarget = link;
+					}
+				} catch (e) { /* use default profileTarget */ }
+
+				window.location.href = profileTarget;
+				return;
+			}
+
+			var errMsg = (res.body && (res.body.message || (res.body.error && res.body.error.message))) || dict.err_hub_fail;
+			showOnlineError(errMsg);
+			if (onlinePassEl) {
+				onlinePassEl.value = '';
+				onlinePassEl.focus();
+			}
+		}).catch(function (err) {
+			setOnlineBusy(false);
+			showOnlineError(dict.err_unreachable);
+		});
+	}
+
+	if (onlineForm) onlineForm.addEventListener('submit', submitOnline);
+
+	// Global fetch interceptor: attach Bearer token and handle 401 Unauthorized (auto-logout)
+	(function attachOnlineAuthInterceptor() {
+		var origFetch = window.fetch;
+		window.fetch = function (url, options) {
+			options = options || {};
+			var urlStr = typeof url === 'string' ? url : (url && url.url ? url.url : '');
+			if (urlStr.indexOf('/api/v4/') !== -1) {
+				var token = localStorage.getItem('pnq_online_token');
+				if (token) {
+					options.headers = options.headers || {};
+					if (options.headers instanceof Headers) {
+						if (!options.headers.has('Authorization')) {
+							options.headers.set('Authorization', 'Bearer ' + token);
+						}
+					} else if (Array.isArray(options.headers)) {
+						var hasAuth = options.headers.some(function (h) { return h[0].toLowerCase() === 'authorization'; });
+						if (!hasAuth) {
+							options.headers.push(['Authorization', 'Bearer ' + token]);
+						}
+					} else {
+						if (!options.headers['Authorization'] && !options.headers['authorization']) {
+							options.headers['Authorization'] = 'Bearer ' + token;
+						}
+					}
+				}
+			}
+
+			return origFetch.call(this, url, options).then(function (response) {
+				// 401 Unauthorized or expired token: Auto-logout to /login/
+				if (response && response.status === 401 && urlStr.indexOf('/api/v4/auth/login') === -1) {
+					localStorage.removeItem('pnq_online_token');
+					localStorage.removeItem('pnq_online_user');
+					localStorage.removeItem('pnq_online_role');
+					localStorage.removeItem('pnq_online_pod');
+					document.cookie = 'pnq_online_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+					
+					var currentPath = window.location.pathname + window.location.search + window.location.hash;
+					if (window.location.pathname.indexOf('/login/') === -1) {
+						window.location.href = '/login/?link=' + encodeURIComponent(currentPath) + '&reason=expired';
+					}
+				}
+				return response;
+			});
+		};
+	})();
 
 	/* ==========================================================================
 	   7. Forgot Password Flow

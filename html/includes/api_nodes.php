@@ -228,6 +228,202 @@ function apiEditLabNodes($lab, $p)
 	}
 	return $output;
 }
+
+/**
+ * Function to swap/replace a heavy node with a lightweight equivalent in-place.
+ * Atomically mutates the node XML definition in the lab file, preserving the
+ * exact node ID, node name, canvas coordinates, and all connected wire links.
+ *
+ * @param   Lab     $lab                Lab
+ * @param   Array   $p                  Parameters (id, type, template, image, ram, cpu, icon)
+ * @param   int     $tenant             Tenant ID
+ * @return  Array                       Return code (JSend data)
+ */
+function apiSwapLabNode($lab, $p, $tenant)
+{
+	$node_id = isset($p['id']) ? (int) $p['id'] : 0;
+	if ($node_id <= 0) {
+		return [
+			'code' => 400,
+			'status' => 'fail',
+			'message' => 'Node ID undefined or invalid',
+		];
+	}
+
+	$nodes = $lab->getNodes();
+	if (!isset($nodes[$node_id])) {
+		return [
+			'code' => 404,
+			'status' => 'fail',
+			'message' => 'Node not found',
+		];
+	}
+
+	// Stop node if currently running
+	apiStopLabNode($lab, $node_id, $tenant);
+
+	// Clean out any runtime temporary files from wrapper
+	if ($lab->getSession() !== null && (int) $lab->getSession() > 0) {
+		$o = '';
+		$rc = 0;
+		node_wrapper_exec($lab, $node_id, 'delete', $tenant, $o, $rc, 30);
+	}
+
+	$labFile = $lab->getFile();
+	if (!is_file($labFile)) {
+		return [
+			'code' => 500,
+			'status' => 'fail',
+			'message' => 'Lab file not found',
+		];
+	}
+
+	$newType = isset($p['type']) ? (string) $p['type'] : 'iol';
+	$newTemplate = isset($p['template']) ? (string) $p['template'] : 'iol';
+	$newImage = isset($p['image']) ? (string) $p['image'] : '';
+	$newRam = isset($p['ram']) ? (int) $p['ram'] : 1024;
+	$newCpu = isset($p['cpu']) ? (int) $p['cpu'] : 1;
+	$newIcon = isset($p['icon']) ? (string) $p['icon'] : 'Router.png';
+
+	$doc = new DOMDocument();
+	$doc->preserveWhiteSpace = false;
+	$doc->formatOutput = true;
+	if (!$doc->load($labFile)) {
+		return [
+			'code' => 500,
+			'status' => 'fail',
+			'message' => 'Failed to parse lab XML',
+		];
+	}
+
+	$xpath = new DOMXPath($doc);
+	$nodeList = $xpath->query('//lab/topology/nodes/node[@id="' . $node_id . '"]');
+	if ($nodeList->length === 0) {
+		return [
+			'code' => 404,
+			'status' => 'fail',
+			'message' => 'Node element not found in lab XML',
+		];
+	}
+
+	/** @var DOMElement $nodeEl */
+	$nodeEl = $nodeList->item(0);
+
+	// Extract all existing connected interfaces
+	$connectedInterfaces = [];
+	$ifList = $xpath->query('interface', $nodeEl);
+	for ($i = 0; $i < $ifList->length; $i++) {
+		/** @var DOMElement $ifEl */
+		$ifEl = $ifList->item($i);
+		$netId = (int) $ifEl->getAttribute('network_id');
+		if ($netId > 0) {
+			$attrs = [];
+			foreach ($ifEl->attributes as $attr) {
+				$attrs[$attr->name] = $attr->value;
+			}
+			$connectedInterfaces[] = $attrs;
+		}
+	}
+
+	// Remove old child elements (interfaces)
+	while ($nodeEl->hasChildNodes()) {
+		$nodeEl->removeChild($nodeEl->firstChild);
+	}
+
+	// Clean out obsolete QEMU attributes if switching to non-QEMU
+	if ($newType !== 'qemu') {
+		$qemuAttrs = [
+			'qemu_options', 'qemu_version', 'qemu_arch', 'qemu_nic',
+			'firstmac', 'firstnic', 'first_nic', 'pci_mode', 'eth_format',
+			'TPM', 'UEFI', 'inject_as_first_nic', 'script_timeout', 'config_script',
+			'console_2nd', 'map_port', 'map_port_2nd', 'uuid', 'cpulimit'
+		];
+		foreach ($qemuAttrs as $qa) {
+			if ($nodeEl->hasAttribute($qa)) {
+				$nodeEl->removeAttribute($qa);
+			}
+		}
+	}
+
+	// Apply target hardware attributes
+	$nodeEl->setAttribute('type', $newType);
+	$nodeEl->setAttribute('template', $newTemplate);
+	if (!empty($p['name'])) {
+		$nodeEl->setAttribute('name', (string) $p['name']);
+	}
+	if (!empty($newImage)) {
+		$nodeEl->setAttribute('image', $newImage);
+	} else {
+		$nodeEl->setAttribute('image', '');
+	}
+	$nodeEl->setAttribute('ram', (string) $newRam);
+	$nodeEl->setAttribute('cpu', (string) $newCpu);
+	$nodeEl->setAttribute('icon', $newIcon);
+	$nodeEl->setAttribute('ethernet', (string) max(4, count($connectedInterfaces)));
+
+	if ($newType === 'iol') {
+		if (!$nodeEl->hasAttribute('nvram')) $nodeEl->setAttribute('nvram', '1024');
+		if (!$nodeEl->hasAttribute('iol_options')) $nodeEl->setAttribute('iol_options', '');
+		if (!$nodeEl->hasAttribute('serial')) $nodeEl->setAttribute('serial', '0');
+	}
+
+	// Re-attach all connected interfaces with correct ID formatting for target platform
+	foreach ($connectedInterfaces as $idx => $origIf) {
+		$newIfEl = $doc->createElement('interface');
+
+		if ($newType === 'iol') {
+			$newIfId = $idx * 16;
+			$newIfName = 'e0/' . $idx;
+		} elseif ($newType === 'vpcs') {
+			$newIfId = $idx;
+			$newIfName = 'eth' . $idx;
+		} else {
+			$newIfId = $idx;
+			$newIfName = 'Gi' . ($idx + 1);
+		}
+
+		$newIfEl->setAttribute('id', (string) $newIfId);
+		$newIfEl->setAttribute('name', $newIfName);
+		$newIfEl->setAttribute('type', 'ethernet');
+		$newIfEl->setAttribute('network_id', (string) $origIf['network_id']);
+
+		// Preserve all line/link styling and VLAN metadata
+		$styleAttrs = ['vid', 'vlanmode', 'vlans', 'style', 'linkstyle', 'color', 'label', 'width', 'fontsize', 'curviness', 'round', 'linkcfg', 'labelpos', 'srcpos', 'dstpos'];
+		foreach ($styleAttrs as $sa) {
+			if (isset($origIf[$sa]) && $origIf[$sa] !== '') {
+				$newIfEl->setAttribute($sa, $origIf[$sa]);
+			}
+		}
+
+		$nodeEl->appendChild($newIfEl);
+	}
+
+	// Atomically write back updated XML
+	$doc->save($labFile);
+
+	// Reload lab session
+	$session = $lab->getSession();
+	$freshLab = new Lab($labFile, $tenant, $session);
+	$html5 = (function_exists('getUser') && is_array(getUser()) && isset(getUser()['html5'])) ? getUser()['html5'] : -1;
+	$nodesData = apiGetLabNodes($freshLab, $html5);
+
+	return [
+		'code' => 200,
+		'status' => 'success',
+		'message' => 'Node swapped in-place successfully',
+		'data' => [
+			'id' => $node_id,
+			'type' => $newType,
+			'template' => $newTemplate,
+			'image' => $newImage,
+			'ram' => $newRam
+		],
+		'update' => [
+			'nodes' => isset($nodesData['data']) ? $nodesData['data'] : []
+		]
+	];
+}
+
 /**
  * Function to export a single node.
  *

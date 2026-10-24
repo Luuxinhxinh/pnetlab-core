@@ -276,6 +276,7 @@ CREATE TABLE `users` (
   `user_max_ram` int DEFAULT NULL,
   `access_days` varchar(16) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `ext_auth` varchar(8) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `user_group` varchar(100) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   PRIMARY KEY (`pod`),
   UNIQUE KEY `email` (`email`),
   KEY `online_time` (`online_time`),
@@ -285,7 +286,8 @@ CREATE TABLE `users` (
   KEY `expired_time` (`expired_time`),
   KEY `user_status` (`user_status`),
   KEY `max_node` (`max_node`),
-  KEY `max_node_lab` (`max_node_lab`)
+  KEY `max_node_lab` (`max_node_lab`),
+  KEY `user_group` (`user_group`)
 ) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `wiresharks`;
