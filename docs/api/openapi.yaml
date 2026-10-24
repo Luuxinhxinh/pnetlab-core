@@ -216,3 +216,179 @@ paths:
                 code: 200
                 status: success
                 message: Node stopped.
+
+  # =========================================================================
+  # Online Mode, Mini-Git & Personal Profile APIs (Slim 4 /api/v4)
+  # =========================================================================
+  /api/v4/user/profile:
+    get:
+      summary: Get user profile details (own or another user)
+      parameters:
+        - name: username
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Target username. If omitted, returns authenticated user.
+      responses:
+        '200':
+          description: User profile and statistics
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                data:
+                  username: admin
+                  name: Nguyễn Văn Nam
+                  email: admin@pnetlab.local
+                  role: "0"
+                  bio: Giảng viên An toàn thông tin
+                  workspace: Default Workspace
+                  stats:
+                    repositories_count: 8
+                    stars_count: 142
+                    forks_count: 65
+    put:
+      summary: Update personal profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                bio:
+                  type: string
+                workspace:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated successfully
+
+  /api/v4/hub/fork:
+    post:
+      summary: Fork/Clone a lab into user personal repository
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_path]
+              properties:
+                source_path:
+                  type: string
+                  example: ccna-enterprise-ospf-multi-area.unl
+                dest_name:
+                  type: string
+                  example: my-forked-lab.unl
+      responses:
+        '201':
+          description: Lab successfully forked
+          content:
+            application/json:
+              example:
+                code: 201
+                status: success
+                data:
+                  forked_from: ccna-enterprise-ospf-multi-area.unl
+                  forked_to: admin/my-forked-lab.unl
+                  absolute_path: /opt/unetlab/labs/admin/my-forked-lab.unl
+                  message: Successfully forked
+
+  /api/v4/hub/snapshot:
+    post:
+      summary: Create a Mini-Git snapshot checkpoint for a lab
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path, message]
+              properties:
+                path:
+                  type: string
+                  example: ccna-enterprise-ospf-multi-area.unl
+                message:
+                  type: string
+                  example: Cột mốc 2 - Hoàn tất Area 0
+      responses:
+        '200':
+          description: Snapshot saved
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                message: Snapshot commit saved
+                data:
+                  snapshot_id: 20261014_045939_46684be3
+                  timestamp: "2026-10-14T04:59:39.658406"
+                  message: Cột mốc 2 - Hoàn tất Area 0
+                  author: admin
+
+  /api/v4/hub/history:
+    get:
+      summary: Get Mini-Git snapshot history for a lab
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+          example: ccna-enterprise-ospf-multi-area.unl
+      responses:
+        '200':
+          description: Array of snapshots
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                data:
+                  - snapshot_id: 20261014_045939_46684be3
+                    message: Cột mốc 2 - Hoàn tất Area 0
+                    author: admin
+                    timestamp: "2026-10-14T04:59:39.658406"
+
+  /api/v4/hub/rollback:
+    post:
+      summary: Rollback lab topology and configs to a prior snapshot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path, snapshot_id]
+              properties:
+                path:
+                  type: string
+                snapshot_id:
+                  type: string
+      responses:
+        '200':
+          description: Lab successfully restored to snapshot
+
+  /api/v4/hub/export:
+    post:
+      summary: Package lab and startup configs into .pnetlabz TAR.GZ archive with SHA256
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path:
+                  type: string
+      responses:
+        '200':
+          description: Lab packaged into archive

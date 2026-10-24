@@ -6,10 +6,14 @@
  * engine's own checkDatabase() PDO helper — the same users/user_roles/
  * user_permission tables the Laravel store uses. Offline local accounts.
  *
- *   GET  ?action=users        → [{pod,username,email,role,role_name,user_status,note}]
- *   POST ?action=user_add     {username,password,email,role,note,user_status}
- *   POST ?action=user_edit    {pod,email,role,note,user_status,password?}
+ *   GET  ?action=users        → [{pod,username,email,role,role_name,user_status,group,note}]
+ *   POST ?action=user_add     {username,password,email,role,note,user_status,group}
+ *   POST ?action=user_import_csv {rows:[...]|csv:"...",default_role,default_workspace,default_group}
+ *   POST ?action=user_edit    {pod,email,role,note,user_status,password?,group}
  *   POST ?action=user_delete  {pod}
+ *   POST ?action=user_batch_delete {pods:[...]}
+ *   POST ?action=user_group_delete {group}
+ *   POST ?action=user_delete_csv  {usernames:[...]|csv:"..."}
  *   GET  ?action=roles        → [{id,name,workspace,cpu,ram,hdd,perms[],users}]
  *   GET  ?action=permcatalog  → [permission names]
  *   POST ?action=role_add     {name,workspace,cpu,ram,hdd,permissions[]}
@@ -71,6 +75,26 @@ function ensure_ext_auth_col($db) {
 function san_ext_auth($v) {
     $v = strtolower(trim((string) $v));
     return ($v === 'radius' || $v === 'ldap') ? $v : null;
+}
+
+/* Ensure user_group column exists for organizing users into batches / classes / groups. */
+function ensure_user_group_col($db) {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $q = $db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'user_group'");
+        if ((int) $q->fetchColumn() === 0) {
+            $db->exec('ALTER TABLE users ADD COLUMN user_group varchar(100) DEFAULT NULL, ADD INDEX idx_user_group (user_group)');
+        }
+    } catch (Exception $e) {
+        // Non-fatal, same rationale as ensure_user_workspace_col.
+    }
+}
+
+function san_group($v) {
+    $v = trim((string) $v);
+    return $v !== '' ? substr($v, 0, 100) : null;
 }
 
 /* Normalise a workspace path: '' -> null; must start with '/'; trailing '/'
@@ -255,18 +279,24 @@ try {
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     ensure_user_workspace_col($db);
     ensure_ext_auth_col($db);
+    ensure_user_group_col($db);
 
     if ($action === 'users') {
         $roles = [];
         foreach ($db->query('SELECT user_role_id,user_role_name FROM user_roles')->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $roles[(string) $r['user_role_id']] = $r['user_role_name'];
         }
-        $rows = $db->query('SELECT pod,username,email,role,user_status,offline,note,user_max_cpu,user_max_ram,access_days,active_time,expired_time,user_workspace,ext_auth FROM users ORDER BY username')->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $db->query('SELECT pod,username,email,role,user_status,offline,note,user_max_cpu,user_max_ram,access_days,active_time,expired_time,user_workspace,ext_auth,user_group FROM users ORDER BY username')->fetchAll(PDO::FETCH_ASSOC);
+        $groups = [];
+        foreach ($db->query("SELECT DISTINCT user_group FROM users WHERE user_group IS NOT NULL AND user_group != '' ORDER BY user_group")->fetchAll(PDO::FETCH_COLUMN) as $grp) {
+            $groups[] = (string) $grp;
+        }
         $data = array_map(function ($u) use ($roles) {
             $rn = ((string) $u['role'] === '0') ? 'Admin' : ($roles[(string) $u['role']] ?? ('role ' . $u['role']));
             return ['pod' => (int) $u['pod'], 'username' => $u['username'], 'email' => $u['email'],
                 'role' => (string) $u['role'], 'role_name' => $rn, 'user_status' => (int) $u['user_status'],
                 'offline' => (int) $u['offline'], 'note' => $u['note'],
+                'group' => (string) ($u['user_group'] ?? ''),
                 'workspace' => (string) ($u['user_workspace'] ?? ''),
                 'max_cpu' => isset($u['user_max_cpu']) && $u['user_max_cpu'] !== null ? (int) $u['user_max_cpu'] : null,
                 'max_ram' => isset($u['user_max_ram']) && $u['user_max_ram'] !== null ? (int) $u['user_max_ram'] : null,
@@ -275,7 +305,7 @@ try {
                 'access_from' => (!empty($u['active_time']) && (int) $u['active_time'] > 0) ? date('Y-m-d\TH:i', (int) $u['active_time']) : '',
                 'access_to' => (!empty($u['expired_time']) && (int) $u['expired_time'] > 0) ? date('Y-m-d\TH:i', (int) $u['expired_time']) : ''];
         }, $rows);
-        out(['data' => $data]);
+        out(['data' => $data, 'groups' => $groups, 'current_pod' => (int) ($user['pod'] ?? 0)]);
     }
 
     if ($action === 'user_add') {
@@ -285,6 +315,7 @@ try {
         $pass = (string) ($b['password'] ?? '');
         $email = trim($b['email'] ?? '');
         $extAuth = san_ext_auth($b['ext_auth'] ?? '');
+        $groupVal = san_group($b['group'] ?? ($b['user_group'] ?? ''));
         if ($username === '') fail(400, 'username is required');
         if ($pass === '' && !$sendWelcome) fail(400, 'password is required');
         if ($sendWelcome && $extAuth !== null) fail(409, 'welcome password links are only available for local accounts');
@@ -309,7 +340,7 @@ try {
         $folder = effective_workspace($db, $ws, $roleVal);
         try {
             $db->beginTransaction();
-            $ins = $db->prepare('INSERT INTO users (username,password,email,role,note,user_status,offline,folder,html5,user_max_cpu,user_max_ram,access_days,active_time,expired_time,user_workspace,ext_auth) VALUES (:u,:p,:e,:r,:n,:s,1,:fo,0,:mc,:mr,:ad,:af,:at,:uw,:ea)');
+            $ins = $db->prepare('INSERT INTO users (username,password,email,role,note,user_status,offline,folder,html5,user_max_cpu,user_max_ram,access_days,active_time,expired_time,user_workspace,ext_auth,user_group) VALUES (:u,:p,:e,:r,:n,:s,1,:fo,0,:mc,:mr,:ad,:af,:at,:uw,:ea,:ug)');
             $ins->execute([
                 'u' => $username, 'p' => hash('sha256', $pass), 'e' => $email,
                 'r' => $roleVal, 'n' => trim($b['note'] ?? ''), 's' => (int) ($b['user_status'] ?? 1),
@@ -317,6 +348,7 @@ try {
                 'mc' => san_limit($b['max_cpu'] ?? ''), 'mr' => san_limit($b['max_ram'] ?? ''),
                 'ad' => san_days($b['access_days'] ?? ''), 'af' => $afrom, 'at' => $ato, 'uw' => $ws,
                 'ea' => $extAuth,
+                'ug' => $groupVal,
             ]);
             $newPod = (int) $db->lastInsertId();
             $welcomeToken = $sendWelcome ? password_reset_create_token($db, $newPod) : null;
@@ -340,6 +372,143 @@ try {
         out($response);
     }
 
+    if ($action === 'user_import_csv') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') fail(405, 'POST required');
+        $b = body();
+        $defaultRole = (string) ($b['default_role'] ?? '0');
+        $defaultWs = san_workspace($b['default_workspace'] ?? '');
+        $defaultGroup = san_group($b['default_group'] ?? '');
+
+        // Preload valid roles map (id => id, lowercase name => id)
+        $roleMap = ['admin' => '0', '0' => '0'];
+        foreach ($db->query('SELECT user_role_id, user_role_name FROM user_roles')->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $roleMap[strtolower(trim($r['user_role_name']))] = (string) $r['user_role_id'];
+            $roleMap[(string) $r['user_role_id']] = (string) $r['user_role_id'];
+        }
+
+        // Preload existing usernames to detect duplicates
+        $existing = [];
+        foreach ($db->query('SELECT username FROM users')->fetchAll(PDO::FETCH_COLUMN) as $u) {
+            $existing[strtolower($u)] = true;
+        }
+
+        // Parse rows from array or raw CSV string
+        $rows = [];
+        if (!empty($b['rows']) && is_array($b['rows'])) {
+            $rows = $b['rows'];
+        } elseif (!empty($b['csv']) && is_string($b['csv'])) {
+            $lines = preg_split('/\r\n|\r|\n/', trim($b['csv']));
+            $headers = [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '') continue;
+                $cells = str_getcsv($line);
+                if (empty($headers)) {
+                    $lowCells = array_map('trim', array_map('strtolower', $cells));
+                    if (in_array('username', $lowCells) || in_array('user', $lowCells)) {
+                        $headers = $lowCells;
+                        continue;
+                    } else {
+                        $headers = ['username', 'password', 'email', 'role', 'workspace', 'group', 'note'];
+                    }
+                }
+                $row = [];
+                foreach ($headers as $hIdx => $hKey) {
+                    $row[$hKey] = isset($cells[$hIdx]) ? trim($cells[$hIdx]) : '';
+                }
+                $rows[] = $row;
+            }
+        }
+
+        if (empty($rows)) {
+            fail(400, 'No user accounts found in CSV.');
+        }
+
+        $results = [];
+        $successCount = 0;
+        $failCount = 0;
+
+        $ins = $db->prepare('INSERT INTO users (username,password,email,role,note,user_status,offline,folder,html5,user_max_cpu,user_max_ram,access_days,active_time,expired_time,user_workspace,ext_auth,user_group) VALUES (:u,:p,:e,:r,:n,1,1,:fo,0,NULL,NULL,NULL,NULL,NULL,:uw,NULL,:ug)');
+
+        foreach ($rows as $idx => $r) {
+            $rowNum = $idx + 1;
+            $username = trim($r['username'] ?? ($r['user'] ?? ''));
+            $pass = (string) ($r['password'] ?? ($r['pass'] ?? ''));
+            $email = trim($r['email'] ?? '');
+            $note = trim($r['note'] ?? '');
+            $rawRole = trim((string) ($r['role'] ?? ''));
+            $rawWs = trim((string) ($r['workspace'] ?? ($r['folder'] ?? '')));
+            $rawGroup = trim((string) ($r['group'] ?? ($r['user_group'] ?? '')));
+            $groupVal = $rawGroup !== '' ? san_group($rawGroup) : $defaultGroup;
+
+            $displayName = $username !== '' ? $username : "Row #$rowNum";
+
+            if ($username === '') {
+                $results[] = ['name' => $displayName, 'ok' => false, 'error' => 'Username is missing'];
+                $failCount++;
+                continue;
+            }
+
+            if (!preg_match('/^[a-zA-Z0-9_.-]+$/', $username)) {
+                $results[] = ['name' => $displayName, 'ok' => false, 'error' => 'Invalid username (letters, digits, _, -, . only)'];
+                $failCount++;
+                continue;
+            }
+
+            if (isset($existing[strtolower($username)])) {
+                $results[] = ['name' => $displayName, 'ok' => false, 'error' => "Username '$username' already exists"];
+                $failCount++;
+                continue;
+            }
+
+            if ($pass === '') {
+                $results[] = ['name' => $displayName, 'ok' => false, 'error' => 'Password is required'];
+                $failCount++;
+                continue;
+            }
+
+            // Map role
+            $roleVal = $defaultRole;
+            if ($rawRole !== '') {
+                $lowRole = strtolower($rawRole);
+                if (isset($roleMap[$lowRole])) {
+                    $roleVal = $roleMap[$lowRole];
+                }
+            }
+
+            // Map workspace
+            $ws = $rawWs !== '' ? san_workspace($rawWs) : $defaultWs;
+            $folder = effective_workspace($db, $ws, $roleVal);
+
+            try {
+                $ins->execute([
+                    'u' => $username,
+                    'p' => hash('sha256', $pass),
+                    'e' => $email,
+                    'r' => $roleVal,
+                    'n' => $note,
+                    'fo' => $folder,
+                    'uw' => $ws,
+                    'ug' => $groupVal,
+                ]);
+                $existing[strtolower($username)] = true;
+                $results[] = ['name' => $displayName, 'ok' => true, 'error' => null];
+                $successCount++;
+            } catch (Throwable $e) {
+                $results[] = ['name' => $displayName, 'ok' => false, 'error' => 'Database error: ' . $e->getMessage()];
+                $failCount++;
+            }
+        }
+
+        out([
+            'ok' => true,
+            'imported' => $successCount,
+            'failed' => $failCount,
+            'total' => count($rows),
+            'results' => $results
+        ]);
+    }
+
     if ($action === 'user_edit') {
         $b = body();
         $pod = (int) ($b['pod'] ?? 0);
@@ -350,6 +519,7 @@ try {
         if ($afrom && $ato && $ato <= $afrom) fail(400, 'access "to" must be after "from"');
         $roleVal = (string) ($b['role'] ?? '0');
         $ws = san_workspace($b['workspace'] ?? '');
+        $groupVal = san_group($b['group'] ?? ($b['user_group'] ?? ''));
         // Read the pre-edit role + workspace so we only re-home the landing folder
         // when one of them actually changes (never stomp a folder they've navigated
         // to via an unrelated edit).
@@ -358,12 +528,13 @@ try {
         $curRow = $cur->fetch(PDO::FETCH_ASSOC);
         $sets = ['email=:e', 'role=:r', 'note=:n', 'user_status=:s', 'user_workspace=:uw',
             'user_max_cpu=:mc', 'user_max_ram=:mr', 'access_days=:ad', 'active_time=:af', 'expired_time=:at',
-            'ext_auth=:ea'];
+            'ext_auth=:ea', 'user_group=:ug'];
         $p = ['e' => trim($b['email'] ?? ''), 'r' => $roleVal,
             'n' => trim($b['note'] ?? ''), 's' => (int) ($b['user_status'] ?? 1), 'pod' => $pod, 'uw' => $ws,
             'mc' => san_limit($b['max_cpu'] ?? ''), 'mr' => san_limit($b['max_ram'] ?? ''),
             'ad' => san_days($b['access_days'] ?? ''), 'af' => $afrom, 'at' => $ato,
-            'ea' => san_ext_auth($b['ext_auth'] ?? '')];
+            'ea' => san_ext_auth($b['ext_auth'] ?? ''),
+            'ug' => $groupVal];
         if ($curRow) {
             $roleChanged = ((string) $curRow['role'] !== $roleVal);
             $wsChanged = (san_workspace($curRow['user_workspace'] ?? '') !== $ws);
@@ -389,6 +560,231 @@ try {
         }
         $db->prepare('DELETE FROM users WHERE pod=:pod')->execute(['pod' => $pod]);
         out(['ok' => true]);
+    }
+
+    if ($action === 'user_batch_delete') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') fail(405, 'POST required');
+        $b = body();
+        $pods = $b['pods'] ?? [];
+        if (!is_array($pods) || empty($pods)) fail(400, 'pods array is required');
+
+        $currentPod = isset($user['pod']) ? (int) $user['pod'] : -1;
+        $sanPods = [];
+        foreach ($pods as $p) {
+            $ip = (int) $p;
+            if ($ip > 0 && !in_array($ip, $sanPods, true)) {
+                $sanPods[] = $ip;
+            }
+        }
+        if (empty($sanPods)) fail(400, 'No valid pods provided');
+
+        $placeholders = implode(',', array_fill(0, count($sanPods), '?'));
+        $stmt = $db->prepare("SELECT pod, username, role FROM users WHERE pod IN ($placeholders)");
+        $stmt->execute($sanPods);
+        $targetRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $rowMap = [];
+        foreach ($targetRows as $row) {
+            $rowMap[(int) $row['pod']] = $row;
+        }
+
+        $adminCount = (int) $db->query('SELECT COUNT(*) FROM users WHERE role="0"')->fetchColumn();
+        $delStmt = $db->prepare('DELETE FROM users WHERE pod = :pod');
+
+        $results = [];
+        $deletedCount = 0;
+        $failedCount = 0;
+
+        foreach ($sanPods as $pod) {
+            if (!isset($rowMap[$pod])) {
+                $results[] = ['name' => "Pod #$pod", 'ok' => false, 'error' => 'User not found'];
+                $failedCount++;
+                continue;
+            }
+            $target = $rowMap[$pod];
+            $uName = $target['username'];
+
+            if ($pod === $currentPod) {
+                $results[] = ['name' => $uName, 'ok' => false, 'error' => 'Cannot delete your own account'];
+                $failedCount++;
+                continue;
+            }
+
+            if ((string) $target['role'] === '0') {
+                if ($adminCount <= 1) {
+                    $results[] = ['name' => $uName, 'ok' => false, 'error' => 'Cannot delete the last administrator'];
+                    $failedCount++;
+                    continue;
+                }
+                $adminCount--;
+            }
+
+            try {
+                $delStmt->execute(['pod' => $pod]);
+                $results[] = ['name' => $uName, 'ok' => true, 'error' => null];
+                $deletedCount++;
+            } catch (Throwable $e) {
+                $results[] = ['name' => $uName, 'ok' => false, 'error' => $e->getMessage()];
+                $failedCount++;
+            }
+        }
+
+        out([
+            'ok' => true,
+            'deleted' => $deletedCount,
+            'failed' => $failedCount,
+            'total' => count($sanPods),
+            'results' => $results
+        ]);
+    }
+
+    if ($action === 'user_group_delete') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') fail(405, 'POST required');
+        $b = body();
+        $groupName = trim((string) ($b['group'] ?? ($b['user_group'] ?? '')));
+        if ($groupName === '') fail(400, 'Group name is required');
+
+        $currentPod = isset($user['pod']) ? (int) $user['pod'] : -1;
+        $stmt = $db->prepare('SELECT pod, username, role FROM users WHERE user_group = :g');
+        $stmt->execute(['g' => $groupName]);
+        $targetRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($targetRows)) {
+            fail(404, "No users found in group '$groupName'");
+        }
+
+        $adminCount = (int) $db->query('SELECT COUNT(*) FROM users WHERE role="0"')->fetchColumn();
+        $delStmt = $db->prepare('DELETE FROM users WHERE pod = :pod');
+
+        $results = [];
+        $deletedCount = 0;
+        $failedCount = 0;
+
+        foreach ($targetRows as $target) {
+            $pod = (int) $target['pod'];
+            $uName = $target['username'];
+
+            if ($pod === $currentPod) {
+                $results[] = ['name' => $uName, 'ok' => false, 'error' => 'Cannot delete your own account'];
+                $failedCount++;
+                continue;
+            }
+
+            if ((string) $target['role'] === '0') {
+                if ($adminCount <= 1) {
+                    $results[] = ['name' => $uName, 'ok' => false, 'error' => 'Cannot delete the last administrator'];
+                    $failedCount++;
+                    continue;
+                }
+                $adminCount--;
+            }
+
+            try {
+                $delStmt->execute(['pod' => $pod]);
+                $results[] = ['name' => $uName, 'ok' => true, 'error' => null];
+                $deletedCount++;
+            } catch (Throwable $e) {
+                $results[] = ['name' => $uName, 'ok' => false, 'error' => $e->getMessage()];
+                $failedCount++;
+            }
+        }
+
+        out([
+            'ok' => true,
+            'deleted' => $deletedCount,
+            'failed' => $failedCount,
+            'total' => count($targetRows),
+            'results' => $results
+        ]);
+    }
+
+    if ($action === 'user_delete_csv') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') fail(405, 'POST required');
+        $b = body();
+        $usernames = [];
+        if (!empty($b['usernames']) && is_array($b['usernames'])) {
+            $usernames = $b['usernames'];
+        } elseif (!empty($b['csv']) && is_string($b['csv'])) {
+            $lines = preg_split('/\r\n|\r|\n/', trim($b['csv']));
+            $headerSeen = false;
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '') continue;
+                $cells = str_getcsv($line);
+                $cell0 = trim($cells[0] ?? '');
+                if (!$headerSeen && (strtolower($cell0) === 'username' || strtolower($cell0) === 'user')) {
+                    $headerSeen = true;
+                    continue;
+                }
+                if ($cell0 !== '') $usernames[] = $cell0;
+            }
+        }
+
+        if (empty($usernames)) {
+            fail(400, 'No usernames provided to delete.');
+        }
+
+        $currentPod = isset($user['pod']) ? (int) $user['pod'] : -1;
+        $adminCount = (int) $db->query('SELECT COUNT(*) FROM users WHERE role="0"')->fetchColumn();
+        $selStmt = $db->prepare('SELECT pod, username, role FROM users WHERE LOWER(username) = LOWER(:u)');
+        $delStmt = $db->prepare('DELETE FROM users WHERE pod = :pod');
+
+        $results = [];
+        $deletedCount = 0;
+        $failedCount = 0;
+        $seen = [];
+
+        foreach ($usernames as $u) {
+            $u = trim((string) $u);
+            if ($u === '') continue;
+            $low = strtolower($u);
+            if (isset($seen[$low])) continue;
+            $seen[$low] = true;
+
+            $selStmt->execute(['u' => $u]);
+            $target = $selStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$target) {
+                $results[] = ['name' => $u, 'ok' => false, 'error' => 'User does not exist'];
+                $failedCount++;
+                continue;
+            }
+
+            $pod = (int) $target['pod'];
+            $actualName = $target['username'];
+
+            if ($pod === $currentPod) {
+                $results[] = ['name' => $actualName, 'ok' => false, 'error' => 'Cannot delete your own account'];
+                $failedCount++;
+                continue;
+            }
+
+            if ((string) $target['role'] === '0') {
+                if ($adminCount <= 1) {
+                    $results[] = ['name' => $actualName, 'ok' => false, 'error' => 'Cannot delete the last administrator'];
+                    $failedCount++;
+                    continue;
+                }
+                $adminCount--;
+            }
+
+            try {
+                $delStmt->execute(['pod' => $pod]);
+                $results[] = ['name' => $actualName, 'ok' => true, 'error' => null];
+                $deletedCount++;
+            } catch (Throwable $e) {
+                $results[] = ['name' => $actualName, 'ok' => false, 'error' => $e->getMessage()];
+                $failedCount++;
+            }
+        }
+
+        out([
+            'ok' => true,
+            'deleted' => $deletedCount,
+            'failed' => $failedCount,
+            'total' => count($seen),
+            'results' => $results
+        ]);
     }
 
     if ($action === 'roles') {

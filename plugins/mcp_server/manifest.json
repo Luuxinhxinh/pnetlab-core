@@ -5,6 +5,7 @@
   "author": "PNETLab Core Team",
   "description": "Exposes standard MCP tools on port 8090/5701 and powers the AI Lab Builder engine",
   "autostart": true,
+  "enabled": true,
   "verbs": [
     "mcp_service",
     "mcp_health",

@@ -23,6 +23,12 @@ require_once BASE_DIR . "/html/includes/activity_log.php";
 require_once BASE_DIR . "/html/includes/password_reset.php";
 require_once BASE_DIR . "/html/devices/interfc.php";
 
+// Handover /api/v4/* to modern Slim 4 front controller
+if (isset($_SERVER['REQUEST_URI']) && str_starts_with($_SERVER['REQUEST_URI'], '/api/v4/')) {
+    require_once __DIR__ . '/api/index.php';
+    exit;
+}
+
 \Slim\Slim::registerAutoloader();
 
 $app = new \Slim\Slim([

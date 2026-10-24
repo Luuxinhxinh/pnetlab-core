@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wireframe Blueprint - PNetLab V8 Mode Online & Personal Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-canvas: #0f1117;
+            --surface-base: #161822;
+            --surface-elevated: #1e2230;
+            --surface-sunken: #0c0e14;
+            --border-light: #2c3242;
+            --border-focus: #4b5563;
+            --text-heading: #f3f4f6;
+            --text-body: #9ca3af;
+            --text-muted: #6b7280;
+            --accent-neutral: #e5e7eb;
+            --btn-neutral: #282e3f;
+            --btn-hover: #374151;
+            --tag-bg: #222634;
+            --tag-border: #3b4254;
+            --danger-text: #f87171;
+            --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-code: 'JetBrains Mono', monospace;
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font-ui);
+            background: var(--bg-canvas);
+            color: var(--text-body);
+            padding: 24px;
+            line-height: 1.5;
+        }
+
+        input[type="radio"] { display: none; }
+
+        .header {
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-heading);
+            letter-spacing: -0.01em;
+        }
+        .header p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .meta-tag {
+            font-family: var(--font-code);
+            font-size: 11px;
+            background: var(--surface-sunken);
+            border: 1px solid var(--border-light);
+            padding: 4px 10px;
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+        }
+
+        .blueprint-nav {
+            display: flex;
+            gap: 8px;
+            background: var(--surface-base);
+            padding: 6px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-light);
+            width: fit-content;
+            margin-bottom: 24px;
+        }
+        .nav-btn {
+            padding: 8px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-radius: 6px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .nav-btn:hover {
+            color: var(--text-heading);
+            background: var(--surface-elevated);
+        }
+
+        .window-frame {
+            background: var(--surface-base);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: 0 16px 36px rgba(0,0,0,0.5);
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+        .window-header {
+            background: var(--surface-sunken);
+            border-bottom: 1px solid var(--border-light);
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .window-dots {
+            display: flex;
+            gap: 6px;
+        }
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--border-focus);
+        }
+        .window-url-bar {
+            background: var(--surface-base);
+            border: 1px solid var(--border-light);
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            color: var(--text-body);
+            font-size: 12px;
+            font-family: var(--font-code);
+            width: 420px;
+            text-align: center;
+        }
+
+        #tab-wf0:checked ~ .blueprint-nav label[for="tab-wf0"],
+        #tab-wf1:checked ~ .blueprint-nav label[for="tab-wf1"],
+        #tab-wf2:checked ~ .blueprint-nav label[for="tab-wf2"] {
+            background: var(--btn-neutral);
+            color: var(--text-heading);
+            border: 1px solid var(--border-focus);
+        }
+
+        .wf-view { display: none; }
+        #tab-wf0:checked ~ .window-frame #view-wf0 { display: block; }
+        #tab-wf1:checked ~ .window-frame #view-wf1 { display: block; }
+        #tab-wf2:checked ~ .window-frame #view-wf2 { display: block; }
+
+        /* WF0: MODE SELECTION & AUTH PORTAL */
+        .wf0-container {
+            padding: 50px 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 580px;
+            background: radial-gradient(circle at 50% 20%, rgba(255,255,255,0.03) 0%, transparent 70%);
+        }
+        .wf0-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        .wf0-subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 580px;
+        }
+        .mode-cards-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            max-width: 860px;
+            width: 100%;
+        }
+        .mode-card {
+            background: var(--surface-elevated);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .mode-card:hover {
+            border-color: var(--border-focus);
+            transform: translateY(-2px);
+        }
+        .mode-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-md);
+            background: var(--surface-sunken);
+            border: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        .mode-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .mode-badge {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-family: var(--font-code);
+            border: 1px solid var(--border-light);
+            color: var(--text-muted);
+        }
+        .mode-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-heading);
+        }
+        .mode-desc {
+            font-size: 13px;
+            color: var(--text-body);
+            line-height: 1.6;
+        }
+        .mode-features {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin: 8px 0;
+        }
+        .mode-features li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .mode-auth-box {
+            background: var(--surface-sunken);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .mode-auth-lbl {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .mode-auth-val {
+            font-family: var(--font-code);
+            color: var(--text-heading);
+        }
+
+        .wf1-layout {
+            display: grid;
+            grid-template-columns: 290px 1fr;
+            min-height: 640px;
+        }
+
+        .wf1-sidebar {
+            background: var(--surface-sunken);
+            border-right: 1px solid var(--border-light);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .avatar-placeholder {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: var(--surface-elevated);
+            border: 2px dashed var(--border-focus);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: var(--text-muted);
+            margin: 0 auto;
+        }
+        .user-identity { text-align: center; }
+        .user-fullname { font-size: 18px; font-weight: 700; color: var(--text-heading); }
+        .user-handle { font-size: 13px; color: var(--text-muted); font-family: var(--font-code); }
+        .user-bio { font-size: 13px; color: var(--text-body); text-align: left; margin-top: 6px; }
+        
+        .stat-group {
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+        }
+        .stat-item { text-align: center; }
+        .stat-num { font-size: 16px; font-weight: 700; color: var(--text-heading); }
+        .stat-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+
+        .sidebar-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .btn-ui {
+            background: var(--btn-neutral);
+            border: 1px solid var(--border-light);
+            color: var(--text-heading);
+            padding: 8px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            user-select: none;
+            transition: all 0.15s ease;
+        }
+        .btn-ui:hover {
+            background: var(--btn-hover);
+            border-color: var(--border-focus);
+        }
+        .btn-ui-primary {
+            background: var(--accent-neutral);
+            color: #111827;
+            border-color: #ffffff;
+            font-weight: 600;
+        }
+        .btn-ui-primary:hover {
+            background: #ffffff;
+        }
+
+        .wf1-main {
+            padding: 24px 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .subtab-bar {
+            display: flex;
+            gap: 20px;
+            border-bottom: 1px solid var(--border-light);
+            margin-bottom: 20px;
+        }
+        .subtab-item {
+            padding-bottom: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            user-select: none;
+        }
+        .subtab-badge {
+            background: var(--surface-elevated);
+            font-size: 11px;
+            padding: 2px 7px;
+            border-radius: 10px;
+            color: var(--text-body);
+        }
+
+        #sub-repos:checked ~ .window-frame .subtab-bar label[for="sub-repos"],
+        #sub-stars:checked ~ .window-frame .subtab-bar label[for="sub-stars"],
+        #sub-history:checked ~ .window-frame .subtab-bar label[for="sub-history"] {
+            color: var(--text-heading);
+        }
+        #sub-repos:checked ~ .window-frame .subtab-bar label[for="sub-repos"]::after,
+        #sub-stars:checked ~ .window-frame .subtab-bar label[for="sub-stars"]::after,
+        #sub-history:checked ~ .window-frame .subtab-bar label[for="sub-history"]::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0; right: 0;
+            height: 2px;
+            background: var(--text-heading);
+        }
+
+        .subtab-content { display: none; }
+        #sub-repos:checked ~ .window-frame #panel-repos { display: block; }
+        #sub-stars:checked ~ .window-frame #panel-stars { display: block; }
+        #sub-history:checked ~ .window-frame #panel-history { display: block; }
+
+        .filter-toolbar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .input-text {
+            background: var(--surface-sunken);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            color: var(--text-heading);
+            padding: 7px 12px;
+            font-size: 13px;
+            flex-grow: 1;
+        }
+        .select-filter {
+            background: var(--surface-sunken);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            color: var(--text-body);
+            padding: 7px 12px;
+            font-size: 13px;
+        }
+
+        .repo-row {
+            background: var(--surface-elevated);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .repo-info { max-width: 65%; }
+        .repo-title-line {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+        .repo-title-text {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-heading);
+            cursor: pointer;
+        }
+        .badge-pill {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border-focus);
+            color: var(--text-body);
+        }
+        .repo-desc-text {
+            font-size: 13px;
+            color: var(--text-body);
+            margin-bottom: 8px;
+        }
+        .repo-meta-line {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: var(--text-muted);
+            font-family: var(--font-code);
+        }
+        .repo-btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .wf2-container {
+            padding: 24px 30px;
+        }
+        .repo-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+        }
+        .breadcrumb {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        .breadcrumb strong { color: var(--text-heading); }
+
+        .file-tree-container {
+            background: var(--surface-sunken);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .file-tree-head {
+            background: var(--surface-elevated);
+            padding: 10px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .file-tree-row {
+            padding: 10px 16px;
+            font-size: 13px;
+            font-family: var(--font-code);
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            align-items: center;
+        }
+        .file-tree-row:last-child { border-bottom: none; }
+        .file-name-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-heading);
+            width: 30%;
+        }
+        .file-commit-msg {
+            color: var(--text-muted);
+            width: 50%;
+            font-size: 12px;
+        }
+        .file-date-cell {
+            color: var(--text-muted);
+            font-size: 12px;
+            text-align: right;
+            width: 20%;
+        }
+
+        .timeline-section {
+            background: var(--surface-elevated);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-md);
+            padding: 20px;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .timeline-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            position: relative;
+            padding-left: 20px;
+            border-left: 2px solid var(--border-light);
+        }
+        .timeline-node {
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .timeline-node::before {
+            content: '';
+            position: absolute;
+            left: -26px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-heading);
+            border: 2px solid var(--bg-canvas);
+        }
+        .snapshot-tag {
+            font-family: var(--font-code);
+            font-size: 12px;
+            color: var(--text-heading);
+            background: var(--surface-sunken);
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+            margin-right: 8px;
+        }
+        .snapshot-msg {
+            font-size: 13px;
+            color: var(--text-body);
+        }
+
+        input[name="modal-radio"] { display: none; }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-box {
+            background: var(--surface-base);
+            border: 1px solid var(--border-focus);
+            border-radius: var(--radius-lg);
+            width: 520px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+            animation: modalPop 0.15s ease-out;
+        }
+        @keyframes modalPop {
+            from { transform: scale(0.96); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-header {
+            padding: 16px 20px;
+            background: var(--surface-elevated);
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-heading);
+        }
+        .modal-close-btn {
+            font-size: 18px;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px 6px;
+        }
+        .modal-close-btn:hover { color: var(--text-heading); }
+        .modal-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .form-help {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .modal-footer {
+            padding: 14px 20px;
+            background: var(--surface-sunken);
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        #modal-fork-toggle:checked ~ #modal-fork { display: flex; }
+        #modal-snapshot-toggle:checked ~ #modal-snapshot { display: flex; }
+        #modal-edit-profile-toggle:checked ~ #modal-edit-profile { display: flex; }
+        #modal-rollback-toggle:checked ~ #modal-rollback { display: flex; }
+    </style>
+</head>
+<body>
+
+    <input type="radio" name="blueprint-tab" id="tab-wf0" checked>
+    <input type="radio" name="blueprint-tab" id="tab-wf1">
+    <input type="radio" name="blueprint-tab" id="tab-wf2">
+
+    <input type="radio" name="modal-radio" id="modal-none" checked>
+    <input type="radio" name="modal-radio" id="modal-fork-toggle">
+    <input type="radio" name="modal-radio" id="modal-snapshot-toggle">
+    <input type="radio" name="modal-radio" id="modal-edit-profile-toggle">
+    <input type="radio" name="modal-radio" id="modal-rollback-toggle">
+
+    <input type="radio" name="subtab-wf1" id="sub-repos" checked>
+    <input type="radio" name="subtab-wf1" id="sub-stars">
+    <input type="radio" name="subtab-wf1" id="sub-history">
+
+    <div class="header">
+        <div>
+            <h1>📐 WIREFRAME SKELETON: ONLINE MODE & MINI-GIT REPO (PNETLAB V8)</h1>
+            <p>Hệ khung sườn Neutral Base (FE tự do áp Theme/Màu sau). Đã tích hợp đầy đủ Modal, Subtabs, Breadcrumb.</p>
+        </div>
+        <div class="meta-tag">PNETLAB_V8 // CORE_BE2_SPEC</div>
+    </div>
+
+    <div class="blueprint-nav">
+        <label for="tab-wf0" class="nav-btn">
+            <span>🌐</span>
+            <span>WF0: Cổng Chọn Chế Độ (Offline vs Online)</span>
+        </label>
+        <label for="tab-wf1" class="nav-btn">
+            <span>👤</span>
+            <span>WF1: Hồ sơ cá nhân & Danh sách Lab Repo</span>
+        </label>
+        <label for="tab-wf2" class="nav-btn">
+            <span>📦</span>
+            <span>WF2: Chi tiết 1 Repo & Lịch sử Snapshot</span>
+        </label>
+    </div>
+
+    <div class="window-frame">
+        <div class="window-header">
+            <div class="window-dots">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+            <div class="window-url-bar">https://pnetlab.local/gateway/select-mode</div>
+            <div style="font-size: 12px; color: var(--text-muted); font-family: var(--font-code);">PNETLAB_GATEWAY // DUAL_SESSION</div>
+        </div>
+
+        <!-- ==========================================================================
+             VIEW 0: WF0 - CỔNG CHỌN CHẾ ĐỘ ĐĂNG NHẬP (OFFLINE VS ONLINE)
+             ========================================================================== -->
+        <div id="view-wf0" class="wf-view">
+            <div class="wf0-container">
+                <div class="wf0-title">CHỌN PHƯƠNG THỨC LÀM VIỆC (PNETLAB V8)</div>
+                <div class="wf0-subtitle">Hệ thống hỗ trợ 2 môi trường hoàn toàn độc lập với cơ chế tài khoản và lưu trữ riêng biệt. Vui lòng chọn chế độ phù hợp:</div>
+
+                <div class="mode-cards-grid">
+                    <!-- MODE 1: OFFLINE LAB -->
+                    <div class="mode-card">
+                        <div class="mode-header">
+                            <div class="mode-icon">💻</div>
+                            <span class="mode-badge">LOCAL APPLIANCE</span>
+                        </div>
+                        <div>
+                            <div class="mode-name">1. Chế Độ Offline (Local Lab)</div>
+                            <div class="mode-desc">Thực hành trên máy chủ nội bộ. Dành cho admin hạ tầng, giảng viên biên soạn giáo trình và cấu hình node mạng độc lập không cần Internet.</div>
+                        </div>
+
+                        <ul class="mode-features">
+                            <li><span>🔒</span> Xác thực: Tài khoản Local Server (Admin / Root)</li>
+                            <li><span>📁</span> Lưu trữ: Hệ thống tệp <code>/opt/unetlab/labs/</code></li>
+                            <li><span>⚡</span> Hiệu năng: Trực tiếp qua Kernel KVM & Docker nội bộ</li>
+                            <li><span>🚫</span> Không yêu cầu kết nối mạng ra Internet</li>
+                        </ul>
+
+                        <div class="mode-auth-box">
+                            <span class="mode-auth-lbl">Thông tin tài khoản:</span>
+                            <span class="mode-auth-val">Local User: admin / pnet (Session ID DB)</span>
+                        </div>
+
+                        <button class="btn-ui btn-ui-primary" style="margin-top: auto; padding: 10px;">
+                            ➡️ Đăng nhập Chế độ Offline
+                        </button>
+                    </div>
+
+                    <!-- MODE 2: ONLINE REPO HUB -->
+                    <div class="mode-card" style="border-color: var(--border-focus);">
+                        <div class="mode-header">
+                            <div class="mode-icon">☁️</div>
+                            <span class="mode-badge" style="color: var(--text-heading); border-color: var(--border-focus);">MULTI-TENANT HUB</span>
+                        </div>
+                        <div>
+                            <div class="mode-name">2. Chế Độ Online (Git Repo Hub)</div>
+                            <div class="mode-desc">Môi trường đám mây phân tán kiểu GitHub. Dành cho học viên tham gia lớp học, trao đổi bài lab, clone/fork và thi đấu Cyber Range.</div>
+                        </div>
+
+                        <ul class="mode-features">
+                            <li><span>👤</span> Xác thực: Tài khoản Cộng đồng (Online Profile / Token)</li>
+                            <li><span>🍴</span> Mini-Git: Snapshot versioning, Fork bài lab đồng nghiệp</li>
+                            <li><span>🛡️</span> Cgroups v2: Giới hạn RAM/CPU theo từng Tenant ID</li>
+                            <li><span>📦</span> Tự động đồng bộ Catalog qua GitHub CDN công khai</li>
+                        </ul>
+
+                        <div class="mode-auth-box">
+                            <span class="mode-auth-lbl">Thông tin tài khoản:</span>
+                            <span class="mode-auth-val">Online Hub Token (Multi-tenant Pod ID)</span>
+                        </div>
+
+                        <label for="tab-wf1" class="btn-ui btn-ui-primary" style="margin-top: auto; padding: 10px; cursor: pointer;">
+                            🚀 Vào Cổng Online & Kho Cá Nhân
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WF1: USER PROFILE & LAB REPOSITORY LIST -->
+        <div id="view-wf1" class="wf-view">
+            <div class="wf1-layout">
+                <div class="wf1-sidebar">
+                    <div class="avatar-placeholder">👤</div>
+                    <div class="user-identity">
+                        <div class="user-fullname">Nguyễn Văn Nam</div>
+                        <div class="user-handle">@nam_teacher</div>
+                        <div class="user-bio">Giảng viên An toàn thông tin & Mạng máy tính. Quản lý hệ thống bài tập lớn CCNA/CCNP và CTF Cyber Range.</div>
+                    </div>
+
+                    <div class="stat-group">
+                        <div class="stat-item">
+                            <div class="stat-num">8</div>
+                            <div class="stat-lbl">Labs</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-num">142</div>
+                            <div class="stat-lbl">Stars</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-num">65</div>
+                            <div class="stat-lbl">Forks</div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-actions">
+                        <label for="modal-edit-profile-toggle" class="btn-ui" style="cursor: pointer;">
+                            ⚙️ Chỉnh sửa Profile
+                        </label>
+                        <label for="modal-snapshot-toggle" class="btn-ui" style="cursor: pointer;">
+                            📸 Tạo Snapshot nhanh
+                        </label>
+                    </div>
+
+                    <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-light); font-size: 11px; color: var(--text-muted);">
+                        Thư mục gốc: <code>/opt/unetlab/labs/nam_teacher/</code>
+                    </div>
+                </div>
+
+                <div class="wf1-main">
+                    <div class="subtab-bar">
+                        <label for="sub-repos" class="subtab-item">
+                            <span>📦 Repositories</span>
+                            <span class="subtab-badge">8</span>
+                        </label>
+                        <label for="sub-stars" class="subtab-item">
+                            <span>⭐ Starred Labs</span>
+                            <span class="subtab-badge">12</span>
+                        </label>
+                        <label for="sub-history" class="subtab-item">
+                            <span>🕒 Hoạt động gần đây</span>
+                            <span class="subtab-badge">24</span>
+                        </label>
+                    </div>
+
+                    <div id="panel-repos" class="subtab-content">
+                        <div class="filter-toolbar">
+                            <input class="input-text" placeholder="🔍 Tìm kiếm bài lab trong repo cá nhân...">
+                            <select class="select-filter">
+                                <option>Tất cả trạng thái</option>
+                                <option>Public</option>
+                                <option>Private</option>
+                            </select>
+                            <select class="select-filter">
+                                <option>Sắp xếp: Mới cập nhật</option>
+                                <option>Nhiều sao nhất</option>
+                                <option>Tên A-Z</option>
+                            </select>
+                        </div>
+
+                        <div class="repo-row">
+                            <div class="repo-info">
+                                <div class="repo-title-line">
+                                    <label for="tab-wf2" class="repo-title-text">📘 ccna-enterprise-ospf-multi-area</label>
+                                    <span class="badge-pill">Public</span>
+                                </div>
+                                <div class="repo-desc-text">Mô phỏng định tuyến động 4 Router Cisco IOL đa vùng (Area 0 & Area 1). Đã nạp sẵn cấu hình mẫu.</div>
+                                <div class="repo-meta-line">
+                                    <span>Cisco IOL (4 Nodes)</span>
+                                    <span>⭐ 24</span>
+                                    <span>🍴 12 forks</span>
+                                    <span>Updated 2 hours ago</span>
+                                </div>
+                            </div>
+                            <div class="repo-btn-group">
+                                <label for="modal-fork-toggle" class="btn-ui" style="cursor: pointer;">🍴 Fork</label>
+                                <label for="tab-wf2" class="btn-ui btn-ui-primary" style="cursor: pointer;">🚀 Mở Lab</label>
+                            </div>
+                        </div>
+
+                        <div class="repo-row">
+                            <div class="repo-info">
+                                <div class="repo-title-line">
+                                    <label for="tab-wf2" class="repo-title-text">🛡️ pfsense-firewall-dmz-hardening</label>
+                                    <span class="badge-pill">Public</span>
+                                </div>
+                                <div class="repo-desc-text">Hạ tầng bảo vệ cụm Web DMZ qua pfSense Firewall, cấu hình NAT Port Forwarding và Snort IPS.</div>
+                                <div class="repo-meta-line">
+                                    <span>pfSense + Linux (3 Nodes)</span>
+                                    <span>⭐ 45</span>
+                                    <span>🍴 18 forks</span>
+                                    <span>Updated yesterday</span>
+                                </div>
+                            </div>
+                            <div class="repo-btn-group">
+                                <label for="modal-fork-toggle" class="btn-ui" style="cursor: pointer;">🍴 Fork</label>
+                                <label for="tab-wf2" class="btn-ui btn-ui-primary" style="cursor: pointer;">🚀 Mở Lab</label>
+                            </div>
+                        </div>
+
+                        <div class="repo-row">
+                            <div class="repo-info">
+                                <div class="repo-title-line">
+                                    <label for="tab-wf2" class="repo-title-text">🔒 ctf-final-exam-cyber-range-2026</label>
+                                    <span class="badge-pill" style="border-color: var(--danger-text); color: var(--danger-text);">Private</span>
+                                </div>
+                                <div class="repo-desc-text">Đề thi thực hành CTF cuối kỳ: Pivoting, Lateral Movement qua 3 phân vùng mạng.</div>
+                                <div class="repo-meta-line">
+                                    <span>QEMU KVM (5 Nodes)</span>
+                                    <span>⭐ 0</span>
+                                    <span>Updated 3 days ago</span>
+                                </div>
+                            </div>
+                            <div class="repo-btn-group">
+                                <button class="btn-ui">Quản lý Đề thi</button>
+                                <label for="tab-wf2" class="btn-ui btn-ui-primary" style="cursor: pointer;">🚀 Mở Lab</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="panel-stars" class="subtab-content">
+                        <div style="padding: 30px; text-align: center; border: 1px dashed var(--border-light); border-radius: var(--radius-md);">
+                            <div style="font-size: 28px; margin-bottom: 8px;">⭐</div>
+                            <div style="font-size: 15px; font-weight: 600; color: var(--text-heading); margin-bottom: 4px;">Danh sách bài Lab bạn đã lưu dấu sao</div>
+                            <div style="font-size: 13px; color: var(--text-muted);">Hiển thị các bài lab công khai từ những giảng viên và chuyên gia mạng khác mà bạn quan tâm.</div>
+                        </div>
+                    </div>
+
+                    <div id="panel-history" class="subtab-content">
+                        <div class="timeline-section">
+                            <div class="section-title">Nhật ký phiên hoạt động cá nhân (Audit Log)</div>
+                            <div class="timeline-list">
+                                <div class="timeline-node">
+                                    <div>
+                                        <span class="snapshot-tag">FORK</span>
+                                        <span class="snapshot-msg">Bạn đã fork lab <code>ccna-enterprise-ospf-multi-area</code> về kho cá nhân</span>
+                                    </div>
+                                    <span style="font-size: 12px; color: var(--text-muted); font-family: var(--font-code);">10 phút trước</span>
+                                </div>
+                                <div class="timeline-node">
+                                    <div>
+                                        <span class="snapshot-tag">SNAPSHOT</span>
+                                        <span class="snapshot-msg">Đã lưu điểm khôi phục cấu hình: "Cột mốc hoàn tất Area 0"</span>
+                                    </div>
+                                    <span style="font-size: 12px; color: var(--text-muted); font-family: var(--font-code);">2 giờ trước</span>
+                                </div>
+                                <div class="timeline-node">
+                                    <div>
+                                        <span class="snapshot-tag">LOGIN</span>
+                                        <span class="snapshot-msg">Đăng nhập thành công từ IP <code>192.168.148.1</code></span>
+                                    </div>
+                                    <span style="font-size: 12px; color: var(--text-muted); font-family: var(--font-code);">Hôm nay 08:30</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WF2: REPOSITORY DETAIL & SNAPSHOT TIMELINE ROLLBACK -->
+        <div id="view-wf2" class="wf-view">
+            <div class="wf2-container">
+                <div class="repo-detail-header">
+                    <div class="breadcrumb">
+                        <span>nam_teacher</span> / <strong>ccna-enterprise-ospf-multi-area</strong>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <label for="modal-fork-toggle" class="btn-ui" style="cursor: pointer;">🍴 Fork (12)</label>
+                        <button class="btn-ui">⭐ Star (24)</button>
+                        <label for="modal-snapshot-toggle" class="btn-ui" style="cursor: pointer;">📸 Tạo Snapshot</label>
+                        <button class="btn-ui btn-ui-primary">🚀 Khởi động Topology</button>
+                    </div>
+                </div>
+
+                <div class="file-tree-container">
+                    <div class="file-tree-head">
+                        <span>CẤU TRÚC GÓI LAB (.PNETLABZ PACKAGE)</span>
+                        <span>COMMIT MỚI NHẤT: "Hoàn tất cấu hình Area 0" • 2h ago</span>
+                    </div>
+                    <div class="file-tree-row">
+                        <div class="file-name-cell">📄 topology.unl</div>
+                        <div class="file-commit-msg">Sơ đồ mạng 4 router Cisco IOL (Area 0 & Area 1)</div>
+                        <div class="file-date-cell">2 hours ago</div>
+                    </div>
+                    <div class="file-tree-row">
+                        <div class="file-name-cell">📁 configs/R1-startup.cfg</div>
+                        <div class="file-commit-msg">IP 10.1.1.1, router-id 1.1.1.1, OSPF Area 0</div>
+                        <div class="file-date-cell">2 hours ago</div>
+                    </div>
+                    <div class="file-tree-row">
+                        <div class="file-name-cell">📁 configs/R2-startup.cfg</div>
+                        <div class="file-commit-msg">IP 10.1.1.2, OSPF Area 0 & Area 1 border</div>
+                        <div class="file-date-cell">2 hours ago</div>
+                    </div>
+                    <div class="file-tree-row">
+                        <div class="file-name-cell">📖 README.md</div>
+                        <div class="file-commit-msg">Đề bài PDF và tiêu chí chấm điểm tự động</div>
+                        <div class="file-date-cell">Yesterday</div>
+                    </div>
+                </div>
+
+                <div class="timeline-section">
+                    <div class="section-title">🕒 LỊCH SỬ MINI-GIT SNAPSHOTS (QUAY NGƯỢC THỜI GIAN CẤU HÌNH)</div>
+                    <div class="timeline-list">
+                        <div class="timeline-node">
+                            <div>
+                                <span class="snapshot-tag">20261014_114000_c3e8</span>
+                                <span class="snapshot-msg"><strong>Cột mốc 3:</strong> Hoàn tất cấu hình OSPF đa vùng và NAT Internet</span>
+                            </div>
+                            <label for="modal-rollback-toggle" class="btn-ui" style="font-size: 12px; padding: 4px 10px; cursor: pointer;">
+                                ⏪ Rollback
+                            </label>
+                        </div>
+                        <div class="timeline-node">
+                            <div>
+                                <span class="snapshot-tag">20261013_180045_4668</span>
+                                <span class="snapshot-msg"><strong>Cột mốc 2:</strong> Đặt xong IP và cấu hình Loopback trên 4 Router</span>
+                            </div>
+                            <label for="modal-rollback-toggle" class="btn-ui" style="font-size: 12px; padding: 4px 10px; cursor: pointer;">
+                                ⏪ Rollback
+                            </label>
+                        </div>
+                        <div class="timeline-node">
+                            <div>
+                                <span class="snapshot-tag">20261013_170000_1a2b</span>
+                                <span class="snapshot-msg"><strong>Cột mốc 1:</strong> Khởi tạo lab trắng từ phôi Cisco IOL</span>
+                            </div>
+                            <label for="modal-rollback-toggle" class="btn-ui" style="font-size: 12px; padding: 4px 10px; cursor: pointer;">
+                                ⏪ Rollback
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 1: FORK LAB DIALOG -->
+    <div id="modal-fork" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">🍴 Fork bài Lab về Kho cá nhân</div>
+                <label for="modal-none" class="modal-close-btn">✕</label>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Lab nguồn</label>
+                    <input class="input-text" value="nam_teacher/ccna-enterprise-ospf-multi-area.unl" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tên bản sao trong repo của bạn</label>
+                    <input class="input-text" value="ccna-enterprise-ospf-multi-area.unl">
+                    <span class="form-help">Sẽ được lưu trữ độc lập tại: <code>/opt/unetlab/labs/admin/</code></span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mô tả ghi chú</label>
+                    <input class="input-text" placeholder="Bản thực hành cá nhân phục vụ ôn thi...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <label for="modal-none" class="btn-ui" style="cursor: pointer;">Hủy bỏ</label>
+                <label for="modal-none" class="btn-ui btn-ui-primary" style="cursor: pointer;">Xác nhận Fork</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: TẠO SNAPSHOT -->
+    <div id="modal-snapshot" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">📸 Tạo Snapshot Điểm khôi phục (Mini-Git)</div>
+                <label for="modal-none" class="modal-close-btn">✕</label>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Bài Lab đang mở</label>
+                    <input class="input-text" value="ccna-enterprise-ospf-multi-area.unl" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Thông điệp Snapshot (Commit Message)</label>
+                    <input class="input-text" placeholder="Ví dụ: Đã cấu hình xong BGP neighbor với ISP...">
+                    <span class="form-help">Hệ thống sẽ nén sơ đồ <code>.unl</code> và startup-configs của tất cả node vào lịch sử.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <label for="modal-none" class="btn-ui" style="cursor: pointer;">Đóng</label>
+                <label for="modal-none" class="btn-ui btn-ui-primary" style="cursor: pointer;">Lưu Snapshot</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: CHỈNH SỬA PROFILE -->
+    <div id="modal-edit-profile" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">⚙️ Cập nhật Hồ sơ cá nhân</div>
+                <label for="modal-none" class="modal-close-btn">✕</label>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Họ và tên hiển thị</label>
+                    <input class="input-text" value="Nguyễn Văn Nam">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email liên hệ</label>
+                    <input class="input-text" value="nam_teacher@pnetlab.local">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tiểu sử (Bio)</label>
+                    <textarea class="input-text" rows="3" style="resize: none;">Giảng viên An toàn thông tin & Mạng máy tính. Quản lý hệ thống bài tập lớn CCNA/CCNP và CTF Cyber Range.</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Workspace mặc định</label>
+                    <input class="input-text" value="Default Workspace">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <label for="modal-none" class="btn-ui" style="cursor: pointer;">Hủy</label>
+                <label for="modal-none" class="btn-ui btn-ui-primary" style="cursor: pointer;">Lưu thay đổi</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: XÁC NHẬN ROLLBACK -->
+    <div id="modal-rollback" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">⚠️ Xác nhận Quay ngược cấu hình (Rollback)</div>
+                <label for="modal-none" class="modal-close-btn">✕</label>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 13px; color: var(--text-heading);">
+                    Bạn có chắc chắn muốn quay ngược bài lab về snapshot <code>20261013_180045_4668</code>?
+                </p>
+                <div style="background: var(--surface-sunken); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); font-size: 12px; color: var(--danger-text);">
+                    Lưu ý: Toàn bộ cấu hình mạng hiện tại chưa lưu snapshot sẽ bị ghi đè bằng cấu hình của thời điểm được chọn.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <label for="modal-none" class="btn-ui" style="cursor: pointer;">Hủy</label>
+                <label for="modal-none" class="btn-ui btn-ui-primary" style="background: var(--danger-text); border-color: var(--danger-text); color: #fff; cursor: pointer;">
+                    Xác nhận Rollback
+                </label>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
