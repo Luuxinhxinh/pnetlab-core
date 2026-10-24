@@ -1143,5 +1143,64 @@
         </div>
     </div>
 
+    <script>
+        (function() {
+            function syncTabFromHash() {
+                var hash = (window.location.hash || '').replace('#', '');
+                if (hash === 'tab-wf1' || hash === 'view-wf1' || hash === 'wf1') {
+                    var el = document.getElementById('tab-wf1');
+                    if (el) el.checked = true;
+                } else if (hash === 'tab-wf2' || hash === 'view-wf2' || hash === 'wf2') {
+                    var el = document.getElementById('tab-wf2');
+                    if (el) el.checked = true;
+                } else if (hash === 'tab-wf0' || hash === 'view-wf0' || hash === 'wf0') {
+                    var el = document.getElementById('tab-wf0');
+                    if (el) el.checked = true;
+                }
+            }
+            window.addEventListener('hashchange', syncTabFromHash);
+            syncTabFromHash();
+
+            // Intercept fetch calls on wireframe: inject Bearer token and auto-logout on 401
+            var origFetch = window.fetch;
+            if (typeof origFetch === 'function') {
+                window.fetch = function (url, options) {
+                    options = options || {};
+                    var urlStr = typeof url === 'string' ? url : (url && url.url ? url.url : '');
+                    if (urlStr.indexOf('/api/v4/') !== -1) {
+                        var token = localStorage.getItem('pnq_online_token');
+                        if (token) {
+                            options.headers = options.headers || {};
+                            if (options.headers instanceof Headers) {
+                                if (!options.headers.has('Authorization')) {
+                                    options.headers.set('Authorization', 'Bearer ' + token);
+                                }
+                            } else if (Array.isArray(options.headers)) {
+                                var hasAuth = options.headers.some(function (h) { return h[0].toLowerCase() === 'authorization'; });
+                                if (!hasAuth) options.headers.push(['Authorization', 'Bearer ' + token]);
+                            } else {
+                                if (!options.headers['Authorization'] && !options.headers['authorization']) {
+                                    options.headers['Authorization'] = 'Bearer ' + token;
+                                }
+                            }
+                        }
+                    }
+
+                    return origFetch.call(this, url, options).then(function (response) {
+                        if (response && response.status === 401) {
+                            localStorage.removeItem('pnq_online_token');
+                            localStorage.removeItem('pnq_online_user');
+                            localStorage.removeItem('pnq_online_role');
+                            localStorage.removeItem('pnq_online_pod');
+                            document.cookie = 'pnq_online_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                            var target = '/login/?link=' + encodeURIComponent(window.location.pathname + window.location.search + window.location.hash) + '&reason=expired';
+                            window.location.href = target;
+                        }
+                        return response;
+                    });
+                };
+            }
+        })();
+    </script>
 </body>
 </html>

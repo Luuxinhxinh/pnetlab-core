@@ -62,7 +62,12 @@ final class AuthController
             ':u' => $username,
         ]);
 
-        return $this->json($response, 200, [
+        $cookieHeader = sprintf(
+            'pnq_online_token=%s; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax',
+            $token
+        );
+
+        $jsonResp = $this->json($response, 200, [
             'code' => 200,
             'status' => 'success',
             'message' => 'Login successful',
@@ -73,6 +78,8 @@ final class AuthController
                 'pod' => $user['pod'],
             ]
         ]);
+
+        return $jsonResp->withHeader('Set-Cookie', $cookieHeader);
     }
 
     /**

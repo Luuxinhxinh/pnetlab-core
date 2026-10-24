@@ -15,10 +15,12 @@ use Slim\Psr7\Response as SlimResponse;
  */
 final class AuthMiddleware implements MiddlewareInterface
 {
+    private ?\PDO $db;
     private bool $allowAnonymousForHealth;
 
-    public function __construct(bool $allowAnonymousForHealth = true)
+    public function __construct(?\PDO $db = null, bool $allowAnonymousForHealth = true)
     {
+        $this->db = $db;
         $this->allowAnonymousForHealth = $allowAnonymousForHealth;
     }
 
@@ -34,30 +36,56 @@ final class AuthMiddleware implements MiddlewareInterface
             return $handler->handle($request);
         }
 
+        $token = null;
+
         // 1. Check Bearer Token in Authorization header
         $authHeader = $request->getHeaderLine('Authorization');
         if (!empty($authHeader) && preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
             $token = trim($matches[1]);
-            if ($token !== '') {
-                // Attach authenticated user attribute to request
-                $request = $request->withAttribute('user_id', 1)->withAttribute('username', 'admin');
-                return $handler->handle($request);
+        }
+
+        // 2. Fallback to HttpOnly Cookie: pnq_online_token
+        $cookies = $request->getCookieParams();
+        if (empty($token) && !empty($cookies['pnq_online_token'])) {
+            $token = trim((string) $cookies['pnq_online_token']);
+        }
+
+        // 3. Validate Token against Database (Checking token exist & expiry)
+        if (!empty($token) && $this->db) {
+            try {
+                $stmt = $this->db->prepare('SELECT pod, username, role, session FROM users WHERE cookie = :c LIMIT 1');
+                $stmt->execute([':c' => $token]);
+                $user = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+                if ($user) {
+                    $sessionTime = (int) ($user['session'] ?? 0);
+                    // Token TTL: 24 hours (86400s)
+                    $ttl = 86400;
+                    if ($sessionTime > 0 && (time() - $sessionTime) <= $ttl) {
+                        $request = $request
+                            ->withAttribute('user_id', (int) ($user['pod'] ?? 1))
+                            ->withAttribute('username', $user['username'])
+                            ->withAttribute('role', $user['role']);
+                        return $handler->handle($request);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // DB error fallback
             }
         }
 
-        // 2. Check Session Cookie
-        $cookies = $request->getCookieParams();
+        // 4. Fallback: Legacy Session Cookies (Offline admin Workbench)
         if (isset($cookies['pnetlab_session']) || isset($cookies['PHPSESSID'])) {
             $request = $request->withAttribute('user_id', 1)->withAttribute('username', 'admin');
             return $handler->handle($request);
         }
 
-        // 3. Unauthorized
+        // 5. Unauthorized (401 Expired or Invalid Token)
         $response = new SlimResponse(401);
         $payload = json_encode([
             'status' => 'error',
             'code' => 401,
-            'message' => 'Unauthorized: Missing or invalid authentication credentials'
+            'message' => 'Unauthorized: Token expired or invalid session'
         ], JSON_UNESCAPED_SLASHES);
 
         $response->getBody()->write((string) $payload);

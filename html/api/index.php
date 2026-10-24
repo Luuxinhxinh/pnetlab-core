@@ -19,18 +19,23 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $containerBuilder = new ContainerBuilder();
 $containerBuilder->addDefinitions([
     PDO::class => function () {
-        $host = '127.0.0.1';
-        $db   = 'pnetlab_db';
-        $user = 'pnetlab';
-        $pass = 'pnetlab';
-        $charset = 'utf8mb4';
-        $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
+        $dbHost = 'localhost';
+        $dbPass = 'pnetlab';
+        if (is_readable('/etc/pnetlab/cluster-db.conf')) {
+            $cdb = json_decode((string) file_get_contents('/etc/pnetlab/cluster-db.conf'), true);
+            if (is_array($cdb) && !empty($cdb['host']) && !empty($cdb['pass'])) {
+                $dbHost = $cdb['host'];
+                $dbPass = $cdb['pass'];
+            }
+        }
+        $dsn = "mysql:host=$dbHost;dbname=pnetlab_db;charset=utf8mb4";
         $opt = [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
+            PDO::ATTR_TIMEOUT            => 3,
         ];
-        return new PDO($dsn, $user, $pass, $opt);
+        return new PDO($dsn, 'pnetlab', $dbPass, $opt);
     },
     BrokerClient::class => fn() => new BrokerClient('/run/pnetlab/broker.sock'),
     AuthController::class => fn($c) => new AuthController($c->get(PDO::class)),
@@ -39,7 +44,7 @@ $containerBuilder->addDefinitions([
     LabController::class => fn($c) => new LabController($c->get(PDO::class), $c->get(BrokerClient::class), '/opt/unetlab/labs'),
     NodeController::class => fn($c) => new NodeController($c->get(BrokerClient::class)),
     SystemController::class => fn($c) => new SystemController($c->get(BrokerClient::class)),
-    AuthMiddleware::class => fn() => new AuthMiddleware(true),
+    AuthMiddleware::class => fn($c) => new AuthMiddleware($c->get(PDO::class), true),
     RateLimitMiddleware::class => fn() => new RateLimitMiddleware(60, 60),
     \PNetLab\Middleware\OpenApiValidationMiddleware::class => fn() => new \PNetLab\Middleware\OpenApiValidationMiddleware(),
     \PNetLab\Middleware\Slim2CompatMiddleware::class => fn() => new \PNetLab\Middleware\Slim2CompatMiddleware(),
