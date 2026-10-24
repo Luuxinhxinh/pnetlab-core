@@ -108,7 +108,7 @@ $ksmRun = @trim((string) @file_get_contents('/sys/kernel/mm/ksm/run'));
 $ksmSharing = (int) @trim((string) @file_get_contents('/sys/kernel/mm/ksm/pages_sharing'));
 $ksmShared = (int) @trim((string) @file_get_contents('/sys/kernel/mm/ksm/pages_shared'));
 $ksmSharingMb = (int) round(($ksmSharing * 4) / 1024);
-$kvmAvailable = file_exists('/dev/kvm') && is_readable('/dev/kvm');
+$kvmAvailable = file_exists('/dev/kvm');
 $zramEnabled = is_dir('/sys/block/zram0');
 
 echo json_encode(array(
