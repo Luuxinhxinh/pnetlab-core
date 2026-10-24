@@ -12,8 +12,8 @@
 		PNetLab Modern Landing & Login Modal
 		CSP compliant: No inline script, purely driven by tokens.css and login.js
 	-->
-	<link rel="stylesheet" href="/login/tokens.css?v=fe2-v1">
-	<link rel="stylesheet" href="/login/login.css?v=fe2-v1">
+	<link rel="stylesheet" href="/login/tokens.css?v=fe2-v3">
+	<link rel="stylesheet" href="/login/login.css?v=fe2-v3">
 	<script src="/assets-common/js/pnq-branding.js?v=fa685e58"></script>
 </head>
 <body>
@@ -127,10 +127,22 @@
 
 			<div class="modal-brand">
 				<h2 class="modal-brand-title" id="modal-title" data-i18n="modal_title">Welcome Back</h2>
-				<p class="modal-brand-subtitle" data-i18n="modal_subtitle">Enter credentials to unlock your workbench</p>
+				<p class="modal-brand-subtitle" id="modal-subtitle" data-i18n="modal_subtitle">Enter credentials to unlock your workbench</p>
 			</div>
 
-			<!-- Standard Sign-in Form -->
+			<!-- Mode Switcher Tabs inside Modal -->
+			<div class="modal-mode-tabs" id="modal-mode-tabs">
+				<button type="button" class="modal-tab-btn is-active" id="tab-mode-offline">
+					<span>💻</span>
+					<span data-i18n="tab_offline">Offline (Local)</span>
+				</button>
+				<button type="button" class="modal-tab-btn" id="tab-mode-online">
+					<span>☁️</span>
+					<span data-i18n="tab_online">Online (Hub)</span>
+				</button>
+			</div>
+
+			<!-- Form 1: Standard Offline Sign-in Form -->
 			<form class="login-form" id="login-form" autocomplete="on">
 				<!-- Username Field -->
 				<div class="field">
@@ -152,13 +164,11 @@
 						<input id="password" name="password" type="password" autocomplete="current-password" required
 							placeholder="••••••••" data-i18n-ph="ph_password">
 						
-						<!-- Exactly ONE SVG eye element with dynamic slash line -->
 						<button type="button" class="password-toggle-btn" id="password-toggle-btn"
 							aria-label="Toggle password visibility" title="Show/Hide password">
 							<svg class="eye-svg" viewBox="0 0 24 24">
 								<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
 								<circle cx="12" cy="12" r="3"></circle>
-								<!-- Slash line displayed only when password visible -->
 								<line class="eye-slash-path" x1="2" y1="2" x2="22" y2="22"></line>
 							</svg>
 						</button>
@@ -196,6 +206,52 @@
 				</p>
 			</form>
 
+			<!-- Form 2: Online (Hub) Sign-in Form -->
+			<form class="login-form" id="online-login-form" autocomplete="on" hidden>
+				<!-- Hub Username / Email Field -->
+				<div class="field">
+					<label for="online-username" data-i18n="label_hub_username">Hub Username</label>
+					<div class="input-wrap">
+						<input id="online-username" name="online_username" type="text" autocomplete="username"
+							autocapitalize="none" autocorrect="off" spellcheck="false" required
+							placeholder="admin" data-i18n-ph="ph_username">
+					</div>
+				</div>
+
+				<!-- Hub Password Field -->
+				<div class="field">
+					<div class="field-header">
+						<label for="online-password" data-i18n="label_hub_password">Hub Password</label>
+					</div>
+					<div class="input-wrap has-toggle">
+						<input id="online-password" name="online_password" type="password" autocomplete="current-password" required
+							placeholder="••••••••" data-i18n-ph="ph_password">
+						
+						<button type="button" class="password-toggle-btn" id="online-password-toggle-btn"
+							aria-label="Toggle password visibility" title="Show/Hide password">
+							<svg class="eye-svg" viewBox="0 0 24 24">
+								<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+								<circle cx="12" cy="12" r="3"></circle>
+								<line class="eye-slash-path" x1="2" y1="2" x2="22" y2="22"></line>
+							</svg>
+						</button>
+					</div>
+				</div>
+
+				<!-- Failure / Info Alert -->
+				<div class="alert" id="online-alert" role="alert" hidden></div>
+
+				<!-- Submit Button -->
+				<button class="btn-submit" id="online-submit" type="submit">
+					<span class="btn-label" data-i18n="btn_signin_online">🚀 Sign in to Online Hub</span>
+					<span class="btn-spin" aria-hidden="true"></span>
+				</button>
+
+				<p class="default-account-tag">
+					<span data-i18n="online_api_info">Multi-tenant Cloud Pod • API Prefix /api/v4/</span>
+				</p>
+			</form>
+
 			<!-- Forgot Password Subform -->
 			<form class="login-form" id="forgot-form" autocomplete="on" hidden>
 				<div class="field">
@@ -225,6 +281,6 @@
 	</div>
 
 	<!-- Login Logic, 3D Constellation Particle Canvas, Theme & i18n Engine -->
-	<script src="/login/login.js?v=fe2-v1"></script>
+	<script src="/login/login.js?v=fe2-v3"></script>
 </body>
 </html>
