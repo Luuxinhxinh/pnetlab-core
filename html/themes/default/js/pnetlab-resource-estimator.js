@@ -286,7 +286,7 @@
     var zramHeadroomBoost = sysStats.zram_enabled ? 1.25 : 1.0;
 
     // 4. KVM Hardware Acceleration vs TCG Software Emulation
-    var kvmStatus = sysStats.kvm_available ? 'KVM Hardware VT-x/AMD-V (Tăng tốc phần cứng ✓)' : 'TCG Software Emulation (Cảnh báo: CPU cao ⚠️)';
+    var kvmStatus = sysStats.kvm_available ? 'KVM Hardware VT-x/AMD-V (Hardware Acceleration ✓)' : 'TCG Software Emulation (Warning: High CPU ⚠️)';
 
     // 5. vCPU Overcommit Ratio Scheduling Evaluation
     var totalClusterVcpus = runningVcpus + totalRequestedVcpus;
@@ -487,48 +487,48 @@
     var forecastHtml = '';
 
     if (data.stoppedCount === 0) {
-      badgeHtml = '<span class="pnq-hud-badge" style="color:#68d391"><i class="fa fa-check-circle"></i> Toàn Lab: Đang chạy hết</span>';
-      forecastHtml = '<span class="pnq-hud-forecast">RAM Host: <b>' + data.currentMemPct + '%</b> (' + formatBytes(data.currentUsedMb) + ' / ' + formatBytes(data.totalHostMb) + ')</span>';
+      badgeHtml = '<span class="pnq-hud-badge" style="color:#68d391"><i class="fa fa-check-circle"></i> Entire Lab: All Running</span>';
+      forecastHtml = '<span class="pnq-hud-forecast">Host RAM: <b>' + data.currentMemPct + '%</b> (' + formatBytes(data.currentUsedMb) + ' / ' + formatBytes(data.totalHostMb) + ')</span>';
     } else {
       if (data.isSelectionMode) {
-        badgeHtml = '<span class="pnq-hud-badge"><i class="fa fa-mouse-pointer"></i> Đang chọn: ' + data.stoppedCount + ' node tắt</span>';
+        badgeHtml = '<span class="pnq-hud-badge"><i class="fa fa-mouse-pointer"></i> Selected: ' + data.stoppedCount + ' stopped node(s)</span>';
       } else {
-        badgeHtml = '<span class="pnq-hud-badge"><i class="fa fa-cubes"></i> Toàn Lab: ' + data.stoppedCount + ' node tắt</span>';
+        badgeHtml = '<span class="pnq-hud-badge"><i class="fa fa-cubes"></i> Entire Lab: ' + data.stoppedCount + ' stopped node(s)</span>';
       }
 
       var hostRamText = '+' + formatBytes(data.totalHostRamMb);
       metricHtml = '<span class="pnq-hud-metric"><i class="fa fa-bolt"></i> ' + hostRamText + ' • +' + data.totalRequestedVcpus + ' vCPU</span>';
 
       var pctClass = data.projectedPct >= 90 ? ' style="color:#fc8181"' : (data.projectedPct >= 75 ? ' style="color:#f6e05e"' : '');
-      forecastHtml = '<span class="pnq-hud-forecast">Dự kiến RAM: <b>' + data.currentMemPct + '%</b> ➔ <b' + pctClass + '>' + data.projectedPct + '%</b></span>';
+      forecastHtml = '<span class="pnq-hud-forecast">Projected RAM: <b>' + data.currentMemPct + '%</b> ➔ <b' + pctClass + '>' + data.projectedPct + '%</b></span>';
     }
 
     hudElement.innerHTML = badgeHtml + metricHtml + forecastHtml;
 
     // Tooltip
     var tooltipLines = [
-      'DỰ ĐOÁN TÀI NGUYÊN (MÔ HÌNH HỆ THỐNG ẢO HÓA & KERNEL)',
+      'PRE-FLIGHT RESOURCE ESTIMATE (HYPERVISOR & KERNEL SIMULATION)',
       '────────────────────────────────────────────────────────',
-      data.isSelectionMode ? '• Phạm vi: Các node đang chọn' : '• Phạm vi: Toàn bộ bài lab',
-      '• Số node cần bật: ' + data.stoppedCount + ' node',
-      '• RAM thực tế máy chủ tiêu tốn: +' + formatBytes(data.totalHostRamMb),
-      '• RAM máy ảo cấu hình (Virtual): +' + formatBytes(data.totalAllocatedRamMb),
-      '• vCPU yêu cầu: +' + data.totalRequestedVcpus + ' vCPU (Tổng cụm: ' + data.totalClusterVcpus + ' vCPU / ' + data.hostCores + ' cores)',
+      data.isSelectionMode ? '• Scope: Selected node(s)' : '• Scope: Entire lab',
+      '• Nodes to start: ' + data.stoppedCount + ' node(s)',
+      '• Estimated host RAM impact: +' + formatBytes(data.totalHostRamMb),
+      '• Configured virtual RAM: +' + formatBytes(data.totalAllocatedRamMb),
+      '• Required vCPUs: +' + data.totalRequestedVcpus + ' vCPU (Total cluster: ' + data.totalClusterVcpus + ' vCPU / ' + data.hostCores + ' cores)',
       '• vCPU Overcommit Ratio: ' + data.vcpuOvercommitRatio + 'x (' + data.overcommitStatus + ')',
-      '• Ảo hóa CPU: ' + data.kvmStatus,
+      '• CPU Virtualization: ' + data.kvmStatus,
       '────────────────────────────────────────────────────────',
-      'CƠ CHẾ TỐI ƯU HÓA HỆ THỐNG ĐANG HOẠT ĐỘNG:',
-      '• CoW & Page Cache Sharing: Tiết kiệm ~' + formatBytes(data.totalCowSavingsMb),
-      '• KSM Deduplication: ' + (data.ksmEnabled ? ('BẬT ✓ (Tiết kiệm ~' + formatBytes(data.totalKsmSavingsMb) + (data.ksmSharingMb > 0 ? (', Live Merged: ' + formatBytes(data.ksmSharingMb)) : '') + ')') : 'TẮT'),
-      '• VirtIO Ballooning: Tiết kiệm ~' + formatBytes(data.totalBallooningSavingsMb),
-      '• ZRAM Compression: ' + (data.zramEnabled ? 'BẬT ✓ (Nén 2.5:1)' : 'TẮT'),
-      '• Demand Paging: Chỉ cấp khung trang khi guest chạm tới',
+      'ACTIVE SYSTEM OPTIMIZATIONS:',
+      '• CoW & Page Cache Sharing: Saves ~' + formatBytes(data.totalCowSavingsMb),
+      '• KSM Deduplication: ' + (data.ksmEnabled ? ('ENABLED ✓ (Saves ~' + formatBytes(data.totalKsmSavingsMb) + (data.ksmSharingMb > 0 ? (', Live Merged: ' + formatBytes(data.ksmSharingMb)) : '') + ')') : 'DISABLED'),
+      '• VirtIO Ballooning: Saves ~' + formatBytes(data.totalBallooningSavingsMb),
+      '• ZRAM Compression: ' + (data.zramEnabled ? 'ENABLED ✓ (2.5:1 ratio)' : 'DISABLED'),
+      '• Demand Paging: Page frames allocated on guest touch only',
       '────────────────────────────────────────────────────────',
-      '• RAM máy chủ hiện tại: ' + data.currentMemPct + '% (' + formatBytes(data.currentUsedMb) + ')',
-      '• RAM máy chủ dự kiến sau khi bật: ' + data.projectedPct + '% (' + formatBytes(data.projectedUsedMb) + ' / ' + formatBytes(data.totalHostMb) + ')',
-      '• RAM khả dụng (MemAvailable): ' + formatBytes(data.availMb) + (data.zramEnabled ? (' [Hiệu dụng: ' + formatBytes(data.effectiveAvailMb) + ']') : ''),
-      '• Đánh giá tải: ' + (data.severity === 'danger' ? '⚠️ Nguy cơ thiếu RAM' : (data.severity === 'warning' ? '⚠️ Cảnh báo tải cao' : '✓ Hoàn toàn an toàn (Tối ưu bởi Kernel)')),
-      '💡 Nhấp chuột vào HUD để xem bảng phân tích 6 cơ chế chi tiết!'
+      '• Current host RAM: ' + data.currentMemPct + '% (' + formatBytes(data.currentUsedMb) + ')',
+      '• Projected host RAM after start: ' + data.projectedPct + '% (' + formatBytes(data.projectedUsedMb) + ' / ' + formatBytes(data.totalHostMb) + ')',
+      '• Available memory (MemAvailable): ' + formatBytes(data.availMb) + (data.zramEnabled ? (' [Effective: ' + formatBytes(data.effectiveAvailMb) + ']') : ''),
+      '• Load evaluation: ' + (data.severity === 'danger' ? '⚠️ High Risk of OOM' : (data.severity === 'warning' ? '⚠️ High Load Warning' : '✓ Safe to Start (Kernel Optimized)')),
+      '💡 Click HUD to view detailed 6-mechanism breakdown!'
     ];
 
     hudElement.title = tooltipLines.join('\n');
@@ -549,28 +549,28 @@
 
     modal.innerHTML = [
       '<h3>',
-      '  <span><i class="fa fa-dashboard"></i> Phân tích 6 Cơ chế Ảo hóa & Kernel</span>',
+      '  <span><i class="fa fa-dashboard"></i> 6-Mechanism Hypervisor & Kernel Breakdown</span>',
       '  <span class="close-btn">&times;</span>',
       '</h3>',
       '<div class="mech-row">',
-      '  <span class="mech-label">Phạm vi tính toán:</span>',
-      '  <span class="mech-val">' + (data.isSelectionMode ? ('Đang chọn (' + data.stoppedCount + ' node)') : ('Toàn bộ lab (' + data.stoppedCount + ' node)')) + '</span>',
+      '  <span class="mech-label">Calculation Scope:</span>',
+      '  <span class="mech-val">' + (data.isSelectionMode ? ('Selected (' + data.stoppedCount + ' node(s))') : ('Entire Lab (' + data.stoppedCount + ' node(s))')) + '</span>',
       '</div>',
       '<div class="mech-row">',
       '  <span class="mech-label">1. CoW & Shared Binary Layers:</span>',
-      '  <span class="mech-val"><span class="mech-tag">Tiết kiệm ' + formatBytes(data.totalCowSavingsMb) + '</span></span>',
+      '  <span class="mech-val"><span class="mech-tag">Saves ' + formatBytes(data.totalCowSavingsMb) + '</span></span>',
       '</div>',
       '<div class="mech-row">',
       '  <span class="mech-label">2. KSM (Kernel Samepage Merging):</span>',
-      '  <span class="mech-val"><span class="mech-tag">' + (data.ksmEnabled ? ('BẬT (Sharing ' + formatBytes(data.ksmSharingMb) + ')') : 'TẮT') + '</span></span>',
+      '  <span class="mech-val"><span class="mech-tag">' + (data.ksmEnabled ? ('ENABLED (Sharing ' + formatBytes(data.ksmSharingMb) + ')') : 'DISABLED') + '</span></span>',
       '</div>',
       '<div class="mech-row">',
       '  <span class="mech-label">3. VirtIO Ballooning & ZRAM:</span>',
-      '  <span class="mech-val"><span class="mech-tag">' + (data.zramEnabled ? 'ZRAM 2.5:1 BẬT' : 'VirtIO Thu hồi ' + formatBytes(data.totalBallooningSavingsMb)) + '</span></span>',
+      '  <span class="mech-val"><span class="mech-tag">' + (data.zramEnabled ? 'ZRAM 2.5:1 ENABLED' : 'VirtIO Reclaimed ' + formatBytes(data.totalBallooningSavingsMb)) + '</span></span>',
       '</div>',
       '<div class="mech-row">',
       '  <span class="mech-label">4. KVM Hardware Acceleration:</span>',
-      '  <span class="mech-val">' + (data.kvmAvailable ? '<span class="mech-tag">VT-x / AMD-V Sẵn sàng</span>' : '<span style="color:#fc8181">TCG Chậm</span>') + '</span>',
+      '  <span class="mech-val">' + (data.kvmAvailable ? '<span class="mech-tag">VT-x / AMD-V Ready</span>' : '<span style="color:#fc8181">TCG Slow</span>') + '</span>',
       '</div>',
       '<div class="mech-row">',
       '  <span class="mech-label">5. vCPU Overcommit Ratio:</span>',
@@ -578,14 +578,14 @@
       '</div>',
       '<div class="mech-row">',
       '  <span class="mech-label">6. Linux Demand Paging:</span>',
-      '  <span class="mech-val">Chỉ nạp working set (~' + formatBytes(data.totalHostRamMb) + ' / ảo ' + formatBytes(data.totalAllocatedRamMb) + ')</span>',
+      '  <span class="mech-val">Working set touch only (~' + formatBytes(data.totalHostRamMb) + ' / Virtual ' + formatBytes(data.totalAllocatedRamMb) + ')</span>',
       '</div>',
       '<div class="mech-row" style="margin-top:10px; border-top: 1px solid rgba(255,255,255,0.15); padding-top:10px;">',
-      '  <span class="mech-label">Dự kiến RAM Máy chủ:</span>',
+      '  <span class="mech-label">Projected Host RAM:</span>',
       '  <span class="mech-val" style="color:#68d391; font-size:13px;">' + data.currentMemPct + '% ➔ ' + data.projectedPct + '% (' + formatBytes(data.projectedUsedMb) + ' / ' + formatBytes(data.totalHostMb) + ')</span>',
       '</div>',
       '<div class="mech-row">',
-      '  <span class="mech-label">Dung lượng Khả dụng (MemAvailable):</span>',
+      '  <span class="mech-label">Available Memory (MemAvailable):</span>',
       '  <span class="mech-val" style="color:#63b3ed;">' + formatBytes(data.availMb) + '</span>',
       '</div>'
     ].join('\n');
