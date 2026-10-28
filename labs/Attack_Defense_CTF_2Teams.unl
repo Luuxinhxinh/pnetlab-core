@@ -1,0 +1,73 @@
+<?xml version="1.0" ?>
+<lab name="Attack-Defense CTF (2 Teams Demo)" id="ccaf1b2f-4f81-401d-82e4-a3194ccdc51b" version="1" scripttimeout="300" countdown="240" darkmode="1" mode3d="0" nogrid="0" joinable="0" openable="0" editable="0">
+  <topology>
+    <nodes>
+      <node id="1" name="rCTF_Portal_10.10.0.111" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="256" ethernet="1" console="vnc" delay="0" icon="Server.png" left="400" top="60" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="1" vid="1" vlanmode="access"/>
+      </node>
+      <node id="2" name="Scoring_Engine_10.10.0.222" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="256" ethernet="1" console="vnc" delay="0" icon="Server.png" left="650" top="60" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="1" vid="1" vlanmode="access"/>
+      </node>
+      <node id="3" name="Central_Firewall_BTC" type="qemu" template="pfsense" image="pfsense-2.7.0" cpu="1" ram="256" ethernet="2" console="vnc" delay="0" icon="Firewall.png" left="520" top="220" config="0" config_data="">
+        <interface id="0" name="vtnet0 (BTC)" type="ethernet" network_id="1" vid="1" vlanmode="access"/>
+        <interface id="16" name="vtnet1 (WAN)" type="ethernet" network_id="2" vid="1" vlanmode="access"/>
+      </node>
+      <node id="10" name="pfSense_Doi_01" type="qemu" template="pfsense" image="pfsense-2.7.0" cpu="1" ram="256" ethernet="2" console="vnc" delay="0" icon="Firewall.png" left="250" top="390" config="0" config_data="">
+        <interface id="0" name="vtnet0 (WAN .201)" type="ethernet" network_id="2" vid="1" vlanmode="access"/>
+        <interface id="16" name="vtnet1 (LAN .254)" type="ethernet" network_id="101" vid="1" vlanmode="access"/>
+      </node>
+      <node id="11" name="T01_Service_102" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="80" top="570" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="101" vid="1" vlanmode="access"/>
+      </node>
+      <node id="12" name="T01_Service_103" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="180" top="570" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="101" vid="1" vlanmode="access"/>
+      </node>
+      <node id="13" name="T01_Service_104" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="280" top="570" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="101" vid="1" vlanmode="access"/>
+      </node>
+      <node id="14" name="T01_Service_105" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="380" top="570" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="101" vid="1" vlanmode="access"/>
+      </node>
+      <node id="15" name="T01_Service_109" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="130" top="680" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="101" vid="1" vlanmode="access"/>
+      </node>
+      <node id="16" name="T01_Service_111_WAN" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Desktop.png" left="230" top="680" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="101" vid="1" vlanmode="access"/>
+      </node>
+      <node id="17" name="T01_VPN_BTC_110" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="330" top="680" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="101" vid="1" vlanmode="access"/>
+      </node>
+      <node id="20" name="pfSense_Doi_02" type="qemu" template="pfsense" image="pfsense-2.7.0" cpu="1" ram="256" ethernet="2" console="vnc" delay="0" icon="Firewall.png" left="800" top="390" config="0" config_data="">
+        <interface id="0" name="vtnet0 (WAN .201)" type="ethernet" network_id="2" vid="1" vlanmode="access"/>
+        <interface id="16" name="vtnet1 (LAN .254)" type="ethernet" network_id="102" vid="1" vlanmode="access"/>
+      </node>
+      <node id="21" name="T02_Service_102" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="630" top="570" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="102" vid="1" vlanmode="access"/>
+      </node>
+      <node id="22" name="T02_Service_103" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="730" top="570" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="102" vid="1" vlanmode="access"/>
+      </node>
+      <node id="23" name="T02_Service_104" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="830" top="570" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="102" vid="1" vlanmode="access"/>
+      </node>
+      <node id="24" name="T02_Service_105" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="930" top="570" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="102" vid="1" vlanmode="access"/>
+      </node>
+      <node id="25" name="T02_Service_109" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="680" top="680" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="102" vid="1" vlanmode="access"/>
+      </node>
+      <node id="26" name="T02_Service_111_WAN" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Desktop.png" left="780" top="680" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="102" vid="1" vlanmode="access"/>
+      </node>
+      <node id="27" name="T02_VPN_BTC_110" type="qemu" template="linux" image="linux-alpine" cpu="1" ram="128" ethernet="1" console="vnc" delay="0" icon="Server.png" left="880" top="680" config="0" config_data="">
+        <interface id="0" name="eth0" type="ethernet" network_id="102" vid="1" vlanmode="access"/>
+      </node>
+    </nodes>
+    <networks>
+      <network id="1" name="Net_BTC" type="bridge" left="525" top="140" visibility="1" icon="lan.png" smart="0"/>
+      <network id="2" name="Net_WAN_Backbone" type="bridge" left="525" top="320" visibility="1" icon="lan.png" smart="0"/>
+      <network id="101" name="LAN_Team_01" type="bridge" left="250" top="490" visibility="1" icon="lan.png" smart="0"/>
+      <network id="102" name="LAN_Team_02" type="bridge" left="800" top="490" visibility="1" icon="lan.png" smart="0"/>
+    </networks>
+  </topology>
+</lab>

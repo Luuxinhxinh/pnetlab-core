@@ -10,9 +10,8 @@
  * 6. Linux Memory Overcommit & Demand Paging
  * 
  * + SMART NODE OPTIMIZER & FUNCTIONAL EQUIVALENCE ENGINE:
- * Tra cứu bảng ánh xạ tương đương chức năng (CSR1000v -> IOL L3, Cat9kv -> IOL L2,
- * Windows -> VPCS/Docker, ...) & tính toán mức tiết kiệm RAM/vCPU, cung cấp giao diện
- * đề xuất thay thế thông minh kèm thao tác 1-Click tối ưu.
+ * Functional equivalence matrix lookup (CSR1000v -> IOL L3, Cat9kv -> IOL L2,
+ * Windows -> VPCS/Docker, ...) & RAM/vCPU savings calculation with 1-Click optimization.
  */
 (function () {
   'use strict';
@@ -41,13 +40,13 @@
   var lastEstimate = null;
   var activeModalTab = 'mechanisms'; // 'mechanisms' or 'recommendations'
 
-  // Bảng ánh xạ tương đương chức năng (Functional Equivalence Matrix)
+  // Functional Equivalence Matrix
   var ALTERNATIVE_MATRIX = [
     {
       id: 'cisco_l3',
       category: 'Cisco L3 Routing',
       roleIcon: 'fa-random',
-      description: 'Định tuyến Core/Edge: BGP, OSPF, EIGRP, MPLS, VRF, NAT',
+      description: 'Core/Edge Routing: BGP, OSPF, EIGRP, MPLS, VRF, NAT',
       matches: function (node) {
         var t = String(node.template || node.type || '').toLowerCase();
         var img = String(node.image || '').toLowerCase();
@@ -68,7 +67,7 @@
         estRamMb: 75,
         estCpu: 1,
         defaultRam: 1024,
-        savingsText: 'Tiết kiệm ~98% RAM (chỉ tốn ~75 MB thay vì ~4 GB)',
+        savingsText: 'Saves ~98% RAM (~75 MB footprint vs ~4 GB)',
         features: ['BGP Full', 'OSPFv2/v3', 'EIGRP', 'MPLS / L3VPN', 'VRF-Lite', 'NAT', 'ACL'],
         createPayload: { template: 'iol', type: 'iol', ram: 1024, nvram: 1024, ethernet: 4, serial: 0 }
       },
@@ -83,7 +82,7 @@
       id: 'cisco_l2',
       category: 'Cisco L2/L3 Switching',
       roleIcon: 'fa-sitemap',
-      description: 'Chuyển mạch: VLAN, 802.1Q Trunking, STP/RSTP, EtherChannel, SVI',
+      description: 'Switching: VLAN, 802.1Q Trunking, STP/RSTP, EtherChannel, SVI',
       matches: function (node) {
         var t = String(node.template || node.type || '').toLowerCase();
         var img = String(node.image || '').toLowerCase();
@@ -103,7 +102,7 @@
         estRamMb: 100,
         estCpu: 1,
         defaultRam: 1024,
-        savingsText: 'Tiết kiệm ~99% RAM (chỉ tốn ~100 MB thay vì 8 - 18 GB)',
+        savingsText: 'Saves ~99% RAM (~100 MB footprint vs 8 - 18 GB)',
         features: ['VLAN 802.1Q', 'STP / RSTP / MSTP', 'EtherChannel LACP', 'L3 SVI', 'DHCP Snooping'],
         createPayload: { template: 'iol', type: 'iol', ram: 1024, nvram: 1024, ethernet: 4, serial: 0 }
       },
@@ -118,7 +117,7 @@
       id: 'end_host',
       category: 'End Host / Client Test',
       roleIcon: 'fa-desktop',
-      description: 'Host kiểm thử: Ping, Trace, IP, DHCP, HTTP, DNS',
+      description: 'Test Host: Ping, Trace, IP, DHCP, HTTP, DNS',
       matches: function (node) {
         var t = String(node.template || node.type || '').toLowerCase();
         var img = String(node.image || '').toLowerCase();
@@ -139,7 +138,7 @@
         estRamMb: 10,
         estCpu: 1,
         defaultRam: 128,
-        savingsText: 'Tiết kiệm ~99.8% RAM (chỉ tốn ~10 MB thay vì 4 - 8 GB)',
+        savingsText: 'Saves ~99.8% RAM (~10 MB footprint vs 4 - 8 GB)',
         features: ['Ping ICMP', 'Traceroute', 'DHCP Client', 'Static IP / Gateway', 'DNS resolution'],
         createPayload: { template: 'vpcs', type: 'vpcs', ram: 128, ethernet: 1 }
       },
@@ -156,7 +155,7 @@
       id: 'high_scale_routing',
       category: 'High-Scale BGP / Core Daemon',
       roleIcon: 'fa-server',
-      description: 'Routing quy mô lớn: BGP Route Reflector, OSPF/ISIS',
+      description: 'Large-scale Routing: BGP Route Reflector, OSPF/ISIS',
       matches: function (node) {
         var t = String(node.template || node.type || '').toLowerCase();
         var img = String(node.image || '').toLowerCase();
@@ -172,8 +171,8 @@
         estRamMb: 128,
         estCpu: 1,
         defaultRam: 256,
-        savingsText: 'Tiết kiệm ~99% RAM (chỉ tốn ~128 MB thay vì 16 GB)',
-        features: ['Hàng triệu BGP Routes', 'EVPN-VxLAN', 'OSPFv2/v3', 'IS-IS', 'BFD', 'Segment Routing'],
+        savingsText: 'Saves ~99% RAM (~128 MB footprint vs 16 GB)',
+        features: ['Millions of BGP Routes', 'EVPN-VxLAN', 'OSPFv2/v3', 'IS-IS', 'BFD', 'Segment Routing'],
         createPayload: { template: 'docker', type: 'docker', ram: 256, ethernet: 4 }
       }
     },
@@ -181,7 +180,7 @@
       id: 'firewall',
       category: 'Firewall & Security Gateway',
       roleIcon: 'fa-shield',
-      description: 'Tường lửa bảo mật: L3/L4 Stateful Filter, NAT, IPsec',
+      description: 'Security Firewall: L3/L4 Stateful Filter, NAT, IPsec',
       matches: function (node) {
         var t = String(node.template || node.type || '').toLowerCase();
         var img = String(node.image || '').toLowerCase();
@@ -197,16 +196,16 @@
         estRamMb: 1024,
         estCpu: 1,
         defaultRam: 2048,
-        savingsText: 'Tiết kiệm ~75% - 85% RAM (chỉ tốn ~1 - 2 GB thay vì 8 GB+)',
+        savingsText: 'Saves ~75% - 85% RAM (~1 - 2 GB footprint vs 8 GB+)',
         features: ['Stateful Packet Inspection', 'NAT / PAT', 'ACL Rule', 'IPsec VPN', 'Remote Access'],
         createPayload: { template: 'asav', type: 'qemu', ram: 2048, ethernet: 4 }
       }
     },
     {
       id: 'rightsize_ram',
-      category: 'Cấu hình RAM dư thừa',
+      category: 'Oversized RAM',
       roleIcon: 'fa-sliders',
-      description: 'Hạ dung lượng RAM cấu hình về mức tiêu chuẩn lab',
+      description: 'Right-size virtual RAM to standard lab baseline',
       matches: function (node) {
         var ram = parseInt(node.ram, 10) || 0;
         var t = String(node.template || node.type || '').toLowerCase();
@@ -223,8 +222,8 @@
         targetRam: 1024,
         estRamMb: 400,
         estCpu: 1,
-        savingsText: 'Hạ RAM cấu hình về 1,024 MB (chuẩn lab mượt mà)',
-        features: ['Bảo toàn 100% image', 'Giữ nguyên cấu hình khởi động', 'Giữ nguyên cổng kết nối cáp']
+        savingsText: 'Right-size RAM to 1,024 MB (smooth lab baseline)',
+        features: ['100% Image Preserved', 'Startup Config Retained', 'Cabled Interfaces Preserved']
       }
     }
   ];
@@ -341,10 +340,10 @@
   }
 
   /**
-   * Đánh giá đề xuất thay thế node nhẹ hơn tương đương chức năng
-   * Phân biệt rõ:
-   * - Host RAM: Dung lượng RAM vật lý thực sự giải phóng trên máy chủ Linux
-   * - Allocated RAM: Dung lượng RAM cấu hình ảo được cắt giảm
+   * Evaluate lightweight functionally equivalent node suggestions
+   * Distinguish:
+   * - Host RAM: Actual physical RAM freed on the host server
+   * - Allocated RAM: Configured virtual RAM reduced
    */
   function evaluateNodeRecommendations(targetNodes, currentProjectedUsedMb, totalHostMb, currentUsedMb) {
     var recs = [];
@@ -366,7 +365,7 @@
           var savedAllocatedRam = Math.max(0, curRam - sugAllocatedRam);
           var savedCpu = Math.max(0, curCpu - (rule.suggested.estCpu || 1));
 
-          // Bỏ qua nếu node không tiết kiệm được dung lượng RAM nào (đã tối ưu)
+          // Skip if node cannot save any RAM (already optimal)
           if (savedHostRam <= 0 && savedAllocatedRam <= 0) {
             continue;
           }
@@ -392,7 +391,7 @@
           totalSavedHostRamMb += savedHostRam;
           totalSavedAllocatedRamMb += savedAllocatedRam;
           totalSavedCpu += savedCpu;
-          break; // Ưu tiên rule phù hợp đầu tiên
+          break; // Match first matching rule
         }
       }
     });
@@ -438,7 +437,7 @@
       if (!node) return;
       var status = parseInt(node.status, 10);
       if (isNaN(status)) status = 0;
-      if (status !== 2) { // Node đang tắt
+      if (status !== 2) { // Stopped node
         node._resolvedId = id;
         targetNodes.push(node);
       }
@@ -574,7 +573,7 @@
     var zramHeadroomBoost = sysStats.zram_enabled ? 1.25 : 1.0;
 
     // 4. KVM Hardware Acceleration vs TCG Software Emulation
-    var kvmStatus = sysStats.kvm_available ? 'KVM Hardware VT-x/AMD-V (Tăng tốc phần cứng ✓)' : 'TCG Software Emulation (Cảnh báo: CPU cao ⚠️)';
+    var kvmStatus = sysStats.kvm_available ? 'KVM Hardware VT-x/AMD-V (Hardware Acceleration ✓)' : 'TCG Software Emulation (Warning: High CPU ⚠️)';
 
     // 5. vCPU Overcommit Ratio Scheduling Evaluation
     var totalClusterVcpus = runningVcpus + totalRequestedVcpus;
@@ -935,18 +934,8 @@
       } else {
         document.body.appendChild(hudElement);
       }
-      hudElement.addEventListener('click', function (e) {
-        var optBtn = e.target.closest('#pnq-hud-opt-trigger');
-        if (optBtn) {
-          showDetailsModal('recommendations');
-        } else {
-          // Nếu đang có cảnh báo tải hoặc có đề xuất, ưu tiên mở tab recommendations
-          if (data.severity !== 'safe' && data.recommendations && data.recommendations.items.length > 0) {
-            showDetailsModal('recommendations');
-          } else {
-            showDetailsModal('mechanisms');
-          }
-        }
+      hudElement.addEventListener('click', function () {
+        showDetailsModal('mechanisms');
       });
     } else if (container && hudElement.parentElement !== container) {
       container.appendChild(hudElement);
@@ -957,71 +946,65 @@
     var badgeHtml = '';
     var metricHtml = '';
     var forecastHtml = '';
-    var optBadgeHtml = '';
 
     if (data.stoppedCount === 0) {
-      badgeHtml = '<span class="pnq-hud-badge" style="color:#68d391"><i class="fa fa-check-circle"></i> Toàn Lab: Đang chạy hết</span>';
+      badgeHtml = '<span class="pnq-hud-badge" style="color:#68d391"><i class="fa fa-check-circle"></i> Entire Lab: All Running</span>';
       forecastHtml = '<span class="pnq-hud-forecast">RAM Host: <b>' + data.currentMemPct + '%</b> (' + formatBytes(data.currentUsedMb) + ' / ' + formatBytes(data.totalHostMb) + ')</span>';
     } else {
       if (data.isSelectionMode) {
-        badgeHtml = '<span class="pnq-hud-badge"><i class="fa fa-mouse-pointer"></i> Đang chọn: ' + data.stoppedCount + ' node tắt</span>';
+        badgeHtml = '<span class="pnq-hud-badge"><i class="fa fa-mouse-pointer"></i> Selected: ' + data.stoppedCount + ' stopped node(s)</span>';
       } else {
-        badgeHtml = '<span class="pnq-hud-badge"><i class="fa fa-cubes"></i> Toàn Lab: ' + data.stoppedCount + ' node tắt</span>';
+        badgeHtml = '<span class="pnq-hud-badge"><i class="fa fa-cubes"></i> Entire Lab: ' + data.stoppedCount + ' stopped node(s)</span>';
       }
 
       var hostRamText = '+' + formatBytes(data.totalHostRamMb);
       metricHtml = '<span class="pnq-hud-metric"><i class="fa fa-bolt"></i> ' + hostRamText + ' • +' + data.totalRequestedVcpus + ' vCPU</span>';
 
       var pctClass = data.projectedPct >= 90 ? ' style="color:#fc8181"' : (data.projectedPct >= 75 ? ' style="color:#f6e05e"' : '');
-      forecastHtml = '<span class="pnq-hud-forecast">Dự kiến RAM: <b>' + data.currentMemPct + '%</b> ➔ <b' + pctClass + '>' + data.projectedPct + '%</b></span>';
-
-      // Nút đề xuất tối ưu nếu có node nặng hoặc RAM dư thừa
-      if (data.recommendations && data.recommendations.items.length > 0) {
-        optBadgeHtml = '<span class="pnq-hud-opt-badge" id="pnq-hud-opt-trigger" title="Nhấp để xem ' + data.recommendations.items.length + ' đề xuất thay thế node nhẹ hơn"><i class="fa fa-lightbulb-o"></i> Tối ưu: Tiết kiệm ' + formatBytes(data.recommendations.totalSavedRamMb) + '</span>';
-      }
+      forecastHtml = '<span class="pnq-hud-forecast">Projected RAM: <b>' + data.currentMemPct + '%</b> ➔ <b' + pctClass + '>' + data.projectedPct + '%</b></span>';
     }
 
-    hudElement.innerHTML = badgeHtml + metricHtml + forecastHtml + optBadgeHtml;
+    hudElement.innerHTML = badgeHtml + metricHtml + forecastHtml;
 
     // Tooltip
     var tooltipLines = [
-      'DỰ ĐOÁN TÀI NGUYÊN (MÔ HÌNH HỆ THỐNG ẢO HÓA & KERNEL)',
+      'PRE-FLIGHT RESOURCE ESTIMATE (HYPERVISOR & KERNEL SIMULATION)',
       '────────────────────────────────────────────────────────',
-      data.isSelectionMode ? '• Phạm vi: Các node đang chọn' : '• Phạm vi: Toàn bộ bài lab',
-      '• Số node cần bật: ' + data.stoppedCount + ' node',
-      '• RAM thực tế máy chủ tiêu tốn: +' + formatBytes(data.totalHostRamMb),
-      '• RAM máy ảo cấu hình (Virtual): +' + formatBytes(data.totalAllocatedRamMb),
-      '• vCPU yêu cầu: +' + data.totalRequestedVcpus + ' vCPU (Tổng cụm: ' + data.totalClusterVcpus + ' vCPU / ' + data.hostCores + ' cores)',
+      data.isSelectionMode ? '• Scope: Selected node(s)' : '• Scope: Entire lab',
+      '• Nodes to start: ' + data.stoppedCount + ' node(s)',
+      '• Estimated host RAM impact: +' + formatBytes(data.totalHostRamMb),
+      '• Configured virtual RAM: +' + formatBytes(data.totalAllocatedRamMb),
+      '• Required vCPUs: +' + data.totalRequestedVcpus + ' vCPU (Total cluster: ' + data.totalClusterVcpus + ' vCPU / ' + data.hostCores + ' cores)',
       '• vCPU Overcommit Ratio: ' + data.vcpuOvercommitRatio + 'x (' + data.overcommitStatus + ')',
-      '• Ảo hóa CPU: ' + data.kvmStatus,
+      '• CPU Virtualization: ' + data.kvmStatus,
       '────────────────────────────────────────────────────────',
-      'CƠ CHẾ TỐI ƯU HÓA HỆ THỐNG ĐANG HOẠT ĐỘNG:',
-      '• CoW & Page Cache Sharing: Tiết kiệm ~' + formatBytes(data.totalCowSavingsMb),
-      '• KSM Deduplication: ' + (data.ksmEnabled ? ('BẬT ✓ (Tiết kiệm ~' + formatBytes(data.totalKsmSavingsMb) + (data.ksmSharingMb > 0 ? (', Live Merged: ' + formatBytes(data.ksmSharingMb)) : '') + ')') : 'TẮT'),
-      '• VirtIO Ballooning: Tiết kiệm ~' + formatBytes(data.totalBallooningSavingsMb),
-      '• ZRAM Compression: ' + (data.zramEnabled ? 'BẬT ✓ (Nén 2.5:1)' : 'TẮT'),
-      '• Demand Paging: Chỉ cấp khung trang khi guest chạm tới',
+      'ACTIVE SYSTEM OPTIMIZATIONS:',
+      '• CoW & Page Cache Sharing: Saves ~' + formatBytes(data.totalCowSavingsMb),
+      '• KSM Deduplication: ' + (data.ksmEnabled ? ('ENABLED ✓ (Saves ~' + formatBytes(data.totalKsmSavingsMb) + (data.ksmSharingMb > 0 ? (', Live Merged: ' + formatBytes(data.ksmSharingMb)) : '') + ')') : 'DISABLED'),
+      '• VirtIO Ballooning: Saves ~' + formatBytes(data.totalBallooningSavingsMb),
+      '• ZRAM Compression: ' + (data.zramEnabled ? 'ENABLED ✓ (2.5:1 ratio)' : 'DISABLED'),
+      '• Demand Paging: Page frames allocated on guest touch only',
       '────────────────────────────────────────────────────────',
-      '• RAM máy chủ hiện tại: ' + data.currentMemPct + '% (' + formatBytes(data.currentUsedMb) + ')',
-      '• RAM máy chủ dự kiến sau khi bật: ' + data.projectedPct + '% (' + formatBytes(data.projectedUsedMb) + ' / ' + formatBytes(data.totalHostMb) + ')',
-      '• RAM khả dụng (MemAvailable): ' + formatBytes(data.availMb) + (data.zramEnabled ? (' [Hiệu dụng: ' + formatBytes(data.effectiveAvailMb) + ']') : ''),
-      '• Đánh giá tải: ' + (data.severity === 'danger' ? '⚠️ Nguy cơ thiếu RAM' : (data.severity === 'warning' ? '⚠️ Cảnh báo tải cao' : '✓ Hoàn toàn an toàn (Tối ưu bởi Kernel)'))
+      '• Current host RAM: ' + data.currentMemPct + '% (' + formatBytes(data.currentUsedMb) + ')',
+      '• Projected host RAM after start: ' + data.projectedPct + '% (' + formatBytes(data.projectedUsedMb) + ' / ' + formatBytes(data.totalHostMb) + ')',
+      '• Available memory (MemAvailable): ' + formatBytes(data.availMb) + (data.zramEnabled ? (' [Effective: ' + formatBytes(data.effectiveAvailMb) + ']') : ''),
+      '• Load evaluation: ' + (data.severity === 'danger' ? '⚠️ High Risk of OOM' : (data.severity === 'warning' ? '⚠️ High Load Warning' : '✓ Safe to Start (Kernel Optimized)'))
     ];
 
     if (data.recommendations && data.recommendations.items.length > 0) {
       tooltipLines.push('────────────────────────────────────────────────────────');
-      tooltipLines.push('💡 CÓ ' + data.recommendations.items.length + ' ĐỀ XUẤT THAY THẾ NODE NHẸ HƠN: Tiết kiệm tới ' + formatBytes(data.recommendations.totalSavedRamMb) + ' RAM!');
+      tooltipLines.push('💡 ' + data.recommendations.items.length + ' LIGHTWEIGHT SUBSTITUTION SUGGESTIONS: Saves up to ' + formatBytes(data.recommendations.totalSavedRamMb) + ' RAM!');
     }
 
-    tooltipLines.push('👉 Nhấp chuột vào HUD để xem bảng phân tích & danh sách đề xuất thay thế!');
+    tooltipLines.push('👉 Click HUD to view breakdown & substitution recommendations!');
     hudElement.title = tooltipLines.join('\n');
   }
 
-  // Thực hiện hạ RAM cấu hình của 1 node qua API
+  // Right-size single node virtual RAM via API
   function applyNodeRamOptimization(nodeId, targetRamMb, btnEl) {
     if (btnEl) {
       btnEl.disabled = true;
-      btnEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Đang lưu...';
+      btnEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
     }
     var base = (window.nodes && window.nodes[nodeId]) || {};
     var postData = Object.assign({}, base, { id: nodeId, ram: targetRamMb });
@@ -1042,40 +1025,40 @@
               window.nodes[nodeId].ram = targetRamMb;
             }
             if (typeof window.addMessage === 'function') {
-              window.addMessage('success', 'Đã tối ưu RAM cho ' + (base.name || ('Node ' + nodeId)) + ' về ' + targetRamMb + ' MB!');
+              window.addMessage('success', 'Successfully right-sized RAM for ' + (base.name || ('Node ' + nodeId)) + ' to ' + targetRamMb + ' MB!');
             }
             recalculateAndRender();
             showDetailsModal('recommendations');
           } else {
-            alert('Không thể cập nhật node: ' + ((res && res.message) || 'Lỗi không xác định'));
+            alert('Cannot update node: ' + ((res && res.message) || 'Unknown error'));
             if (btnEl) {
               btnEl.disabled = false;
-              btnEl.innerHTML = 'Thử lại';
+              btnEl.innerHTML = 'Retry';
             }
           }
         },
         error: function () {
-          alert('Lỗi kết nối khi gửi yêu cầu cập nhật node.');
+          alert('Connection error while updating node.');
           if (btnEl) {
             btnEl.disabled = false;
-            btnEl.innerHTML = 'Thử lại';
+            btnEl.innerHTML = 'Retry';
           }
         }
       });
     }
   }
 
-  // Thay thế node nặng bằng node nhẹ: Hoán đổi tại chỗ (in-place atomic swap), bảo toàn 100% dây kết nối và vị trí
+  // In-place atomic node replacement: preserves 100% cabled interfaces and coordinates
   function swapWithAlternativeNode(oldNodeId, suggested, btnEl) {
     if (btnEl) {
       btnEl.disabled = true;
-      btnEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Đang thay thế...';
+      btnEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Replacing...';
     }
 
     var src = resolveNodeRecord(oldNodeId);
     var oldName = src.name || ('Node ' + oldNodeId);
 
-    // Tính toán tên mới và icon mới phù hợp trực quan với thiết bị đã chọn
+    // Compute visual name and icon for new template
     var newName = oldName;
     if (suggested.type === 'vpcs') {
       newName = oldName.replace(/win\d*/i, 'VPCS').replace(/qemu/i, 'vpcs');
@@ -1133,13 +1116,13 @@
       data: JSON.stringify(swapPayload),
       success: function (res) {
         if (!res || res.status !== 'success') {
-          alert('Không thể thay thế node: ' + ((res && res.message) || 'Lỗi xử lý'));
-          if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = 'Thử lại'; }
+          alert('Could not replace node: ' + ((res && res.message) || 'Processing error'));
+          if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = 'Retry'; }
           return;
         }
 
         if (typeof window.addMessage === 'function') {
-          window.addMessage('success', 'Đã thay thế ' + oldName + ' sang ' + suggested.name + ' tại chỗ, bảo toàn 100% dây kết nối!');
+          window.addMessage('success', 'Successfully replaced ' + oldName + ' with ' + suggested.name + ' in-place, 100% cabled interfaces preserved!');
         }
 
         closeDetailsModal();
@@ -1152,31 +1135,31 @@
         }, 400);
       },
       error: function (xhr) {
-        var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || xhr.statusText || 'Lỗi kết nối';
-        alert('Lỗi thay thế node: ' + msg);
-        if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = 'Thử lại'; }
+        var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || xhr.statusText || 'Connection error';
+        alert('Node replacement error: ' + msg);
+        if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = 'Retry'; }
       }
     });
   }
 
-  // Tạo node nhẹ tương đương (alias)
+  // Create lightweight replacement node (alias)
   function createAlternativeNode(srcNodeId, suggested, btnEl) {
     swapWithAlternativeNode(srcNodeId, suggested, btnEl);
   }
 
-  // Tối ưu hàng loạt RAM cho các node có RAM dư thừa
+  // Batch right-size oversized RAM across multiple nodes
   function applyBatchRightSize(btnEl) {
     if (!lastEstimate || !lastEstimate.recommendations || !lastEstimate.recommendations.items) return;
     var candidates = lastEstimate.recommendations.items.filter(function (it) {
       return it.suggested && it.suggested.isRightSize;
     });
     if (!candidates.length) {
-      alert('Không có node nào có RAM dư thừa cần hạ cấu hình.');
+      alert('No oversized nodes found that require right-sizing.');
       return;
     }
     if (btnEl) {
       btnEl.disabled = true;
-      btnEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Đang tối ưu ' + candidates.length + ' node...';
+      btnEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Optimizing ' + candidates.length + ' node(s)...';
     }
 
     var pending = candidates.length;
@@ -1197,7 +1180,7 @@
           successCount++;
           if (pending === 0) {
             if (typeof window.addMessage === 'function') {
-              window.addMessage('success', 'Đã tối ưu RAM cho ' + successCount + ' node thành công!');
+              window.addMessage('success', 'Successfully right-sized RAM for ' + successCount + ' node(s)!');
             }
             recalculateAndRender();
             showDetailsModal('recommendations');
@@ -1226,38 +1209,33 @@
     var recs = (data.recommendations && data.recommendations.items) || [];
     var recCount = recs.length;
 
-    // Render HTML modal với 2 tab
+    // Render Pre-Flight Resource Analysis modal
     modal.innerHTML = [
       '<div id="pnq-estimator-modal-header">',
-      '  <h3><i class="fa fa-dashboard"></i> Phân tích Tài nguyên & Tối ưu hóa Node</h3>',
+      '  <h3><i class="fa fa-dashboard"></i> Pre-Flight Resource Analysis</h3>',
       '  <span class="close-btn">&times;</span>',
       '</div>',
-      '<div class="pnq-modal-tabs">',
-      '  <button class="pnq-modal-tab ' + (activeModalTab === 'mechanisms' ? 'active' : '') + '" data-tab="mechanisms"><i class="fa fa-cogs"></i> 6 Cơ chế Hypervisor</button>',
-      '  <button class="pnq-modal-tab tab-opt ' + (activeModalTab === 'recommendations' ? 'active' : '') + '" data-tab="recommendations"><i class="fa fa-lightbulb-o"></i> Đề xuất thay thế Node <span class="pnq-tab-counter">' + recCount + '</span></button>',
-      '</div>',
-      '<div class="pnq-tab-content">',
-      '  <!-- TAB 1: 6 CƠ CHẾ KERNEL -->',
-      '  <div id="pane-mechanisms" class="pnq-tab-pane ' + (activeModalTab === 'mechanisms' ? 'active' : '') + '">',
+      '<div class="pnq-tab-content" style="padding: 16px 20px;">',
+      '  <div id="pane-mechanisms" class="pnq-tab-pane active">',
       '    <div class="mech-row">',
-      '      <span class="mech-label">Phạm vi tính toán:</span>',
-      '      <span class="mech-val">' + (data.isSelectionMode ? ('Đang chọn (' + data.stoppedCount + ' node)') : ('Toàn bộ lab (' + data.stoppedCount + ' node)')) + '</span>',
+      '      <span class="mech-label">Calculation Scope:</span>',
+      '      <span class="mech-val">' + (data.isSelectionMode ? ('Selected (' + data.stoppedCount + ' node(s))') : ('Entire Lab (' + data.stoppedCount + ' node(s))')) + '</span>',
       '    </div>',
       '    <div class="mech-row">',
       '      <span class="mech-label">1. CoW & Shared Binary Layers:</span>',
-      '      <span class="mech-val"><span class="mech-tag">Tiết kiệm ' + formatBytes(data.totalCowSavingsMb) + '</span></span>',
+      '      <span class="mech-val"><span class="mech-tag">Saves ' + formatBytes(data.totalCowSavingsMb) + '</span></span>',
       '    </div>',
       '    <div class="mech-row">',
       '      <span class="mech-label">2. KSM (Kernel Samepage Merging):</span>',
-      '      <span class="mech-val"><span class="mech-tag">' + (data.ksmEnabled ? ('BẬT (Sharing ' + formatBytes(data.ksmSharingMb) + ')') : 'TẮT') + '</span></span>',
+      '      <span class="mech-val"><span class="mech-tag">' + (data.ksmEnabled ? ('ENABLED (Sharing ' + formatBytes(data.ksmSharingMb) + ')') : 'DISABLED') + '</span></span>',
       '    </div>',
       '    <div class="mech-row">',
       '      <span class="mech-label">3. VirtIO Ballooning & ZRAM:</span>',
-      '      <span class="mech-val"><span class="mech-tag">' + (data.zramEnabled ? 'ZRAM 2.5:1 BẬT' : 'VirtIO Thu hồi ' + formatBytes(data.totalBallooningSavingsMb)) + '</span></span>',
+      '      <span class="mech-val"><span class="mech-tag">' + (data.zramEnabled ? 'ZRAM 2.5:1 ENABLED' : 'VirtIO Reclaimed ' + formatBytes(data.totalBallooningSavingsMb)) + '</span></span>',
       '    </div>',
       '    <div class="mech-row">',
       '      <span class="mech-label">4. KVM Hardware Acceleration:</span>',
-      '      <span class="mech-val">' + (data.kvmAvailable ? '<span class="mech-tag">VT-x / AMD-V Sẵn sàng</span>' : '<span style="color:#fc8181">TCG Chậm</span>') + '</span>',
+      '      <span class="mech-val">' + (data.kvmAvailable ? '<span class="mech-tag">VT-x / AMD-V Ready</span>' : '<span style="color:#fc8181">TCG Slow</span>') + '</span>',
       '    </div>',
       '    <div class="mech-row">',
       '      <span class="mech-label">5. vCPU Overcommit Ratio:</span>',
@@ -1265,132 +1243,22 @@
       '    </div>',
       '    <div class="mech-row">',
       '      <span class="mech-label">6. Linux Demand Paging:</span>',
-      '      <span class="mech-val">Chỉ nạp working set (~' + formatBytes(data.totalHostRamMb) + ' / ảo ' + formatBytes(data.totalAllocatedRamMb) + ')</span>',
+      '      <span class="mech-val">Working set touch only (~' + formatBytes(data.totalHostRamMb) + ' / Virtual ' + formatBytes(data.totalAllocatedRamMb) + ')</span>',
       '    </div>',
       '    <div class="mech-row" style="margin-top:10px; border-top: 1px solid rgba(255,255,255,0.15); padding-top:10px;">',
-      '      <span class="mech-label">Dự kiến RAM Máy chủ:</span>',
+      '      <span class="mech-label">Projected Host RAM:</span>',
       '      <span class="mech-val" style="color:#68d391; font-size:13px;">' + data.currentMemPct + '% ➔ ' + data.projectedPct + '% (' + formatBytes(data.projectedUsedMb) + ' / ' + formatBytes(data.totalHostMb) + ')</span>',
       '    </div>',
       '    <div class="mech-row">',
-      '      <span class="mech-label">Dung lượng Khả dụng (MemAvailable):</span>',
+      '      <span class="mech-label">Available Memory (MemAvailable):</span>',
       '      <span class="mech-val" style="color:#63b3ed;">' + formatBytes(data.availMb) + '</span>',
       '    </div>',
-      '  </div>',
-      '  <!-- TAB 2: ĐỀ XUẤT THAY THẾ NODE THÔNG MINH -->',
-      '  <div id="pane-recommendations" class="pnq-tab-pane ' + (activeModalTab === 'recommendations' ? 'active' : '') + '">',
-      recCount === 0 ? [
-        '    <div style="text-align: center; padding: 30px 10px; color: #a0aec0;">',
-        '      <i class="fa fa-check-circle" style="font-size: 36px; color: #68d391; margin-bottom: 10px; display: block;"></i>',
-        '      <b style="color: #fff; font-size: 14px;">Không có node nào cần tối ưu hiện tại</b>',
-        '      <p style="margin-top: 6px; font-size: 11px;">Toàn bộ node đã ở cấu hình tối ưu hoặc không có node nào tiêu thụ tài nguyên đột biến.</p>',
-        '    </div>'
-      ].join('\n') : [
-        '    <div class="pnq-opt-summary-box">',
-        '      <div>',
-        '        <div class="pnq-opt-summary-title"><i class="fa fa-bolt"></i> Dự phóng tải Máy chủ sau khi Tối ưu</div>',
-        '        <div class="pnq-opt-summary-desc">RAM máy chủ dự kiến: <b style="color:#fc8181">' + data.projectedPct + '%</b> ➔ <b style="color:#68d391">' + data.recommendations.optimizedProjectedPct + '%</b> (' + formatBytes(data.recommendations.optimizedProjectedUsedMb) + ' / ' + formatBytes(data.totalHostMb) + ')</div>',
-        '      </div>',
-        '      <div class="pnq-opt-summary-stat">',
-        '        <div class="pnq-opt-summary-stat-val">-' + formatBytes(data.recommendations.totalSavedHostRamMb) + '</div>',
-        '        <div class="pnq-opt-summary-stat-sub">RAM Host thực tế giải phóng</div>',
-        '      </div>',
-        '    </div>',
-        '    <div class="pnq-opt-list">',
-        recs.map(function (item) {
-          var sug = item.suggested;
-          var featuresHtml = (sug.features || []).map(function (f) {
-            return '<span class="pnq-opt-feat-chip"><i class="fa fa-check" style="color:#68d391"></i> ' + f + '</span>';
-          }).join(' ');
-
-          var actionBtnHtml = '';
-          if (sug.isRightSize) {
-            actionBtnHtml = '<button class="pnq-opt-btn pnq-opt-btn-gold" data-action="rightsize" data-node="' + item.nodeId + '" data-ram="' + sug.targetRam + '"><i class="fa fa-magic"></i> Hạ RAM về ' + sug.targetRam + ' MB</button>';
-          } else {
-            actionBtnHtml = '<button class="pnq-opt-btn pnq-opt-btn-success" data-action="swap-node" data-node="' + item.nodeId + '"><i class="fa fa-refresh"></i> Thay thế & Xóa node cũ</button>';
-          }
-
-          return [
-            '<div class="pnq-opt-card">',
-            '  <div class="pnq-opt-card-header">',
-            '    <div class="pnq-opt-card-title">',
-            '      <i class="fa ' + (item.rule.roleIcon || 'fa-server') + '" style="color:#63b3ed"></i>',
-            '      <span>' + item.nodeName + '</span>',
-            '      <span style="font-weight:normal; font-size:11px; color:#a0aec0">(' + item.currentTemplate + ')</span>',
-            '    </div>',
-            '    <span class="pnq-opt-card-badge">' + item.rule.category + '</span>',
-            '  </div>',
-            '  <div class="pnq-opt-card-grid">',
-            '    <div class="pnq-opt-col-cur">',
-            '      <div>Hiện tại (RAM thực ~' + formatBytes(item.currentHostRam) + '):</div>',
-            '      <b>' + formatBytes(item.currentRam) + ' cấu hình • ' + item.currentCpu + ' vCPU</b>',
-            '    </div>',
-            '    <div class="pnq-opt-arrow"><i class="fa fa-arrow-right"></i></div>',
-            '    <div class="pnq-opt-col-sug">',
-            '      <div>Đề xuất: <b>' + sug.name + '</b></div>',
-            '      <b>RAM thực ~' + formatBytes(sug.estRamMb) + ' • ' + sug.estCpu + ' vCPU</b>',
-            '      <div style="font-size:10px; color:#ecc94b; margin-top:2px;">Tiết kiệm ' + formatBytes(item.savedHostRamMb) + ' RAM Host (' + sug.savingsText + ')</div>',
-            '    </div>',
-            '  </div>',
-            '  <div class="pnq-opt-features">' + featuresHtml + '</div>',
-            '  <div class="pnq-opt-card-actions">' + actionBtnHtml + '</div>',
-            '</div>'
-          ].join('\n');
-        }).join('\n'),
-        '    </div>',
-        '    <div class="pnq-opt-batch-bar">',
-        '      <span style="font-size: 11px; color: #a0aec0;">Đề xuất bảo toàn 100% tính năng định tuyến & kiểm thử của bài lab.</span>',
-        recs.some(function (r) { return r.suggested && r.suggested.isRightSize; }) ?
-          '<button class="pnq-opt-btn pnq-opt-btn-gold" id="pnq-batch-rightsize-btn"><i class="fa fa-flash"></i> Tự động tối ưu toàn bộ RAM các node</button>' : '',
-        '    </div>'
-      ].join('\n'),
       '  </div>',
       '</div>'
     ].join('\n');
 
-    // Sự kiện đóng modal
+    // Close modal event
     modal.querySelector('.close-btn').addEventListener('click', closeDetailsModal);
-
-    // Chuyển Tab
-    var tabBtns = modal.querySelectorAll('.pnq-modal-tab');
-    tabBtns.forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var tab = this.getAttribute('data-tab');
-        activeModalTab = tab;
-        tabBtns.forEach(function (b) { b.classList.remove('active'); });
-        this.classList.add('active');
-
-        var panes = modal.querySelectorAll('.pnq-tab-pane');
-        panes.forEach(function (p) { p.classList.remove('active'); });
-        var targetPane = modal.querySelector('#pane-' + tab);
-        if (targetPane) targetPane.classList.add('active');
-      });
-    });
-
-    // Sự kiện Click hành động trên thẻ
-    modal.addEventListener('click', function (e) {
-      var btn = e.target.closest('button[data-action]');
-      if (!btn) return;
-      var action = btn.getAttribute('data-action');
-      var nodeId = btn.getAttribute('data-node');
-
-      if (action === 'rightsize') {
-        var ram = parseInt(btn.getAttribute('data-ram'), 10) || 1024;
-        applyNodeRamOptimization(nodeId, ram, btn);
-      } else if (action === 'swap-node' || action === 'create-alt') {
-        var item = recs.find(function (r) { return String(r.nodeId) === String(nodeId); });
-        if (item && item.suggested) {
-          swapWithAlternativeNode(nodeId, item.suggested, btn);
-        }
-      }
-    });
-
-    // Sự kiện Batch Right-size
-    var batchBtn = modal.querySelector('#pnq-batch-rightsize-btn');
-    if (batchBtn) {
-      batchBtn.addEventListener('click', function () {
-        applyBatchRightSize(this);
-      });
-    }
 
     document.body.appendChild(backdrop);
     document.body.appendChild(modal);

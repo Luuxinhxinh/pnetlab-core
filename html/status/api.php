@@ -725,4 +725,413 @@ if ($action === 'history_sys' || $action === 'history_nodes') {
     out(['data' => ['range' => $range, 'step' => $step, 'nodes' => $nodes]]);
 }
 
+/* ---- GET user_resources: live CPU and RAM consumption per user (admin-only) ---- */
+if ($action === 'user_resources') {
+    if (!$isAdmin) fail(403, 'admin only');
+
+    // 0. Primary path: Consume root telemetry published by pnetlab-resource-guard daemon (0ms, 100% root access)
+    $shm_file = '/dev/shm/pnetlab_user_resources.json';
+    if (is_file($shm_file) && (time() - filemtime($shm_file)) <= 15) {
+        $raw = @file_get_contents($shm_file);
+        if ($raw) {
+            $parsed = json_decode($raw, true);
+            if (is_array($parsed) && isset($parsed['server']) && isset($parsed['users'])) {
+                out(['data' => $parsed]);
+            }
+        }
+    }
+
+    $db = checkDatabase();
+
+    // 1. Load users & lab sessions to establish accurate Pod -> User and Lab -> Pod mappings
+    $users_info = [];
+    if ($db) {
+        try {
+            $u_rows = $db->query("SELECT pod, username, name, email FROM users")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($u_rows as $ur) {
+                $users_info[(int)$ur['pod']] = $ur;
+            }
+        } catch (Exception $e) {}
+    }
+
+    $lab_to_pod = [];
+    $pod_labs = [];
+    if ($db) {
+        try {
+            $l_rows = $db->query("SELECT lab_session_id, lab_session_pod, lab_session_path FROM lab_sessions")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($l_rows as $lr) {
+                $lid = (int)$lr['lab_session_id'];
+                $lpod = (int)$lr['lab_session_pod'];
+                $lab_to_pod[$lid] = $lpod;
+                if (!isset($pod_labs[$lpod])) $pod_labs[$lpod] = [];
+                $lab_name = basename($lr['lab_session_path'], '.unl');
+                if (!in_array($lab_name, $pod_labs[$lpod], true)) {
+                    $pod_labs[$lpod][] = ['lab_name' => $lab_name];
+                }
+            }
+        } catch (Exception $e) {}
+    }
+
+    // 2. Measure Host CPU via 150ms /proc/stat delta
+    $read_stat = function() {
+        $lines = @file('/proc/stat');
+        if (!$lines) return null;
+        $p = preg_split('/\s+/', trim($lines[0]));
+        if ($p[0] !== 'cpu') return null;
+        $total = array_sum(array_slice($p, 1));
+        $idle = (int)$p[4] + (isset($p[5]) ? (int)$p[5] : 0);
+        return ['total' => $total, 'idle' => $idle];
+    };
+    $s1 = $read_stat();
+    $server_cpu = 0.0;
+    if ($s1) {
+        usleep(150000); // 150ms
+        $s2 = $read_stat();
+        if ($s2) {
+            $dt = $s2['total'] - $s1['total'];
+            $di = $s2['idle'] - $s1['idle'];
+            if ($dt > 0) {
+                $server_cpu = round(max(0, min(100, 100 * ($dt - $di) / $dt)), 1);
+            }
+        }
+    }
+
+    // 3. Measure Host RAM via /proc/meminfo
+    $ram_total_mb = 0;
+    $ram_used_mb = 0;
+    $server_ram_percent = 0.0;
+    $memdata = @file_get_contents('/proc/meminfo');
+    if ($memdata) {
+        $m = [];
+        foreach (explode("\n", $memdata) as $l) {
+            if (preg_match('/^(\w+):\s+(\d+)/', $l, $x)) {
+                $m[$x[1]] = (int)$x[2];
+            }
+        }
+        $total_kb = isset($m['MemTotal']) ? $m['MemTotal'] : 0;
+        $avail_kb = isset($m['MemAvailable']) ? $m['MemAvailable'] : (isset($m['MemFree']) ? $m['MemFree'] : 0);
+        if ($total_kb > 0) {
+            $ram_total_mb = (int)round($total_kb / 1024);
+            $ram_used_mb = max(0, (int)round(($total_kb - $avail_kb) / 1024));
+            $server_ram_percent = round(($ram_used_mb * 100) / $ram_total_mb, 1);
+        }
+    }
+
+    $disk_total_bytes = @disk_total_space('/') ?: 0;
+    $disk_free_bytes = @disk_free_space('/') ?: 0;
+    $disk_used_bytes = max(0, $disk_total_bytes - $disk_free_bytes);
+    $disk_total_mb = (int)round($disk_total_bytes / (1024 * 1024));
+    $disk_used_mb = (int)round($disk_used_bytes / (1024 * 1024));
+    $server_disk_percent = $disk_total_bytes > 0 ? round(($disk_used_bytes * 100) / $disk_total_bytes, 1) : 0.0;
+
+    // 4. Scan node processes under /proc/[0-9]*/cwd
+    $proc_dirs = @glob('/proc/[0-9]*', GLOB_NOSORT);
+    $node_pids = []; // pid => pod
+    $pod_stats = []; // pod => ['cpu' => 0.0, 'ram_mb' => 0, 'pids' => [], 'unique_nodes' => []]
+    $all_unique_nodes = [];
+
+    if (is_array($proc_dirs)) {
+        foreach ($proc_dirs as $pdir) {
+            $cwd = @readlink($pdir . '/cwd');
+            if ($cwd && strpos($cwd, '/opt/unetlab/tmp/') === 0) {
+                $parts = explode('/', trim($cwd, '/'));
+                if (isset($parts[3]) && is_numeric($parts[3])) {
+                    $lab_session_id = (int)$parts[3];
+                    $node_session_id = (isset($parts[4]) && is_numeric($parts[4])) ? (int)$parts[4] : 0;
+
+                    // Resolve Pod: lab_session_id -> pod, fallback to direct pod match
+                    $pod = isset($lab_to_pod[$lab_session_id])
+                        ? $lab_to_pod[$lab_session_id]
+                        : (isset($users_info[$lab_session_id]) ? $lab_session_id : 0);
+
+                    $pid = (int)basename($pdir);
+                    $node_pids[$pid] = $pod;
+
+                    if (!isset($pod_stats[$pod])) {
+                        $pod_stats[$pod] = ['cpu' => 0.0, 'ram_mb' => 0, 'pids' => [], 'unique_nodes' => []];
+                    }
+                    $pod_stats[$pod]['pids'][] = $pid;
+                    $node_key = $lab_session_id . '_' . $node_session_id;
+                    $pod_stats[$pod]['unique_nodes'][$node_key] = true;
+                    $all_unique_nodes[$node_key] = true;
+
+                    // Read RSS from /proc/<pid>/statm
+                    $statm = @file_get_contents($pdir . '/statm');
+                    if ($statm) {
+                        $f = preg_split('/\s+/', trim($statm));
+                        if (isset($f[1])) {
+                            // resident pages * 4KB
+                            $pod_stats[$pod]['ram_mb'] += (int)round(((int)$f[1] * 4) / 1024);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 5. Measure CPU per pid via ps
+    if (!empty($node_pids)) {
+        $ps_out = [];
+        @exec('ps -eo pid=,%cpu=', $ps_out);
+        foreach ($ps_out as $row) {
+            $c = preg_split('/\s+/', trim($row));
+            if (count($c) >= 2 && is_numeric($c[0])) {
+                $pid = (int)$c[0];
+                if (isset($node_pids[$pid])) {
+                    $pod = $node_pids[$pid];
+                    $pod_stats[$pod]['cpu'] += (float)str_replace(',', '.', $c[1]);
+                }
+            }
+        }
+    }
+
+    // Number of CPU cores for system-wide 0-100% normalization
+    $num_cores = 1;
+    $cpuinfo = @file_get_contents('/proc/cpuinfo');
+    if ($cpuinfo) {
+        $num_cores = max(1, substr_count($cpuinfo, 'processor'));
+    }
+
+    $total_node_ps_cpu = 0.0;
+    foreach ($pod_stats as $stat) {
+        $total_node_ps_cpu += (float)$stat['cpu'];
+    }
+
+    $calc_user_cpu = function($stat_cpu) use ($num_cores, $server_cpu, $total_node_ps_cpu) {
+        $raw_avg = $stat_cpu / $num_cores;
+        if ($server_cpu > 0 && $total_node_ps_cpu > 5.0) {
+            $share = $stat_cpu / $total_node_ps_cpu;
+            $proportional = $server_cpu * $share;
+            return round(min(100.0, max($raw_avg, $proportional)), 1);
+        }
+        return round(min(100.0, $raw_avg), 1);
+    };
+
+    $user_list = [];
+    foreach ($users_info as $pod => $u) {
+        $stat = isset($pod_stats[$pod]) ? $pod_stats[$pod] : ['cpu' => 0.0, 'ram_mb' => 0, 'pids' => [], 'unique_nodes' => []];
+        $cpu_rounded = $calc_user_cpu($stat['cpu']);
+        $running_nodes_count = count($stat['unique_nodes']);
+        $is_high = ($cpu_rounded >= 80.0 || $stat['ram_mb'] >= 5000);
+        $is_warning = (!$is_high && ($cpu_rounded >= 60.0 || $stat['ram_mb'] >= 3500));
+        $user_list[] = [
+            'pod'           => (int)$pod,
+            'username'      => $u['username'],
+            'name'          => $u['name'],
+            'email'         => $u['email'],
+            'cpu_percent'   => $cpu_rounded,
+            'ram_mb'        => (int)$stat['ram_mb'],
+            'running_nodes' => $running_nodes_count,
+            'is_high_load'  => $is_high,
+            'is_warning'    => $is_warning,
+            'labs'          => isset($pod_labs[$pod]) ? $pod_labs[$pod] : [],
+            'pids'          => $stat['pids']
+        ];
+    }
+    foreach ($pod_stats as $pod => $stat) {
+        if (!isset($users_info[$pod])) {
+            $cpu_rounded = $calc_user_cpu($stat['cpu']);
+            $running_nodes_count = count($stat['unique_nodes']);
+            $is_high = ($cpu_rounded >= 80.0 || $stat['ram_mb'] >= 5000);
+            $is_warning = (!$is_high && ($cpu_rounded >= 60.0 || $stat['ram_mb'] >= 3500));
+            $user_list[] = [
+                'pod'           => (int)$pod,
+                'username'      => 'Pod ' . $pod,
+                'name'          => '',
+                'email'         => '',
+                'cpu_percent'   => $cpu_rounded,
+                'ram_mb'        => (int)$stat['ram_mb'],
+                'running_nodes' => $running_nodes_count,
+                'is_high_load'  => $is_high,
+                'is_warning'    => $is_warning,
+                'labs'          => isset($pod_labs[$pod]) ? $pod_labs[$pod] : [],
+                'pids'          => $stat['pids']
+            ];
+        }
+    }
+
+    usort($user_list, function($a, $b) {
+        if (($b['running_nodes'] > 0) !== ($a['running_nodes'] > 0)) {
+            return ($b['running_nodes'] > 0) ? 1 : -1;
+        }
+        if ($b['ram_mb'] === $a['ram_mb']) {
+            return $b['cpu_percent'] <=> $a['cpu_percent'];
+        }
+        return $b['ram_mb'] <=> $a['ram_mb'];
+    });
+
+    out(['data' => [
+        'server' => [
+            'cpu'                 => $server_cpu,
+            'ram_percent'         => $server_ram_percent,
+            'ram_used_mb'         => $ram_used_mb,
+            'ram_total_mb'        => $ram_total_mb,
+            'disk_percent'        => $server_disk_percent,
+            'disk_used_mb'        => $disk_used_mb,
+            'disk_total_mb'       => $disk_total_mb,
+            'total_running_nodes' => count($all_unique_nodes),
+            'total_active_users'  => count($user_list)
+        ],
+        'users' => $user_list
+    ]]);
+}
+
+/* ---- GET resource_incidents: historical incident snapshot records (admin-only) - */
+if ($action === 'resource_incidents') {
+    if (!$isAdmin) fail(403, 'admin only');
+    $db = checkDatabase();
+    if (!$db) out(['data' => []]);
+
+    // Ensure table exists
+    $db->exec("CREATE TABLE IF NOT EXISTS `resource_incidents` (
+        `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `created_at` INT UNSIGNED NOT NULL,
+        `server_cpu` FLOAT NOT NULL DEFAULT 0,
+        `server_ram` FLOAT NOT NULL DEFAULT 0,
+        `server_disk` FLOAT NOT NULL DEFAULT 0,
+        `top_users` TEXT NOT NULL,
+        `total_nodes` INT NOT NULL DEFAULT 0,
+        `severity` VARCHAR(16) NOT NULL DEFAULT 'warning',
+        INDEX `idx_created_at` (`created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    try {
+        $db->exec("ALTER TABLE `resource_incidents` ADD COLUMN `server_disk` FLOAT NOT NULL DEFAULT 0 AFTER `server_ram`");
+    } catch (Exception $e) {}
+
+    $stmt = $db->query("SELECT id, created_at, server_cpu, server_ram, server_disk, top_users, total_nodes, severity FROM resource_incidents ORDER BY created_at DESC LIMIT 100");
+    $list = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $row['id'] = (int)$row['id'];
+        $row['created_at'] = (int)$row['created_at'];
+        $row['server_cpu'] = (float)$row['server_cpu'];
+        $row['server_ram'] = (float)$row['server_ram'];
+        $row['server_disk'] = isset($row['server_disk']) ? (float)$row['server_disk'] : 0.0;
+        $row['total_nodes'] = (int)$row['total_nodes'];
+        $row['top_users'] = json_decode($row['top_users'], true);
+        if (!is_array($row['top_users'])) $row['top_users'] = [];
+        $list[] = $row;
+    }
+    out(['data' => $list]);
+}
+
+/* ---- POST resource_incidents_clear: clear all recorded incident snapshots (admin-only) ---- */
+if ($action === 'resource_incidents_clear') {
+    if (!$isAdmin) fail(403, 'admin only');
+    $db = checkDatabase();
+    if ($db) {
+        try {
+            $db->exec("TRUNCATE TABLE resource_incidents");
+        } catch (Exception $e) {}
+    }
+    out(['ok' => true, 'message' => 'Incident log cleared successfully.']);
+}
+
+/* ---- POST stop_user_nodes: emergency stop for a specific user's running nodes -- */
+if ($action === 'stop_user_nodes') {
+    if (!$isAdmin) fail(403, 'admin only');
+    $body = json_decode(file_get_contents('php://input'), true);
+    $pod = (is_array($body) && isset($body['pod'])) ? (int)$body['pod'] : -1;
+    if ($pod < 0) fail(400, 'invalid pod id');
+
+    // Notify root daemon to execute root-level process termination
+    @file_put_contents('/dev/shm/pnetlab_guard_stop.req', json_encode(['pod' => $pod, 'time' => time()]));
+
+    $db = checkDatabase();
+    $target_lab_sessions = [];
+    if ($db) {
+        try {
+            $stmt = $db->prepare("SELECT lab_session_id FROM lab_sessions WHERE lab_session_pod = ?");
+            $stmt->execute([$pod]);
+            $target_lab_sessions = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Exception $e) {}
+    }
+
+    // Find and terminate all pids whose cwd is in /opt/unetlab/tmp/<lab_session_id>/... or /opt/unetlab/tmp/<pod>/...
+    $proc_dirs = @glob('/proc/[0-9]*', GLOB_NOSORT);
+    $killed = 0;
+    if (is_array($proc_dirs)) {
+        $match_prefixes = ["/opt/unetlab/tmp/$pod/"];
+        foreach ($target_lab_sessions as $tls) {
+            $match_prefixes[] = "/opt/unetlab/tmp/$tls/";
+        }
+
+        foreach ($proc_dirs as $pdir) {
+            $cwd = @readlink($pdir . '/cwd');
+            if ($cwd) {
+                $is_match = false;
+                foreach ($match_prefixes as $mp) {
+                    if (strpos($cwd, $mp) === 0) {
+                        $is_match = true;
+                        break;
+                    }
+                }
+                if ($is_match) {
+                    $pid = (int)basename($pdir);
+                    if ($pid > 1) {
+                        @exec("kill -15 $pid 2>/dev/null");
+                        $killed++;
+                    }
+                }
+            }
+        }
+
+        if ($killed > 0) {
+            usleep(300000); // 300ms grace period before force kill if still alive
+            foreach ($proc_dirs as $pdir) {
+                $cwd = @readlink($pdir . '/cwd');
+                if ($cwd) {
+                    $is_match = false;
+                    foreach ($match_prefixes as $mp) {
+                        if (strpos($cwd, $mp) === 0) {
+                            $is_match = true;
+                            break;
+                        }
+                    }
+                    if ($is_match) {
+                        $pid = (int)basename($pdir);
+                        if ($pid > 1) {
+                            @exec("kill -9 $pid 2>/dev/null");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Synchronize running state in database so Running Labs and Labs views immediately reflect 0 running
+    if ($db) {
+        try {
+            $db->prepare("UPDATE node_sessions SET node_session_running = 0, node_cpu = 0, node_ram = 0 WHERE node_session_pod = ?")->execute([$pod]);
+            if (!empty($target_lab_sessions)) {
+                $in_clause = implode(',', array_map('intval', $target_lab_sessions));
+                $db->exec("UPDATE node_sessions SET node_session_running = 0, node_cpu = 0, node_ram = 0 WHERE node_session_lab IN ($in_clause)");
+                $db->exec("UPDATE lab_sessions SET lab_session_running = 0 WHERE lab_session_id IN ($in_clause)");
+            }
+        } catch (Exception $e) {}
+    }
+
+    // Immediately update live telemetry cache in /dev/shm
+    if (is_file('/dev/shm/pnetlab_user_resources.json')) {
+        $raw_shm = @file_get_contents('/dev/shm/pnetlab_user_resources.json');
+        if ($raw_shm) {
+            $jdata = json_decode($raw_shm, true);
+            if (is_array($jdata) && isset($jdata['users'])) {
+                foreach ($jdata['users'] as &$ju) {
+                    if ((int)$ju['pod'] === $pod) {
+                        $ju['running_nodes'] = 0;
+                        $ju['cpu_percent'] = 0.0;
+                        $ju['ram_mb'] = 0;
+                        $ju['is_high_load'] = false;
+                        $ju['pids'] = [];
+                    }
+                }
+                @file_put_contents('/dev/shm/pnetlab_user_resources.json', json_encode($jdata));
+            }
+        }
+    }
+
+    out(['ok' => true, 'message' => "Successfully stopped nodes for Pod $pod ($killed processes terminated)."]);
+}
+
 fail(400, 'unknown action');

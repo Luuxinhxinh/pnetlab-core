@@ -1,0 +1,274 @@
+{
+  "challenge_id": "attack-defense-ctf",
+  "name": "Attack-Defense CTF (2 Teams Demo)",
+  "author": "BTC",
+  "timeout_minutes": 240,
+  "networks": [
+    { "id": 1, "name": "Net_BTC", "type": "bridge", "left": 525, "top": 140 },
+    { "id": 2, "name": "Net_WAN_Backbone", "type": "bridge", "left": 525, "top": 320 },
+    { "id": 101, "name": "LAN_Team_01", "type": "bridge", "left": 250, "top": 490 },
+    { "id": 102, "name": "LAN_Team_02", "type": "bridge", "left": 800, "top": 490 }
+  ],
+  "nodes": [
+    {
+      "id": 1,
+      "name": "rCTF_Portal_10.10.0.111",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 256,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 400, "top": 60,
+      "interfaces": [
+        { "id": 0, "name": "eth0", "network_id": 1 }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Scoring_Engine_10.10.0.222",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 256,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 650, "top": 60,
+      "interfaces": [
+        { "id": 0, "name": "eth0", "network_id": 1 }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Central_Firewall_BTC",
+      "type": "qemu",
+      "template": "pfsense",
+      "image": "pfsense-2.7.0",
+      "cpu": 1,
+      "ram": 256,
+      "console": "vnc",
+      "icon": "Firewall.png",
+      "left": 520, "top": 220,
+      "interfaces": [
+        { "id": 0, "name": "vtnet0 (BTC)", "network_id": 1 },
+        { "id": 16, "name": "vtnet1 (WAN)", "network_id": 2 }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "pfSense_Doi_01",
+      "type": "qemu",
+      "template": "pfsense",
+      "image": "pfsense-2.7.0",
+      "cpu": 1,
+      "ram": 256,
+      "console": "vnc",
+      "icon": "Firewall.png",
+      "left": 250, "top": 390,
+      "interfaces": [
+        { "id": 0, "name": "vtnet0 (WAN .201)", "network_id": 2 },
+        { "id": 16, "name": "vtnet1 (LAN .254)", "network_id": 101 }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "T01_Service_102",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 80, "top": 570,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 101 }]
+    },
+    {
+      "id": 12,
+      "name": "T01_Service_103",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 180, "top": 570,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 101 }]
+    },
+    {
+      "id": 13,
+      "name": "T01_Service_104",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 280, "top": 570,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 101 }]
+    },
+    {
+      "id": 14,
+      "name": "T01_Service_105",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 380, "top": 570,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 101 }]
+    },
+    {
+      "id": 15,
+      "name": "T01_Service_109",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 130, "top": 680,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 101 }]
+    },
+    {
+      "id": 16,
+      "name": "T01_Service_111_WAN",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Desktop.png",
+      "left": 230, "top": 680,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 101 }]
+    },
+    {
+      "id": 17,
+      "name": "T01_VPN_BTC_110",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 330, "top": 680,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 101 }]
+    },
+    {
+      "id": 20,
+      "name": "pfSense_Doi_02",
+      "type": "qemu",
+      "template": "pfsense",
+      "image": "pfsense-2.7.0",
+      "cpu": 1,
+      "ram": 256,
+      "console": "vnc",
+      "icon": "Firewall.png",
+      "left": 800, "top": 390,
+      "interfaces": [
+        { "id": 0, "name": "vtnet0 (WAN .201)", "network_id": 2 },
+        { "id": 16, "name": "vtnet1 (LAN .254)", "network_id": 102 }
+      ]
+    },
+    {
+      "id": 21,
+      "name": "T02_Service_102",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 630, "top": 570,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 102 }]
+    },
+    {
+      "id": 22,
+      "name": "T02_Service_103",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 730, "top": 570,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 102 }]
+    },
+    {
+      "id": 23,
+      "name": "T02_Service_104",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 830, "top": 570,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 102 }]
+    },
+    {
+      "id": 24,
+      "name": "T02_Service_105",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 930, "top": 570,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 102 }]
+    },
+    {
+      "id": 25,
+      "name": "T02_Service_109",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 680, "top": 680,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 102 }]
+    },
+    {
+      "id": 26,
+      "name": "T02_Service_111_WAN",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Desktop.png",
+      "left": 780, "top": 680,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 102 }]
+    },
+    {
+      "id": 27,
+      "name": "T02_VPN_BTC_110",
+      "type": "qemu",
+      "template": "linux",
+      "image": "linux-alpine",
+      "cpu": 1,
+      "ram": 128,
+      "console": "vnc",
+      "icon": "Server.png",
+      "left": 880, "top": 680,
+      "interfaces": [{ "id": 0, "name": "eth0", "network_id": 102 }]
+    }
+  ]
+}
