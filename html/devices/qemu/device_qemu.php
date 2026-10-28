@@ -449,11 +449,10 @@ if ($this->inject_as_first_nic == 1) {
             }
         }
 
-        if (isset($p["uuid"])) {
+        if (isset($p["uuid"]) && checkUuid($p["uuid"])) {
             $this->uuid = $p["uuid"];
-            if (!checkUuid($this->uuid)) {
-                $this->uuid = genUuid();
-            }
+        } else {
+            $this->uuid = genUuid();
         }
 
         if (isset($p["qemu_options"])) {

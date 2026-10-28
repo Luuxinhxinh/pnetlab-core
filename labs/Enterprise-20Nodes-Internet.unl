@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<lab name="Enterprise-20Nodes-Internet" id="b1729dbf-2ce7-4b9e-b89c-9a0b91518916" version="1" scripttimeout="300" password="" countdown="" darkmode="1" mode3d="1" nogrid="0" joinable="2" joinable_emails="44" openable="2" openable_emails="44" editable="2" editable_emails="44" multi_config_active="">
+  <topology>
+    <nodes>
+      <node id="1" type="iol" template="iol" config="1" config_data="" multi_config="W10=" delay="0" icon="Router.png" console="" image="L3-ADVENTERPRISEK9-M-15.4-2T.bin" left="600" name="R_Edge" top="100" width="" size="0" ethernet="1" ram="512" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="100" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="1" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="32" name="e0/2" type="ethernet" network_id="2" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="2" type="iol" template="iol" config="1" config_data="" multi_config="W10=" delay="0" icon="Router.png" console="" image="L3-ADVENTERPRISEK9-M-15.4-2T.bin" left="441" name="R_ISP1" top="213" width="" size="0" ethernet="1" ram="512" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="1" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="3" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="3" type="iol" template="iol" config="1" config_data="" multi_config="W10=" delay="0" icon="Router.png" console="" image="L3-ADVENTERPRISEK9-M-15.4-2T.bin" left="735" name="R_ISP2" top="214" width="" size="0" ethernet="1" ram="512" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="2" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="4" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="4" type="iol" template="iol" config="1" config_data="" multi_config="W10=" delay="0" icon="Switch L3.png" console="" image="L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin" left="231" name="Core_SW1" top="57" width="" size="0" ethernet="1" ram="512" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="3" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="5" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="32" name="e0/2" type="ethernet" network_id="6" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="48" name="e0/3" type="ethernet" network_id="7" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="5" type="iol" template="iol" config="1" config_data="" multi_config="W10=" delay="0" icon="Switch L3.png" console="" image="L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin" left="777" name="Core_SW2" top="318" width="" size="0" ethernet="1" ram="512" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="4" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="5" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="32" name="e0/2" type="ethernet" network_id="8" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="48" name="e0/3" type="ethernet" network_id="9" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="6" type="iol" template="iol" config="1" config_data="" multi_config="W10=" delay="0" icon="Switch.png" console="" image="L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin" left="400" name="Dist_SW1" top="500" width="" size="0" ethernet="1" ram="512" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="6" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="8" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="32" name="e0/2" type="ethernet" network_id="10" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="48" name="e0/3" type="ethernet" network_id="11" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="7" type="iol" template="iol" config="1" config_data="" multi_config="W10=" delay="0" icon="Switch.png" console="" image="L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin" left="800" name="Dist_SW2" top="500" width="" size="0" ethernet="1" ram="512" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="7" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="9" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="32" name="e0/2" type="ethernet" network_id="12" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="48" name="e0/3" type="ethernet" network_id="13" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="8" type="iol" template="iol" config="1" config_data="" multi_config="W10=" delay="0" icon="Switch.png" console="" image="L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin" left="250" name="Acc_SW1" top="660" width="" size="0" ethernet="1" ram="512" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="10" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="14" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="32" name="e0/2" type="ethernet" network_id="15" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="9" type="iol" template="iol" config="1" config_data="" multi_config="W10=" delay="0" icon="Switch.png" console="" image="L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin" left="450" name="Acc_SW2" top="660" width="" size="0" ethernet="1" ram="512" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="11" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="16" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="32" name="e0/2" type="ethernet" network_id="17" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="48" name="e0/3" type="ethernet" network_id="18" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="10" type="iol" template="iol" config="1" config_data="" multi_config="W10=" delay="0" icon="Switch.png" console="" image="L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin" left="750" name="Acc_SW3" top="660" width="" size="0" ethernet="1" ram="512" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="12" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="19" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="32" name="e0/2" type="ethernet" network_id="20" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="11" type="iol" template="iol" config="1" config_data="" multi_config="W10=" delay="0" icon="Switch.png" console="" image="L2-ADVENTERPRISEK9-M-15.2-IRON-20151103.bin" left="950" name="Acc_SW4" top="660" width="" size="0" ethernet="1" ram="512" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="" Initial_startup_config="" serial="0" nvram="1024">
+        <interface id="0" name="e0/0" type="ethernet" network_id="13" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="16" name="e0/1" type="ethernet" network_id="21" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+        <interface id="32" name="e0/2" type="ethernet" network_id="22" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="12" type="vpcs" template="vpcs" config="" config_data="" multi_config="W10=" delay="0" icon="Server.png" console="" image="" left="-69" name="SRV_DHCP_DNS" top="696" width="" size="0" ethernet="1" ram="128" mtu="9000" backspace="127" terminaltype="linux" lock="0">
+        <interface id="0" name="eth0" type="ethernet" network_id="14" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="13" type="vpcs" template="vpcs" config="" config_data="" multi_config="W10=" delay="0" icon="Server.png" console="" image="" left="350" name="SRV_Web" top="800" width="" size="0" ethernet="1" ram="128" mtu="9000" backspace="127" terminaltype="linux" lock="0">
+        <interface id="0" name="eth0" type="ethernet" network_id="16" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="14" type="vpcs" template="vpcs" config="" config_data="" multi_config="W10=" delay="0" icon="Desktop.png" console="" image="" left="81" name="PC1" top="720" width="" size="0" ethernet="1" ram="128" mtu="9000" backspace="127" terminaltype="linux" lock="0">
+        <interface id="0" name="eth0" type="ethernet" network_id="15" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="15" type="vpcs" template="vpcs" config="" config_data="" multi_config="W10=" delay="0" icon="Desktop.png" console="" image="" left="450" name="PC2" top="800" width="" size="0" ethernet="1" ram="128" mtu="9000" backspace="127" terminaltype="linux" lock="0">
+        <interface id="0" name="eth0" type="ethernet" network_id="17" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="16" type="vpcs" template="vpcs" config="" config_data="" multi_config="W10=" delay="0" icon="Desktop.png" console="" image="" left="550" name="PC3" top="800" width="" size="0" ethernet="1" ram="128" mtu="9000" backspace="127" terminaltype="linux" lock="0">
+        <interface id="0" name="eth0" type="ethernet" network_id="18" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="17" type="vpcs" template="vpcs" config="" config_data="" multi_config="W10=" delay="0" icon="Desktop.png" console="" image="" left="680" name="PC4" top="800" width="" size="0" ethernet="1" ram="128" mtu="9000" backspace="127" terminaltype="linux" lock="0">
+        <interface id="0" name="eth0" type="ethernet" network_id="19" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="18" type="vpcs" template="vpcs" config="" config_data="" multi_config="W10=" delay="0" icon="Desktop.png" console="" image="" left="800" name="PC5" top="800" width="" size="0" ethernet="1" ram="128" mtu="9000" backspace="127" terminaltype="linux" lock="0">
+        <interface id="0" name="eth0" type="ethernet" network_id="20" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="19" type="vpcs" template="vpcs" config="" config_data="" multi_config="W10=" delay="0" icon="Desktop.png" console="" image="" left="950" name="PC6" top="800" width="" size="0" ethernet="1" ram="128" mtu="9000" backspace="127" terminaltype="linux" lock="0">
+        <interface id="0" name="eth0" type="ethernet" network_id="21" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="20" type="vpcs" template="vpcs" config="" config_data="" multi_config="W10=" delay="0" icon="Desktop.png" console="" image="" left="1050" name="PC7_Admin" top="800" width="" size="0" ethernet="1" ram="128" mtu="9000" backspace="127" terminaltype="linux" lock="0">
+        <interface id="0" name="eth0" type="ethernet" network_id="22" vid="1" vlanmode="access" vlans="" style="" linkstyle="" color="" label="" linkcfg="" labelpos="" srcpos="" dstpos="" width="" fontsize="" curviness="" round=""/>
+      </node>
+      <node id="23" type="iol" template="iol" config="0" config_data="" multi_config="W10=" delay="0" icon="Router-2D-Gen-White-S.svg" console="" image="i86bi_Linux-L3-AdvEnterpriseK9-M2_157_3_May_2018.bin" left="-414" name="R23" top="525" width="" size="0" ethernet="4" ram="1024" mtu="9000" backspace="127" terminaltype="linux" lock="0" iol_options="" keepalive="0" Initial_startup_config="1" serial="0" nvram="1024"/>
+    </nodes>
+    <networks>
+      <network id="100" type="pnet0" name="Net_Internet" left="600" top="20" visibility="1" icon="Cloud.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="1" type="bridge" name="Net1" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="2" type="bridge" name="Net2" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="3" type="bridge" name="Net3" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="4" type="bridge" name="Net4" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="5" type="bridge" name="Net5" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="6" type="bridge" name="Net6" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="7" type="bridge" name="Net7" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="8" type="bridge" name="Net8" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="9" type="bridge" name="Net9" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="10" type="bridge" name="Net10" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="11" type="bridge" name="Net11" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="12" type="bridge" name="Net12" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="13" type="bridge" name="Net13" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="14" type="bridge" name="Net14" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="15" type="bridge" name="Net15" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="16" type="bridge" name="Net16" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="17" type="bridge" name="Net17" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="18" type="bridge" name="Net18" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="19" type="bridge" name="Net19" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="20" type="bridge" name="Net20" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="21" type="bridge" name="Net21" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+      <network id="22" type="bridge" name="Net22" left="0" top="0" visibility="0" icon="lan.png" size="" smart="0" vlan8021ad="0"/>
+    </networks>
+  </topology>
+</lab>

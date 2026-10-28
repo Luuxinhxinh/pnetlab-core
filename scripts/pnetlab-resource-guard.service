@@ -1,0 +1,17 @@
+[Unit]
+Description=PNetLab Resource Guard 24/7 Incident Monitor
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/php /opt/unetlab/scripts/resource_guard_daemon.php
+Restart=always
+RestartSec=10
+Environment=HOME=/root
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target
