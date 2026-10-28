@@ -272,5 +272,12 @@
 		});
 	}
 
-	App.register('history', { title: 'History', icon: 'fa-line-chart', admin: true, render: render });
+	App.register('history', {
+		title: 'History',
+		icon: 'fa-line-chart',
+		admin: true,
+		render: function () {
+			window.location.hash = '#/resource-monitor';
+		}
+	});
 })();

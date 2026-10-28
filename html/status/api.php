@@ -817,6 +817,13 @@ if ($action === 'user_resources') {
         }
     }
 
+    $disk_total_bytes = @disk_total_space('/') ?: 0;
+    $disk_free_bytes = @disk_free_space('/') ?: 0;
+    $disk_used_bytes = max(0, $disk_total_bytes - $disk_free_bytes);
+    $disk_total_mb = (int)round($disk_total_bytes / (1024 * 1024));
+    $disk_used_mb = (int)round($disk_used_bytes / (1024 * 1024));
+    $server_disk_percent = $disk_total_bytes > 0 ? round(($disk_used_bytes * 100) / $disk_total_bytes, 1) : 0.0;
+
     // 4. Scan node processes under /proc/[0-9]*/cwd
     $proc_dirs = @glob('/proc/[0-9]*', GLOB_NOSORT);
     $node_pids = []; // pid => pod
@@ -959,6 +966,9 @@ if ($action === 'user_resources') {
             'ram_percent'         => $server_ram_percent,
             'ram_used_mb'         => $ram_used_mb,
             'ram_total_mb'        => $ram_total_mb,
+            'disk_percent'        => $server_disk_percent,
+            'disk_used_mb'        => $disk_used_mb,
+            'disk_total_mb'       => $disk_total_mb,
             'total_running_nodes' => count($all_unique_nodes),
             'total_active_users'  => count($user_list)
         ],
@@ -978,25 +988,43 @@ if ($action === 'resource_incidents') {
         `created_at` INT UNSIGNED NOT NULL,
         `server_cpu` FLOAT NOT NULL DEFAULT 0,
         `server_ram` FLOAT NOT NULL DEFAULT 0,
+        `server_disk` FLOAT NOT NULL DEFAULT 0,
         `top_users` TEXT NOT NULL,
         `total_nodes` INT NOT NULL DEFAULT 0,
         `severity` VARCHAR(16) NOT NULL DEFAULT 'warning',
         INDEX `idx_created_at` (`created_at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-    $stmt = $db->query("SELECT id, created_at, server_cpu, server_ram, top_users, total_nodes, severity FROM resource_incidents ORDER BY created_at DESC LIMIT 100");
+    try {
+        $db->exec("ALTER TABLE `resource_incidents` ADD COLUMN `server_disk` FLOAT NOT NULL DEFAULT 0 AFTER `server_ram`");
+    } catch (Exception $e) {}
+
+    $stmt = $db->query("SELECT id, created_at, server_cpu, server_ram, server_disk, top_users, total_nodes, severity FROM resource_incidents ORDER BY created_at DESC LIMIT 100");
     $list = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $row['id'] = (int)$row['id'];
         $row['created_at'] = (int)$row['created_at'];
         $row['server_cpu'] = (float)$row['server_cpu'];
         $row['server_ram'] = (float)$row['server_ram'];
+        $row['server_disk'] = isset($row['server_disk']) ? (float)$row['server_disk'] : 0.0;
         $row['total_nodes'] = (int)$row['total_nodes'];
         $row['top_users'] = json_decode($row['top_users'], true);
         if (!is_array($row['top_users'])) $row['top_users'] = [];
         $list[] = $row;
     }
     out(['data' => $list]);
+}
+
+/* ---- POST resource_incidents_clear: clear all recorded incident snapshots (admin-only) ---- */
+if ($action === 'resource_incidents_clear') {
+    if (!$isAdmin) fail(403, 'admin only');
+    $db = checkDatabase();
+    if ($db) {
+        try {
+            $db->exec("TRUNCATE TABLE resource_incidents");
+        } catch (Exception $e) {}
+    }
+    out(['ok' => true, 'message' => 'Incident log cleared successfully.']);
 }
 
 /* ---- POST stop_user_nodes: emergency stop for a specific user's running nodes -- */

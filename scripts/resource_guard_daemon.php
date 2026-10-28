@@ -65,17 +65,33 @@ function measure_ram() {
     return ['percent' => $percent, 'used_mb' => $used_mb, 'total_mb' => $total_mb];
 }
 
+function measure_disk() {
+    $total_bytes = @disk_total_space('/') ?: 0;
+    $free_bytes = @disk_free_space('/') ?: 0;
+    if ($total_bytes <= 0) return ['percent' => 0.0, 'used_mb' => 0, 'total_mb' => 0];
+    $used_bytes = max(0, $total_bytes - $free_bytes);
+    $total_mb = (int)round($total_bytes / (1024 * 1024));
+    $used_mb = (int)round($used_bytes / (1024 * 1024));
+    $percent = round(($used_bytes * 100) / $total_bytes, 1);
+    return ['percent' => $percent, 'used_mb' => $used_mb, 'total_mb' => $total_mb];
+}
+
 function ensure_incident_table($db) {
     $db->exec("CREATE TABLE IF NOT EXISTS `resource_incidents` (
         `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         `created_at` INT UNSIGNED NOT NULL,
         `server_cpu` FLOAT NOT NULL DEFAULT 0,
         `server_ram` FLOAT NOT NULL DEFAULT 0,
+        `server_disk` FLOAT NOT NULL DEFAULT 0,
         `top_users` TEXT NOT NULL,
         `total_nodes` INT NOT NULL DEFAULT 0,
         `severity` VARCHAR(16) NOT NULL DEFAULT 'warning',
         INDEX `idx_created_at` (`created_at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    try {
+        $db->exec("ALTER TABLE `resource_incidents` ADD COLUMN `server_disk` FLOAT NOT NULL DEFAULT 0 AFTER `server_ram`");
+    } catch (Exception $e) {}
 }
 
 function scan_user_telemetry($db, $host_cpu = 0.0) {
@@ -330,6 +346,7 @@ while (true) {
         if ($db) {
             $cpu = measure_cpu($last_cpu_sample);
             $ram = measure_ram();
+            $disk = measure_disk();
 
             $telemetry = scan_user_telemetry($db, $cpu);
 
@@ -340,6 +357,9 @@ while (true) {
                     'ram_percent'         => $ram['percent'],
                     'ram_used_mb'         => $ram['used_mb'],
                     'ram_total_mb'        => $ram['total_mb'],
+                    'disk_percent'        => $disk['percent'],
+                    'disk_used_mb'        => $disk['used_mb'],
+                    'disk_total_mb'       => $disk['total_mb'],
                     'total_running_nodes' => $telemetry['total_nodes'],
                     'total_active_users'  => count($telemetry['users'])
                 ],
@@ -364,7 +384,7 @@ while (true) {
                 }
             }
 
-            // Overload detection (Record incident ONLY when Host CPU >= 80% or Host RAM >= 80% or an individual user consumes >= 80% CPU)
+            // Overload detection (Record incident when Host CPU >= 80% or Host RAM >= 80% or Host Disk >= 90% or user >= 80%)
             $has_critical_user = false;
             foreach ($telemetry['users'] as $u_check) {
                 if (!empty($u_check['cpu_percent']) && $u_check['cpu_percent'] >= 80.0) {
@@ -373,7 +393,7 @@ while (true) {
                 }
             }
 
-            if ($cpu >= 80.0 || $ram['percent'] >= 80.0 || $has_critical_user) {
+            if ($cpu >= 80.0 || $ram['percent'] >= 80.0 || $disk['percent'] >= 90.0 || $has_critical_user) {
                 $now = time();
                 if (($now - $last_incident_ts) >= 60) {
                     $active_consumers = array_filter($telemetry['users'], function($u) {
@@ -382,13 +402,14 @@ while (true) {
                                (!empty($u['ram_mb']) && $u['ram_mb'] > 0);
                     });
                     $top_snapshot = array_slice(array_values($active_consumers), 0, 5);
-                    $severity = ($cpu >= 90.0 || $ram['percent'] >= 90.0) ? 'critical' : 'warning';
+                    $severity = ($cpu >= 90.0 || $ram['percent'] >= 90.0 || $disk['percent'] >= 95.0) ? 'critical' : 'warning';
 
-                    $ins = $db->prepare("INSERT INTO resource_incidents (created_at, server_cpu, server_ram, top_users, total_nodes, severity) VALUES (?, ?, ?, ?, ?, ?)");
+                    $ins = $db->prepare("INSERT INTO resource_incidents (created_at, server_cpu, server_ram, server_disk, top_users, total_nodes, severity) VALUES (?, ?, ?, ?, ?, ?, ?)");
                     $ins->execute([
                         $now,
                         $cpu,
                         $ram['percent'],
+                        $disk['percent'],
                         json_encode($top_snapshot),
                         $telemetry['total_nodes'],
                         $severity
